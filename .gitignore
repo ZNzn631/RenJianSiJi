@@ -1,0 +1,18 @@
+# 备份与回滚目录
+Backups/
+_backup_*/
+_pre_rollback_*/
+历史版本/
+截图/
+
+# 依赖
+node_modules/
+
+# 系统 / 临时文件
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.tmp
+_stability_run.html
+_sim_run.html
+_sim_result.json
