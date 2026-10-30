@@ -1,0 +1,3322 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>人间四季 · 文字模拟 MVP</title>
+<!-- 像素字体 A：Press Start 2P（西文 / 数字），Google Fonts 官方引入 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+<style>
+  /* 像素字体 B：Zpix（中文像素字）。Google Fonts 没有 Zpix（请求会返回 400），
+     这里用它官方仓库的 woff2 直接 @font-face；cdn.jsdelivr.net 在部分网络下不可达，
+     所以主源用 fastly 镜像，gcore 作第二备用。 */
+  @font-face{
+    font-family:'Zpix';
+    src:url('https://fastly.jsdelivr.net/gh/SolidZORO/zpix-pixel-font@3.1.9/website/zpix.woff2') format('woff2'),
+        url('https://gcore.jsdelivr.net/gh/SolidZORO/zpix-pixel-font@3.1.9/website/zpix.woff2') format('woff2');
+    font-weight:400;
+    font-style:normal;
+    font-display:swap;
+  }
+  :root{
+    --ink:#111;
+    --paper:#fff;
+    --soft:#8a8a8a;
+    --hair:#e4e4e4;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    /* 中文走 Zpix，西文/数字若 Zpix 缺字再走 Press Start 2P，最后退等宽 */
+    font-family:'Zpix','Press Start 2P',monospace;
+    font-size:14px;
+    line-height:1.7;
+    /* 关抗锯齿：-webkit-font-smoothing:none 写在这里，Chromium 会忽略非法值，
+       真正的清晰感来自 Zpix 的位图字格 + optimizeSpeed 关掉字距微调 */
+    -webkit-font-smoothing:none;
+    -moz-osx-font-smoothing:grayscale;
+    text-rendering:optimizeSpeed;
+    overflow:hidden;          /* 锁定视口高度，整页不滚动 */
+  }
+  .num{font-family:'Press Start 2P','Zpix',monospace;font-variant-numeric:tabular-nums}
+
+  /* 页面高度锁死在 100vh：内部各区块自己滚动 */
+  .wrap{max-width:1024px;margin:0 auto;height:100%;min-height:0;overflow:hidden;padding:16px 16px 18px;display:flex;flex-direction:column;gap:12px}
+
+  header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;border-bottom:1px solid var(--ink);padding-bottom:8px}
+  h1{margin:0;font-size:19px;font-weight:600;letter-spacing:.34em}
+  .sub{font-size:10px;color:var(--soft);letter-spacing:.22em;white-space:nowrap}
+
+  main{display:grid;grid-template-columns:3fr 2fr;grid-template-rows:minmax(0,1fr);gap:12px;flex:1 1 auto;min-height:0}
+  .col{display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0;overflow:hidden}
+  .status-panel{flex:1 1 auto;min-height:258px;overflow-y:auto;overscroll-behavior:contain}
+
+  /* 测试用快捷按钮（正式版删掉 .dev-bar 即可整块消失） */
+  .dev-bar{display:flex;gap:6px;padding:4px 10px;border-bottom:1px dashed var(--hair);flex:0 0 auto}
+  .dev-bar.off{display:none}
+  .status-panel::-webkit-scrollbar{width:8px}
+  .status-panel::-webkit-scrollbar-track{background:var(--paper);border-left:1px solid var(--hair)}
+  .status-panel::-webkit-scrollbar-thumb{background:var(--ink)}
+  .dev-btn{
+    flex:1 1 auto;appearance:none;cursor:pointer;font-family:inherit;
+    font-size:10px;letter-spacing:.06em;color:#9a9a9a;background:var(--paper);
+    border:1px dashed #cfcfcf;padding:4px 6px;
+  }
+  .dev-btn:hover{color:var(--ink);border-color:var(--ink)}
+  .dev-x{flex:0 0 auto;width:22px;padding:5px 0;text-align:center}
+  .dev-open{
+    appearance:none;border:none;background:none;cursor:pointer;font-family:inherit;
+    font-size:9px;letter-spacing:.12em;color:#c8c8c8;padding:0 5px;
+  }
+  .dev-open:hover{color:var(--ink)}
+
+  .panel{border:1px solid var(--ink);background:var(--paper);display:flex;flex-direction:column;min-height:0}
+  .panel-h{display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-bottom:1px solid var(--ink);font-size:11px;letter-spacing:.22em;flex:0 0 auto}
+  .panel-h .hint{font-size:10px;letter-spacing:.06em;color:var(--soft)}
+
+  /* 场景区 */
+  .scene{position:relative;flex:0 0 auto;height:clamp(170px,30vh,252px);overflow:hidden}
+  .scene .art{position:absolute;inset:0}
+  .scene svg{display:block;width:100%;height:100%}
+  .scene svg *{vector-effect:non-scaling-stroke}
+  .scene .season{position:absolute;top:8px;right:12px;font-size:30px;line-height:1.15;letter-spacing:.06em;background:var(--paper);padding:0 6px}
+  .scene .cap{position:absolute;left:10px;bottom:10px;background:var(--paper);border:1px solid var(--ink);padding:2px 8px;font-size:11px;letter-spacing:.14em}
+
+  /* 日志：固定高度上限 + 内部滚动。min-height:0 是关键，
+     否则 flex 子项不会小于内容高度，会把整页顶长。 */
+  .log-wrap{flex:1 1 auto;min-height:0}
+  .log{
+    flex:1 1 auto;min-height:0;max-height:60vh;
+    overflow-y:auto;overscroll-behavior:contain;
+    padding:8px 12px 12px;font-size:13px;line-height:1.85;
+  }
+  .log-line{display:flex;gap:9px;align-items:baseline;padding:1px 0}
+  .log-date{flex:0 0 46px;font-size:10px;color:#b3b3b3;letter-spacing:.02em}
+  .log-txt{flex:1 1 auto;min-width:0;word-break:break-word}
+  .k-action .log-txt{font-weight:600;letter-spacing:.04em}
+  .k-day .log-txt{color:#5a5a5a}
+  .k-month .log-txt{font-weight:700;letter-spacing:.04em;border-left:3px solid var(--ink);padding-left:7px}
+  .k-sys .log-txt{color:#8a8a8a;font-style:italic}
+  .k-event .log-txt{font-weight:700;letter-spacing:.05em;border-bottom:1px solid var(--ink);display:inline-block;padding-bottom:1px}
+  .k-danger .log-txt{color:#b3261e;font-weight:700;letter-spacing:.04em;border-left:3px solid #b3261e;padding-left:7px}
+  .log-tag{flex:0 0 auto;font-size:10px;color:#c2c2c2;letter-spacing:.02em;white-space:nowrap}
+  .k-warn .log-txt{color:#4a4a4a;letter-spacing:.02em;border-left:3px solid #cfcfcf;padding-left:7px}
+  .log::-webkit-scrollbar{width:8px}
+  .log::-webkit-scrollbar-track{background:var(--paper);border-left:1px solid var(--hair)}
+  .log::-webkit-scrollbar-thumb{background:var(--ink)}
+
+  /* 状态 */
+  .time-block{padding:8px 12px 9px;border-bottom:1px solid var(--hair);flex:0 0 auto}
+  .time-main{font-size:18px;letter-spacing:.05em}
+  .time-meta{display:flex;justify-content:space-between;gap:8px;margin-top:3px;font-size:11px;color:var(--soft);letter-spacing:.06em}
+  .bar{position:relative;height:6px;border:1px solid var(--ink);background:var(--paper);margin-top:9px}
+  .bar > i{display:block;height:100%;width:0;background:var(--ink);transition:width .18s ease}
+
+  .stat-row{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:4px 12px;border-bottom:1px solid var(--hair);flex:0 0 auto}
+  .stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-bottom:1px solid var(--hair);flex:0 0 auto}
+  .stat-grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stat-cell{display:flex;align-items:baseline;justify-content:space-between;gap:6px;padding:5px 10px;min-width:0}
+  .stat-cell .stat-k{font-size:11px;letter-spacing:.06em;white-space:nowrap}
+  .stat-cell .stat-v{font-size:15px;display:block;white-space:nowrap}
+  .stat-cell .sub-val{font-size:11px}
+  .stat-row:last-child{border-bottom:none}
+  .stat-k{font-size:12px;letter-spacing:.16em}
+  .stat-v{font-size:16px;display:inline-flex;align-items:baseline;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .sub-val{font-size:12px;color:#8a8a8a}
+  .stat-v.neg{text-decoration:underline}
+  .mood-row{flex-direction:column;align-items:stretch;gap:6px}
+  .mood-top{display:flex;align-items:baseline;justify-content:space-between}
+
+  /* 行动 */
+  .action-panel{flex:0 1 auto;min-height:0}   /* 行动区优先完整，空间不足时内部滚动 */
+  .actions::-webkit-scrollbar{width:8px}
+  .actions::-webkit-scrollbar-track{background:var(--paper);border-left:1px solid var(--hair)}
+  .actions::-webkit-scrollbar-thumb{background:var(--ink)}
+  .actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:min-content;gap:8px;padding:12px;flex:1 1 auto;align-content:start;min-height:0}
+  button.act{
+    appearance:none;cursor:pointer;font-family:inherit;color:var(--ink);background:var(--paper);
+    border:1px solid var(--ink);padding:9px 12px 8px;text-align:left;min-height:0;
+    display:flex;flex-direction:column;justify-content:center;gap:3px;
+    transition:background .12s,color .12s;
+  }
+  button.act:hover{background:var(--ink);color:var(--paper)}
+  button.act:active{transform:translateY(1px)}
+  .act-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .act-name{font-size:16px;letter-spacing:.18em;line-height:1.5}
+  .act-days{flex:0 0 auto;font-size:10px;letter-spacing:.04em;color:var(--soft)}
+  .act-meta{font-size:10px;color:var(--soft);letter-spacing:.02em}
+  .act-flavor{font-size:10px;color:#bdbdbd;letter-spacing:.06em;margin-top:2px}
+  button.act:hover .act-meta,
+  button.act:hover .act-days{color:#dcdcdc}
+  button.act:hover .act-flavor{color:#8f8f8f}
+
+  /* 门槛未满足：半透明置灰 + 虚线框 + 禁止手势，点击只给原因不执行 */
+  button.act[hidden]{display:none}
+  button.act.is-locked{opacity:.42;border-style:dashed;cursor:not-allowed}
+  button.act.is-locked:hover{background:var(--paper);color:var(--ink)}
+  button.act.is-locked:hover .act-meta,
+  button.act.is-locked:hover .act-days{color:var(--soft)}
+  button.act.is-locked:hover .act-flavor{color:#bdbdbd}
+  button.act.is-locked .act-days{color:#9a9a9a;letter-spacing:0}
+
+  /* 未解锁的行动：隐藏按钮，但留一条可查的线索 */
+  .lock-hint{
+    flex:0 0 auto;border-top:1px dashed var(--hair);padding:6px 12px;
+    font-size:10px;color:#a8a8a8;letter-spacing:.04em;line-height:1.8;
+  }
+  .lock-hint[hidden]{display:none}
+  .lock-name{border-bottom:1px dotted #cfcfcf;cursor:help}
+  .lock-name:hover{color:var(--ink);border-bottom-color:var(--ink)}
+
+  /* 行动数超过 6 个时自动切换密集模式（隐藏氛围小字） */
+  .actions.dense button.act{padding:6px 10px 5px}
+  .actions.dense .act-flavor{display:none}
+  .actions.dense .act-name{font-size:15px}
+
+  footer{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;border-top:1px solid var(--ink);padding-top:10px;flex:0 0 auto}
+  .btns{display:flex;gap:8px;flex-wrap:wrap}
+  button.ghost{
+    appearance:none;cursor:pointer;font-family:inherit;color:var(--ink);background:var(--paper);
+    border:1px solid var(--ink);padding:7px 16px;font-size:12px;letter-spacing:.18em;
+    transition:background .12s,color .12s;
+  }
+  button.ghost:hover{background:var(--ink);color:var(--paper)}
+  .foot-meta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--soft);letter-spacing:.06em}
+  .foot-meta b{font-weight:400;color:#6d6d6d}
+
+  /* 事件弹窗（黑白极简：白遮罩 + 1px 黑框 + 无圆角） */
+  .modal-mask{
+    position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:24px;
+    background:rgba(255,255,255,.78);backdrop-filter:blur(1.5px);-webkit-backdrop-filter:blur(1.5px);
+  }
+  .modal-mask[hidden]{display:none}
+  /* v3.4：图鉴遮罩必须压过标题层，否则从主菜单打开图鉴会被盖住 */
+  #dexMask{z-index:90}
+  .modal{
+    width:min(470px,100%);max-height:80vh;overflow:auto;background:var(--paper);
+    border:1px solid var(--ink);box-shadow:6px 6px 0 rgba(17,17,17,.12);
+    display:flex;flex-direction:column;
+  }
+  .event-title{margin:16px 18px 0;font-size:20px;letter-spacing:.22em;line-height:1.4}
+  .event-desc{margin:9px 18px 16px;font-size:13px;line-height:1.9;color:#333}
+  .event-options{display:flex;flex-direction:column;gap:8px;padding:0 18px 18px}
+  .modal-note{
+    padding:7px 18px;border-top:1px dashed var(--hair);
+    font-size:10px;line-height:1.8;color:#8a8a8a;letter-spacing:.04em;
+  }
+  .modal-note[hidden]{display:none}
+  .event-opt{
+    appearance:none;cursor:pointer;font-family:inherit;text-align:left;
+    background:var(--paper);color:var(--ink);border:1px solid var(--ink);
+    padding:9px 12px;display:flex;flex-direction:column;gap:2px;
+    transition:background .12s,color .12s;
+  }
+  .event-opt:hover{background:var(--ink);color:var(--paper)}
+  .event-opt:active{transform:translateY(1px)}
+  .event-opt.is-locked{opacity:.42;border-style:dashed;cursor:not-allowed}
+  .event-opt.is-locked:hover{background:var(--paper);color:var(--ink)}
+  .event-opt.is-locked:hover .opt-meta{color:var(--soft)}
+  .opt-label{font-size:14px;letter-spacing:.12em}
+  .opt-meta{font-size:10px;color:var(--soft);letter-spacing:.02em}
+  .event-opt:hover .opt-meta{color:#d0d0d0}
+
+  /* 人生结算面板 */
+  .end-modal{box-shadow:8px 8px 0 rgba(17,17,17,.14)}
+  .end-hero{padding:18px 18px 12px;border-bottom:1px solid var(--hair)}
+  .end-name{font-size:26px;letter-spacing:.28em;line-height:1.4}
+  .end-desc{margin:10px 0 0;font-size:13px;line-height:1.95;color:#333}
+  .end-stats{padding:6px 18px 12px}
+  .end-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:5px 0;border-bottom:1px dotted var(--hair);font-size:13px}
+  .end-row:last-child{border-bottom:none}
+  .end-k{color:#8a8a8a;letter-spacing:.1em;font-size:12px}
+  .end-v{font-family:'Press Start 2P','Zpix',monospace;font-size:12px}
+  .end-dex{border-top:2px dashed var(--ink);padding:12px 18px 14px}
+  .dex-head{font-size:11px;letter-spacing:.12em;color:#8a8a8a;margin-bottom:9px}
+  .dex-list{display:flex;flex-wrap:wrap;gap:6px}
+  .dex-new{margin-top:9px;font-size:10px;letter-spacing:.12em;color:#8a8a8a}
+  .dex-new[hidden]{display:none}
+  .dex-complete{margin-top:10px;font-size:12px;letter-spacing:.14em;font-weight:700;color:var(--ink)}
+  .dex-complete[hidden]{display:none}
+  .end-actions{padding:0 18px 18px}
+  .end-btn{
+    width:100%;appearance:none;cursor:pointer;font-family:inherit;font-size:13px;letter-spacing:.28em;
+    color:var(--paper);background:var(--ink);border:1px solid var(--ink);padding:11px 0;
+    transition:background .12s,color .12s;
+  }
+  .end-btn:hover{background:var(--paper);color:var(--ink)}
+
+  .toast{
+    position:fixed;left:50%;bottom:30px;transform:translate(-50%,10px);
+    background:var(--ink);color:var(--paper);padding:8px 18px;font-size:12px;letter-spacing:.16em;
+    opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:95;   /* v3.4：高于标题层 */
+  }
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+
+  /* 矮窗口：按钮压缩一点，避免右列被挤爆 */
+  @media (max-height:720px){
+    .scene{height:150px}
+    button.act{padding:6px 10px}
+    .act-flavor{display:none}
+    .time-block{padding:8px 12px 9px}
+    .time-main{font-size:17px}
+    .stat-row{padding:3px 12px}
+    .mood-row{padding:4px 12px}
+    .stat-v{font-size:15px}
+    .time-block .time-meta:last-of-type{display:none}
+    .actions{padding:9px;gap:7px}
+    .status-panel{flex:1 1 auto}
+    .dev-bar{padding:4px 10px}
+    .dev-btn{padding:3px 6px;font-size:9px}
+    .actions.dense button.act{padding:5px 9px 4px}
+  }
+
+  /* 更矮的窗口：进一步让位给行动区 */
+  @media (max-height:660px){
+    .scene{height:120px}
+    button.act{padding:5px 9px}
+    .actions{padding:8px;gap:6px}
+    .status-panel{min-height:0}
+  }
+
+  /* 窄屏：改回整页滚动（上下堆叠时无法固定视口） */
+  @media (max-width:820px){
+    body{overflow:auto}
+    .wrap{height:auto;min-height:100%}
+    main{grid-template-columns:1fr}
+    .scene{height:190px}
+    .log{max-height:45vh;height:300px}
+    h1{font-size:16px}
+    .sub{display:none}
+  }
+
+  /* ================= 像素字体适配（只调字号/字距，不动结构） ================= */
+  /* Press Start 2P 的字宽约为普通等宽字的 1.6 倍，Zpix 的汉字也比宋体占地，
+     原设计按 14px 宋体算的栅格会挤，这里按位置收一档尺寸。 */
+  h1{font-size:15px;letter-spacing:.2em}
+  .sub{font-size:9px;letter-spacing:.06em;word-spacing:.35em}
+  .panel-h{font-size:10px;letter-spacing:.14em}
+  .panel-h .hint{font-size:9px;letter-spacing:.02em}
+
+  .time-main{font-size:12px;letter-spacing:.02em}
+  .time-meta{font-size:9px;letter-spacing:.02em}
+  .stat-cell{padding:5px 8px;gap:4px}
+  .stat-cell .stat-k{font-size:10px;letter-spacing:.02em}
+  .stat-cell .stat-v{font-size:12px;letter-spacing:0}
+  .stat-cell .sub-val{font-size:9px}
+  .stat-row .stat-k{font-size:11px;letter-spacing:.08em}
+  .stat-row .stat-v{font-size:12px}
+  .stat-v{font-size:13px}
+
+  .log{padding:8px 10px 12px}
+  .log-line{gap:8px}
+  .log-date{flex:0 0 62px;font-size:8px;line-height:2;letter-spacing:0}
+  .log-txt{font-size:12px;line-height:1.95}
+  .log-tag{font-size:8px}
+  .k-action .log-txt{font-size:12px;letter-spacing:0}
+
+  .scene .season{font-size:24px;line-height:1.2}
+  .scene .cap{font-size:9px;letter-spacing:.06em}
+
+  .act-name{font-size:13px;letter-spacing:.08em}
+  .act-days{font-size:9px}
+  .act-meta{font-size:9px;letter-spacing:0;line-height:1.7}
+  .act-flavor{font-size:8px;letter-spacing:.02em}
+  .lock-hint{font-size:9px;letter-spacing:0}
+  .act-top{gap:6px}
+
+  button.ghost{font-size:11px;letter-spacing:.1em;padding:6px 12px}
+  .foot-meta{font-size:9px;letter-spacing:0}
+
+  .event-title{font-size:15px;letter-spacing:.14em}
+  .event-desc{font-size:12px;line-height:1.95}
+  .opt-label{font-size:12px;letter-spacing:.06em}
+  .opt-meta{font-size:9px}
+  .modal-note{font-size:9px}
+
+  .end-name{font-size:18px;letter-spacing:.16em}
+  .end-desc{font-size:12px}
+  .end-k{font-size:10px;letter-spacing:.04em}
+  .end-v{font-size:11px}
+  .dex-head{font-size:9px;letter-spacing:.06em}
+  .dex-new,.dex-complete{font-size:9px}
+  .end-btn{font-size:12px;letter-spacing:.16em}
+
+  .toast{font-size:10px;letter-spacing:.08em;padding:7px 14px}
+  .dev-btn{font-size:8px;letter-spacing:0}
+
+  /* ======================================================================
+     8-bit 改造：方角 · 硬边 · 硬阴影 · 无中间帧
+     —— 只覆盖视觉，不动任何布局骨架与 JS
+     ====================================================================== */
+
+  /* ① 全局重置：圆角归零，过渡/动画全部取消（像素风要的是帧切换） */
+  *,*::before,*::after{
+    border-radius:0 !important;
+    transition:none !important;
+    animation:none !important;
+  }
+
+  :root{
+    --ink:#000;
+    --paper:#fff;
+    --soft:#6a6a6a;
+    --hair:#b9b9b9;          /* 细分隔线：用中灰，避免满屏黑线糊成一片 */
+    --bd:3px;                /* 统一描边粗细 */
+    --sh:4px;                /* 统一硬阴影偏移（= 按下位移量） */
+    --gray:#dcdcdc;          /* 悬停底色 */
+    --gray2:#bdbdbd;         /* 按下底色 */
+    --canvas:#e9e9e9;        /* 页面底色：浅灰，让白面板和硬阴影浮起来 */
+  }
+
+  body{
+    background:var(--canvas);
+    font-synthesis:none;     /* 关掉伪粗体：加粗改用描边 + 硬阴影 */
+  }
+
+  /* ② 面板：3px 黑边 + 4px 硬阴影 */
+  .panel{
+    border:var(--bd) solid var(--ink);
+    box-shadow:var(--sh) var(--sh) 0 var(--ink);
+    background:var(--paper);
+  }
+  .panel-h{
+    border-bottom:var(--bd) solid var(--ink);
+    background:var(--paper);
+  }
+  /* 面板阴影要落在列内边距里，不能被 .col 的 overflow:hidden 裁掉 */
+  .col{overflow:hidden;padding:0 6px 6px 0}
+  main{gap:14px}
+
+  /* ③ 标题：像素字不能伪加粗，改用 1px 描边加厚 + 灰色硬阴影做厚度
+     （实测黑字压黑阴影在 24px 以下会糊成双影，所以阴影只在标题层用浅灰） */
+  h1{
+    font-size:24px;
+    font-weight:400;
+    line-height:1.1;
+    letter-spacing:.16em;
+    -webkit-text-stroke:1px var(--ink);
+    text-shadow:3px 3px 0 #9a9a9a;
+  }
+  .panel-h > span:first-child{
+    font-size:12px;
+    -webkit-text-stroke:.4px var(--ink);
+  }
+  .panel-h .hint,
+  .sub{text-shadow:none}
+
+  /* ④ 行动按钮：白底黑边 + 硬阴影，悬停变灰，按下沉进去 */
+  button.act{
+    border:var(--bd) solid var(--ink);
+    box-shadow:var(--sh) var(--sh) 0 var(--ink);
+    background:var(--paper);
+    color:var(--ink);
+    padding:9px 11px 8px;
+  }
+  button.act:hover{
+    background:var(--gray);
+    color:var(--ink);
+  }
+  button.act:active{
+    background:var(--gray2);
+    box-shadow:none;
+    transform:translate(var(--sh),var(--sh));
+  }
+  button.act .act-name{font-weight:400;font-size:12px;letter-spacing:.1em}
+  button.act .act-meta,
+  button.act .act-days{color:#5c5c5c}
+  button.act .act-flavor{color:#8c8c8c}
+  button.act:hover .act-meta,
+  button.act:hover .act-days{color:#3a3a3a}
+  button.act:hover .act-flavor{color:#6a6a6a}
+
+  /* 门槛未满足：虚线边 + 2px 浅阴影，按不动 */
+  button.act.is-locked{
+    border-style:dashed;
+    background:#f7f7f7;
+    box-shadow:2px 2px 0 #a8a8a8;
+    opacity:.72;
+  }
+  button.act.is-locked:hover{
+    background:#f7f7f7;
+    color:var(--ink);
+  }
+  button.act.is-locked:active{
+    transform:none;
+    box-shadow:2px 2px 0 #a8a8a8;
+  }
+  button.act.is-locked .act-name{text-shadow:none}
+
+  /* ⑤ 底部按钮：同款硬边 + 按下位移 */
+  button.ghost{
+    border:var(--bd) solid var(--ink);
+    box-shadow:var(--sh) var(--sh) 0 var(--ink);
+    background:var(--paper);
+    padding:7px 14px;
+  }
+  button.ghost:hover{background:var(--gray);color:var(--ink)}
+  button.ghost:active{
+    background:var(--gray2);
+    box-shadow:none;
+    transform:translate(var(--sh),var(--sh));
+  }
+
+  /* ⑥ 数值条：粗黑框 + 纯色填充，没有渐变 */
+  .bar{
+    border:2px solid var(--ink);
+    height:10px;
+    box-shadow:2px 2px 0 rgba(0,0,0,.18);
+  }
+  .bar > i{background:var(--ink)}
+
+  /* ⑦ 滚动条：方块滑块，去掉圆角与渐变 */
+  .log::-webkit-scrollbar,
+  .status-panel::-webkit-scrollbar,
+  .actions::-webkit-scrollbar,
+  .modal::-webkit-scrollbar{width:12px;height:12px}
+  .log::-webkit-scrollbar-track,
+  .status-panel::-webkit-scrollbar-track,
+  .actions::-webkit-scrollbar-track,
+  .modal::-webkit-scrollbar-track{background:var(--paper);border-left:2px solid var(--ink)}
+  .log::-webkit-scrollbar-thumb,
+  .status-panel::-webkit-scrollbar-thumb,
+  .actions::-webkit-scrollbar-thumb,
+  .modal::-webkit-scrollbar-thumb{background:var(--ink);border:2px solid var(--paper)}
+
+  /* ⑧ 弹窗：平遮罩（去模糊）+ 3px 边框 + 8px 硬投影 */
+  .modal-mask{
+    background:rgba(20,20,20,.42);
+    backdrop-filter:none;
+    -webkit-backdrop-filter:none;
+  }
+  .modal,
+  .end-modal{
+    border:var(--bd) solid var(--ink);
+    box-shadow:8px 8px 0 var(--ink);
+  }
+  .event-title,
+  .end-name{
+    font-weight:400;
+    text-shadow:2px 2px 0 #9a9a9a;
+  }
+  .event-title{
+    font-size:15px;
+    letter-spacing:.12em;
+    -webkit-text-stroke:.6px var(--ink);
+  }
+  .end-name{
+    font-size:18px;
+    letter-spacing:.14em;
+    -webkit-text-stroke:.8px var(--ink);
+  }
+  .event-opt{
+    border:var(--bd) solid var(--ink);
+    box-shadow:3px 3px 0 var(--ink);
+    background:var(--paper);
+  }
+  .event-opt:hover{background:var(--gray);color:var(--ink)}
+  .event-opt:hover .opt-meta{color:#3a3a3a}
+  .event-opt:active{
+    background:var(--gray2);
+    box-shadow:none;
+    transform:translate(3px,3px);
+  }
+  .event-opt.is-locked{
+    border-style:dashed;
+    box-shadow:2px 2px 0 #a8a8a8;
+  }
+  .event-opt.is-locked:active{transform:none;box-shadow:2px 2px 0 #a8a8a8}
+  .end-btn{
+    border:var(--bd) solid var(--ink);
+    box-shadow:var(--sh) var(--sh) 0 var(--ink);
+  }
+  .end-btn:hover{background:var(--paper);color:var(--ink)}
+  .end-btn:active{box-shadow:none;transform:translate(var(--sh),var(--sh))}
+
+  /* ⑨ 小件：场景角标、图鉴、提示条、DEV 条 */
+  .scene .cap{
+    border:2px solid var(--ink);
+    box-shadow:2px 2px 0 var(--ink);
+    background:var(--paper);
+  }
+  .scene .season{text-shadow:2px 2px 0 var(--ink)}
+  .lock-hint{border-top:2px dashed var(--ink)}
+  .dev-bar{border-bottom:2px dashed var(--ink)}
+  .dev-btn{border:2px dashed #a8a8a8}
+  .dev-btn:hover{border:2px solid var(--ink);box-shadow:2px 2px 0 var(--ink)}
+  .toast{
+    border:var(--bd) solid var(--ink);
+    box-shadow:var(--sh) var(--sh) 0 rgba(0,0,0,.35);
+  }
+  /* 12px 正文不加阴影：这个尺寸下 1px 偏移会把笔画糊成重影 */
+
+  /* ⑩ 键盘可达性：方块 focus 框，不用浏览器默认圆角 */
+  button:focus-visible{
+    outline:3px solid var(--ink);
+    outline-offset:3px;
+  }
+
+  /* ===================== ⑪ 状态栏：RPG 属性表 ===================== */
+  /* 三列网格：定宽品名 / 点线引导 / 右对齐数值。
+     数值列共用同一条右边界，Press Start 2P 等宽，所以个位十位天然对齐。 */
+  .stat-ledger{padding:5px 18px 1px 12px}
+  .stat-line{
+    display:grid;
+    grid-template-columns:84px minmax(10px,1fr) auto;
+    align-items:baseline;
+    padding:2px 0;
+  }
+  .stat-line .stat-k{
+    font-size:10px;
+    letter-spacing:.18em;
+    color:#3a3a3a;
+    white-space:nowrap;
+  }
+  .leader{
+    align-self:center;
+    height:0;
+    margin:0 8px;
+    border-bottom:2px dotted #c2c2c2;
+    transform:translateY(-2px);
+  }
+  .stat-line .stat-v{
+    display:flex;
+    align-items:baseline;
+    justify-content:flex-end;
+    justify-self:end;
+    min-width:0;
+    gap:6px;
+    font-size:15px;
+    line-height:1.35;
+    white-space:nowrap;
+    color:var(--ink);
+  }
+  .stat-line .stat-v .sub-val{font-size:10px;color:var(--soft)}
+  .stat-bar-row{display:flex;padding:6px 0 5px}
+  .stat-bar-row .bar{flex:1;margin-top:0}
+
+  /* 资料区：黑线切一刀，字号降一档，形成主次 */
+  .stat-ledger--meta{
+    margin-top:2px;
+    padding-top:6px;
+    border-top:2px solid var(--ink);
+  }
+  .stat-ledger--meta .stat-line{padding:2px 0}
+  .stat-ledger--meta .stat-line .stat-v{font-size:12px;gap:8px;align-items:center}
+  .stat-ledger--meta .stat-line .stat-k{color:#4a4a4a}
+  .stat-v.neg{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+
+  /* ===================== ⑬ 当前目标：复古 RPG 任务条 ===================== */
+  /* margin-top:auto 把它顶到面板底部，正好吃掉高屏属性表下面的空白；
+     矮屏时由断点改成紧凑单行（见下）。 */
+  .quest{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:auto;
+    padding:7px 12px 8px;
+    border-top:2px solid var(--ink);
+    background:var(--paper);
+  }
+  /* 闪烁黄块：steps(1) 硬切，不渐变 */
+  .quest-icon{
+    flex:0 0 auto;
+    width:10px;
+    height:10px;
+    background:#ffd400;
+    border:2px solid var(--ink);
+    box-shadow:2px 2px 0 var(--ink);
+    animation:questBlink 1.1s steps(1,end) infinite !important;
+  }
+  @keyframes questBlink{
+    0%,50%{opacity:1}
+    50.01%,100%{opacity:0}
+  }
+  .quest-label{
+    flex:0 0 auto;
+    font-size:10px;
+    letter-spacing:.14em;
+    color:var(--ink);
+    -webkit-text-stroke:.3px var(--ink);
+  }
+  .quest-label::after{content:'：'}
+  .quest-text{
+    flex:1 1 auto;
+    min-width:0;
+    font-size:11px;
+    line-height:1.55;
+    color:#2a2a2a;
+  }
+  /* 尊重系统的「减少动态效果」设置 */
+  @media (prefers-reduced-motion:reduce){
+    .quest-icon{animation:none !important}
+  }
+
+  /* ===================== ⑭ 人生图鉴：像素卡片网格 ===================== */
+  .dex-grid{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:10px;
+  }
+  .dex-card{
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:7px;
+    min-height:96px;
+    padding:14px 6px 12px;
+    background:var(--paper);
+    border:2px solid var(--ink);
+    box-shadow:3px 3px 0 var(--ink);
+  }
+  /* 顶部色条：按结局顺序分配点缀色（纯展示，不参与数据） */
+  .dex-card::before{
+    content:'';
+    position:absolute;left:0;right:0;top:0;height:6px;
+    background:var(--accent,#111);
+    border-bottom:2px solid var(--ink);
+  }
+  .dex-card:nth-child(1){--accent:#8fa3b8}   /* 英年早逝 · 冷灰蓝 */
+  .dex-card:nth-child(2){--accent:#a8433a}   /* 贫病交加 · 暗红 */
+  .dex-card:nth-child(3){--accent:#d9a400}   /* 功成名就 · 金 */
+  .dex-card:nth-child(4){--accent:#4f8f86}   /* 劳碌一生 · 青 */
+  .dex-card:nth-child(5){--accent:#b9a06a}   /* 平凡的一生 · 沙黄 */
+
+  .dex-icon{
+    position:relative;
+    width:24px;height:24px;
+    margin-top:8px;
+    color:var(--accent,#111);
+  }
+  /* 图标本体：3px 一格，8×8 点阵 = 24px；形状由 data-shape 决定 */
+  .dex-icon i{
+    position:absolute;left:0;top:0;
+    width:3px;height:3px;
+    background:transparent;
+  }
+  /* 0 · 骷髅 */
+  .dex-icon[data-shape="0"] i{
+    box-shadow:
+      6px 0px 0 currentColor,
+      9px 0px 0 currentColor,
+      12px 0px 0 currentColor,
+      15px 0px 0 currentColor,
+      3px 3px 0 currentColor,
+      6px 3px 0 currentColor,
+      9px 3px 0 currentColor,
+      12px 3px 0 currentColor,
+      15px 3px 0 currentColor,
+      18px 3px 0 currentColor,
+      0px 6px 0 currentColor,
+      3px 6px 0 currentColor,
+      6px 6px 0 currentColor,
+      9px 6px 0 currentColor,
+      12px 6px 0 currentColor,
+      15px 6px 0 currentColor,
+      18px 6px 0 currentColor,
+      21px 6px 0 currentColor,
+      0px 9px 0 currentColor,
+      9px 9px 0 currentColor,
+      12px 9px 0 currentColor,
+      21px 9px 0 currentColor,
+      0px 12px 0 currentColor,
+      9px 12px 0 currentColor,
+      12px 12px 0 currentColor,
+      21px 12px 0 currentColor,
+      0px 15px 0 currentColor,
+      3px 15px 0 currentColor,
+      6px 15px 0 currentColor,
+      9px 15px 0 currentColor,
+      12px 15px 0 currentColor,
+      15px 15px 0 currentColor,
+      18px 15px 0 currentColor,
+      21px 15px 0 currentColor,
+      3px 18px 0 currentColor,
+      6px 18px 0 currentColor,
+      9px 18px 0 currentColor,
+      12px 18px 0 currentColor,
+      15px 18px 0 currentColor,
+      18px 18px 0 currentColor,
+      3px 21px 0 currentColor,
+      9px 21px 0 currentColor,
+      12px 21px 0 currentColor,
+      18px 21px 0 currentColor;
+  }
+  /* 1 · 血滴 */
+  .dex-icon[data-shape="1"] i{
+    box-shadow:
+      9px 0px 0 currentColor,
+      12px 0px 0 currentColor,
+      6px 3px 0 currentColor,
+      9px 3px 0 currentColor,
+      12px 3px 0 currentColor,
+      15px 3px 0 currentColor,
+      6px 6px 0 currentColor,
+      9px 6px 0 currentColor,
+      12px 6px 0 currentColor,
+      15px 6px 0 currentColor,
+      3px 9px 0 currentColor,
+      6px 9px 0 currentColor,
+      9px 9px 0 currentColor,
+      12px 9px 0 currentColor,
+      15px 9px 0 currentColor,
+      18px 9px 0 currentColor,
+      0px 12px 0 currentColor,
+      3px 12px 0 currentColor,
+      6px 12px 0 currentColor,
+      9px 12px 0 currentColor,
+      12px 12px 0 currentColor,
+      15px 12px 0 currentColor,
+      18px 12px 0 currentColor,
+      21px 12px 0 currentColor,
+      0px 15px 0 currentColor,
+      3px 15px 0 currentColor,
+      6px 15px 0 currentColor,
+      9px 15px 0 currentColor,
+      12px 15px 0 currentColor,
+      15px 15px 0 currentColor,
+      18px 15px 0 currentColor,
+      21px 15px 0 currentColor,
+      3px 18px 0 currentColor,
+      6px 18px 0 currentColor,
+      9px 18px 0 currentColor,
+      12px 18px 0 currentColor,
+      15px 18px 0 currentColor,
+      18px 18px 0 currentColor,
+      6px 21px 0 currentColor,
+      9px 21px 0 currentColor,
+      12px 21px 0 currentColor,
+      15px 21px 0 currentColor;
+  }
+  /* 2 · 皇冠 */
+  .dex-icon[data-shape="2"] i{
+    box-shadow:
+      0px 3px 0 currentColor,
+      9px 3px 0 currentColor,
+      18px 3px 0 currentColor,
+      0px 6px 0 currentColor,
+      9px 6px 0 currentColor,
+      18px 6px 0 currentColor,
+      0px 9px 0 currentColor,
+      3px 9px 0 currentColor,
+      6px 9px 0 currentColor,
+      9px 9px 0 currentColor,
+      12px 9px 0 currentColor,
+      15px 9px 0 currentColor,
+      18px 9px 0 currentColor,
+      21px 9px 0 currentColor,
+      0px 12px 0 currentColor,
+      3px 12px 0 currentColor,
+      6px 12px 0 currentColor,
+      9px 12px 0 currentColor,
+      12px 12px 0 currentColor,
+      15px 12px 0 currentColor,
+      18px 12px 0 currentColor,
+      21px 12px 0 currentColor,
+      0px 15px 0 currentColor,
+      3px 15px 0 currentColor,
+      6px 15px 0 currentColor,
+      9px 15px 0 currentColor,
+      12px 15px 0 currentColor,
+      15px 15px 0 currentColor,
+      18px 15px 0 currentColor,
+      21px 15px 0 currentColor;
+  }
+  /* 3 · 齿轮 */
+  .dex-icon[data-shape="3"] i{
+    box-shadow:
+      3px 0px 0 currentColor,
+      9px 0px 0 currentColor,
+      12px 0px 0 currentColor,
+      18px 0px 0 currentColor,
+      3px 3px 0 currentColor,
+      6px 3px 0 currentColor,
+      9px 3px 0 currentColor,
+      12px 3px 0 currentColor,
+      15px 3px 0 currentColor,
+      18px 3px 0 currentColor,
+      0px 6px 0 currentColor,
+      3px 6px 0 currentColor,
+      6px 6px 0 currentColor,
+      15px 6px 0 currentColor,
+      18px 6px 0 currentColor,
+      21px 6px 0 currentColor,
+      0px 9px 0 currentColor,
+      3px 9px 0 currentColor,
+      18px 9px 0 currentColor,
+      21px 9px 0 currentColor,
+      0px 12px 0 currentColor,
+      3px 12px 0 currentColor,
+      18px 12px 0 currentColor,
+      21px 12px 0 currentColor,
+      0px 15px 0 currentColor,
+      3px 15px 0 currentColor,
+      6px 15px 0 currentColor,
+      15px 15px 0 currentColor,
+      18px 15px 0 currentColor,
+      21px 15px 0 currentColor,
+      3px 18px 0 currentColor,
+      6px 18px 0 currentColor,
+      9px 18px 0 currentColor,
+      12px 18px 0 currentColor,
+      15px 18px 0 currentColor,
+      18px 18px 0 currentColor,
+      3px 21px 0 currentColor,
+      9px 21px 0 currentColor,
+      12px 21px 0 currentColor,
+      18px 21px 0 currentColor;
+  }
+  /* 4 · 星 */
+  .dex-icon[data-shape="4"] i{
+    box-shadow:
+      9px 0px 0 currentColor,
+      12px 0px 0 currentColor,
+      6px 3px 0 currentColor,
+      9px 3px 0 currentColor,
+      12px 3px 0 currentColor,
+      15px 3px 0 currentColor,
+      0px 6px 0 currentColor,
+      3px 6px 0 currentColor,
+      6px 6px 0 currentColor,
+      9px 6px 0 currentColor,
+      12px 6px 0 currentColor,
+      15px 6px 0 currentColor,
+      18px 6px 0 currentColor,
+      21px 6px 0 currentColor,
+      3px 9px 0 currentColor,
+      6px 9px 0 currentColor,
+      9px 9px 0 currentColor,
+      12px 9px 0 currentColor,
+      15px 9px 0 currentColor,
+      18px 9px 0 currentColor,
+      6px 12px 0 currentColor,
+      9px 12px 0 currentColor,
+      12px 12px 0 currentColor,
+      15px 12px 0 currentColor,
+      6px 15px 0 currentColor,
+      9px 15px 0 currentColor,
+      12px 15px 0 currentColor,
+      15px 15px 0 currentColor,
+      3px 18px 0 currentColor,
+      6px 18px 0 currentColor,
+      15px 18px 0 currentColor,
+      18px 18px 0 currentColor,
+      0px 21px 0 currentColor,
+      3px 21px 0 currentColor,
+      18px 21px 0 currentColor,
+      21px 21px 0 currentColor;
+  }
+
+  /* 未解锁：同一形状只留灰色剪影，降一档亮度 */
+  .dex-card.is-locked .dex-icon{
+    color:#7b7b7b;
+  }
+
+  .dex-name{
+    font-size:11px;
+    line-height:1.4;
+    letter-spacing:.06em;
+    text-align:center;
+    color:var(--ink);
+  }
+  .dex-no{
+    position:absolute;right:4px;bottom:3px;
+    font-family:'Press Start 2P','Zpix',monospace;
+    font-size:8px;
+    color:#c4c4c4;
+  }
+
+  /* 未解锁：降饱和 + 虚线边 + 灰阴影，顶部色条直接收掉 */
+  .dex-card.is-locked{
+    --accent:#9a9a9a;
+    background:#e3e3e3;
+    border-color:#7d7d7d;
+    border-style:dashed;
+    box-shadow:3px 3px 0 #b8b8b8;
+  }
+  .dex-card.is-locked::before{display:none}
+  .dex-card.is-locked .dex-name{color:#7a7a7a;letter-spacing:.12em}
+  .dex-card.is-locked .dex-no{color:#a8a8a8}
+
+  /* 本次结算达成的结局：外描边 + NEW 角标 */
+  .dex-card.is-current{
+    outline:2px solid var(--ink);
+    outline-offset:3px;
+  }
+  .dex-card.is-current::after{
+    content:'NEW';
+    position:absolute;left:2px;bottom:2px;
+    padding:2px 4px;
+    background:var(--ink);
+    color:#fff;
+    font-family:'Press Start 2P','Zpix',monospace;
+    font-size:7px;
+    letter-spacing:.06em;
+  }
+
+  /* 卡片可点：悬停抬起 + 聚焦描边 */
+  .dex-card{cursor:pointer}
+  .dex-card:hover,
+  .dex-card:focus-visible{
+    transform:translate(-2px,-2px);
+    box-shadow:5px 5px 0 var(--ink);
+    z-index:2;
+  }
+  .dex-card.is-locked:hover,
+  .dex-card.is-locked:focus-visible{
+    box-shadow:5px 5px 0 #9a9a9a;
+  }
+  .dex-card:focus-visible{
+    outline:3px solid var(--ink);
+    outline-offset:3px;
+  }
+
+  /* ============ 点击卡片后的像素贴士 ============ */
+  .dex-pop{
+    position:fixed;
+    z-index:96;                 /* v3.4：需高于标题层(80)与图鉴遮罩(90) */
+    width:238px;
+    padding:10px 12px 12px;
+    background:var(--paper);
+    border:3px solid var(--ink);
+    box-shadow:5px 5px 0 var(--ink);
+    display:grid;
+    grid-template-columns:24px minmax(0,1fr);
+    grid-template-areas:
+      "icon name"
+      "age  age"
+      "stat stat"
+      "hint hint"
+      "lock lock";
+    gap:6px 8px;
+    align-items:center;
+  }
+  .dex-pop[hidden]{display:none}
+  .dex-pop::after{                       /* 指向卡片的小三角 */
+    content:'';
+    position:absolute;left:50%;bottom:-8px;
+    width:10px;height:10px;margin-left:-5px;
+    background:var(--paper);
+    border-right:3px solid var(--ink);
+    border-bottom:3px solid var(--ink);
+    transform:rotate(45deg);
+  }
+  .dex-pop.is-below::after{
+    top:-8px;bottom:auto;
+    border-right:none;border-bottom:none;
+    border-left:3px solid var(--ink);
+    border-top:3px solid var(--ink);
+  }
+  .dex-pop .dex-pop-icon{grid-area:icon;margin:0}
+  .dex-pop-name{grid-area:name;font-size:12px;letter-spacing:.08em;color:var(--ink)}
+  .dex-pop[data-shape="0"]{--accent:#8fa3b8}
+  .dex-pop[data-shape="1"]{--accent:#a8433a}
+  .dex-pop[data-shape="2"]{--accent:#d9a400}
+  .dex-pop[data-shape="3"]{--accent:#4f8f86}
+  .dex-pop[data-shape="4"]{--accent:#b9a06a}
+  .dex-pop .dex-icon.is-locked{color:#5f5f5f}
+  .dex-pop-age{grid-area:age;font-size:10px;color:#5c5c5c;letter-spacing:.04em}
+  .dex-pop-stats{grid-area:stat;display:block}
+  .dex-pop-row{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+    padding:1px 0;border-bottom:1px dotted #dcdcdc;font-size:10px;line-height:1.6}
+  .dex-pop-row:last-child{border-bottom:none}
+  .dex-pop-row b{font-weight:400;color:#6a6a6a;flex:0 0 auto}
+  .dex-pop-row i{font-style:normal;font-family:'Press Start 2P','Zpix',monospace;font-size:9px;color:var(--ink);text-align:right}
+  .dex-pop-hint{
+    grid-area:hint;
+    margin-top:2px;
+    padding-top:6px;
+    border-top:2px dashed #b9b9b9;
+    font-size:10px;
+    line-height:1.65;
+    color:#333;
+  }
+  .dex-pop-lock{grid-area:lock;font-size:9px;letter-spacing:.12em;color:#8a8a8a}
+
+  /* ===================== ⑮ 六维属性 + 天赋区（v2.7） ===================== */
+  /* 8 项属性一行一点线，行高压到 15px 左右才装得下 */
+  .stat-line{padding:1px 0}
+  .stat-line .stat-v{font-size:13px;line-height:1.3}
+  .stat-line .stat-k{font-size:9px;letter-spacing:.14em}
+
+  /* 资料区：年龄·学历 + 工龄 合并在一格，右格放职业·月薪 */
+  .stat-ledger--meta{display:grid;grid-template-columns:1.45fr 0.85fr;column-gap:10px}
+  .stat-ledger--meta .stat-line{display:flex;align-items:baseline;justify-content:flex-start;gap:8px;min-width:0}
+  .stat-ledger--meta .stat-line:last-child{justify-content:space-between}
+  .stat-ledger--meta .leader{display:none}
+  .stat-ledger--meta .stat-line .stat-k{font-size:8px;letter-spacing:0;flex:0 0 auto}
+  .stat-ledger--meta .stat-line .stat-v{font-size:11px;white-space:nowrap;overflow:hidden;gap:4px}
+  .meta-sep{display:inline-block;width:1px;height:9px;background:#c2c2c2;margin:0 2px;vertical-align:middle}
+  .meta-tag{font-size:8px;color:#8a8a8a;letter-spacing:0}
+
+  .talent-box{
+    display:flex;
+    flex-direction:column;
+    gap:1px;
+    padding:4px 12px 4px;
+    border-top:2px dashed var(--ink);
+  }
+  .talent-head{font-size:9px;letter-spacing:.16em;color:#6a6a6a}
+  .talent-list{display:flex;flex-direction:column;gap:1px}
+  .talent-item{display:flex;align-items:baseline;gap:6px;font-size:10px;line-height:1.45}
+  .talent-item b{font-weight:400;color:var(--ink)}
+  .talent-item i{font-style:normal;font-size:8px;color:#8a8a8a}
+  .talent-item em{font-style:normal;font-size:9px;color:#5f5f5f;margin-left:auto}
+  .talent-empty{font-size:9px;color:#9a9a9a}
+
+  /* 矮屏：天赋折叠成一行「天赋：A · B」 */
+  @media (max-height:820px){
+    .talent-box{flex-direction:row;align-items:baseline;gap:6px;padding:2px 12px}
+    .talent-list{flex-direction:row;gap:8px;overflow:hidden;white-space:nowrap}
+    .talent-item em,
+    .talent-item i{display:none}
+    .talent-item b{font-size:9px}
+    .talent-item::after{content:'·';margin-left:6px;color:#c2c2c2}
+    .talent-item:last-child::after{content:''}
+
+    /* 资料区两格：年龄·学历+工龄 | 职业·月薪 */
+    .stat-ledger--meta{display:grid !important;grid-template-columns:1.5fr 0.9fr;column-gap:8px;padding-top:0 !important}
+    .stat-ledger--meta .stat-line{display:flex !important;align-items:baseline;justify-content:flex-start;gap:6px;min-width:0;padding:0 !important}
+    .stat-ledger--meta .stat-line:last-child{justify-content:space-between !important}
+    .stat-ledger--meta .stat-line .stat-k{font-size:8px;letter-spacing:0}
+    .stat-ledger--meta .stat-line .stat-v{font-size:9px;gap:3px;overflow:hidden}
+    /* 矮屏不显示「（当前岗位 X 年）」，否则这格放不下 */
+    .stat-ledger--meta .stat-line .stat-v .sub-val#sPosYears{display:none}
+    .stat-bar-row{padding:2px 0 1px}
+  }
+
+  /* 图鉴独立弹窗 */
+  .dex-modal{width:min(560px,100%)}
+  .dex-grid--modal{padding:18px 18px 4px;gap:12px}
+  .dex-grid--modal .dex-card{min-height:110px}
+  .dex-foot{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-top:14px;
+    padding:12px 18px 16px;
+    border-top:2px dashed var(--ink);
+  }
+  .dex-tip{font-size:10px;line-height:1.6;color:#5f5f5f;letter-spacing:.02em}
+  .dex-foot button.ghost{padding:6px 14px;font-size:11px}
+
+  /* 时间块压缩一档，给属性表腾出垂直空间 */
+  .time-block{padding:6px 12px 7px}
+
+  /* 矮屏（≤820px 视口高）：属性表改成两列紧凑排，保证 700 出头的高度也不裁行 */
+  @media (max-height:820px){
+    .time-block{padding:4px 12px 5px}
+    .stat-line{padding:1px 0}
+    .stat-line .stat-v{font-size:13px;line-height:1.3}
+    .stat-line .stat-k{font-size:9px}
+    .stat-ledger--meta{padding-top:4px}
+    .stat-ledger--meta .stat-line{padding:0}
+    .stat-ledger--meta .stat-line .stat-v{font-size:11px}
+    .stat-bar-row{padding:3px 0 1px}
+    .stat-bar-row .bar{height:8px}
+
+    /* 资料区并成两列，腾出一行给目标条 */
+    .stat-ledger--meta{display:grid;grid-template-columns:1fr 1fr;column-gap:10px}
+    .stat-ledger--meta .stat-line{
+      display:flex;
+      align-items:baseline;
+      justify-content:space-between;
+      gap:6px;
+      min-width:0;
+    }
+    .stat-ledger--meta .leader{display:none}
+    .stat-ledger--meta .stat-line:last-child{grid-column:1 / -1}
+
+    /* 目标条改成紧凑单行，避免挤爆矮屏 */
+    .quest{padding:4px 10px 6px;gap:6px;border-top:2px dashed var(--ink)}
+    .quest-icon{width:8px;height:8px;box-shadow:1px 1px 0 var(--ink)}
+    .quest-label{font-size:9px;letter-spacing:.1em}
+    .quest-text{font-size:9px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+    /* 智力 / 体质 / 金钱 挤成一行三列，心情单独整行带进度条，点线让位给高度 */
+    .stat-ledger:not(.stat-ledger--meta){
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      column-gap:6px;
+      padding:3px 12px 0;
+    }
+    .stat-ledger:not(.stat-ledger--meta) .stat-line{
+      display:flex;
+      align-items:baseline;
+      justify-content:space-between;
+      gap:4px;
+      min-width:0;
+    }
+    .stat-ledger:not(.stat-ledger--meta) .stat-line:nth-of-type(4),
+    .stat-ledger:not(.stat-ledger--meta) .stat-bar-row{grid-column:1 / -1}
+    .stat-ledger:not(.stat-ledger--meta) .leader{display:none}
+    .stat-ledger:not(.stat-ledger--meta) .stat-v{font-size:11px}
+  }
+
+  /* ===================== ⑫ 事件遮罩：扫描线 + 竖向网点 ===================== */
+  /* 不用模糊：8-bit 的「遮住」是拿网点盖上去的。
+     底色压暗 + 2px 横向扫描线 + 6px 竖向细网，叠出 CRT 屏幕质感，
+     比棋盘格少了摩尔纹，底下界面仍能看出轮廓。 */
+  .modal-mask{
+    background-color:rgba(0,0,0,.34);
+    background-image:
+      repeating-linear-gradient(0deg,
+        rgba(0,0,0,.13) 0 2px,
+        rgba(0,0,0,0)  2px 4px),
+      repeating-linear-gradient(90deg,
+        rgba(0,0,0,.05) 0 2px,
+        rgba(0,0,0,0)  2px 6px);
+    backdrop-filter:none;
+    -webkit-backdrop-filter:none;
+  }
+  /* ===================== ⑯ 升学考核弹窗（v2.8） ===================== */
+  .exam-modal{width:min(420px,100%)}
+  .exam-hero{padding:16px 18px 12px;border-bottom:2px dashed var(--ink)}
+  .exam-title{
+    font-size:18px;
+    letter-spacing:.14em;
+    -webkit-text-stroke:.8px var(--ink);
+    text-shadow:2px 2px 0 #9a9a9a;
+  }
+  .exam-desc{margin:10px 0 0;font-size:12px;line-height:1.9;color:#333}
+  .exam-result{padding:14px 18px 2px;display:flex;flex-direction:column;gap:6px}
+  .exam-result[hidden]{display:none}
+  .exam-score{font-family:'Press Start 2P','Zpix',monospace;font-size:20px;letter-spacing:.02em}
+  .exam-line{font-size:12px;letter-spacing:.1em;color:var(--ink);display:flex;align-items:baseline;gap:8px}
+  .exam-full{font-style:normal;font-size:9px;color:#8a8a8a;letter-spacing:0}
+  .exam-note{font-size:10px;color:#6a6a6a;line-height:1.6}
+  .exam-actions{padding:12px 18px 18px}
+  .exam-actions .end-btn{font-size:12px;letter-spacing:.2em;padding:10px 0}
+
+  /* ===== v2.7 最终布局覆盖：8 项属性 ===== */
+  /* 高屏：一列一点线，行高压到 12px 级 */
+  .stat-line{padding:0}
+  .stat-line .stat-v{font-size:12px;line-height:1.25}
+  .stat-line .stat-k{font-size:9px;color:#2b2b2b}
+
+  /* 矮屏：3 列三行（8 项 = 3+3+2），资料区一行三格，天赋一行 */
+  @media (max-height:820px){
+    .stat-ledger:not(.stat-ledger--meta){
+      display:grid !important;
+      grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+      column-gap:10px !important;
+      row-gap:1px;
+      padding:2px 12px 0 !important;
+    }
+    .stat-ledger:not(.stat-ledger--meta) .stat-line{
+      display:flex !important;
+      align-items:baseline;
+      justify-content:space-between;
+      gap:4px;
+      min-width:0;
+      padding:0 !important;
+      grid-column:auto !important;
+    }
+    .stat-ledger:not(.stat-ledger--meta) .leader{display:none !important}
+    .stat-ledger:not(.stat-ledger--meta) .stat-v{font-size:11px !important;line-height:1.3;overflow:hidden}
+    .stat-ledger:not(.stat-ledger--meta) .stat-k{font-size:8px !important;letter-spacing:0}
+    /* 心情数值较长，矮屏独占后两格 */
+    .stat-ledger:not(.stat-ledger--meta) .stat-line:nth-of-type(8){grid-column:2 / -1 !important}
+    .stat-ledger:not(.stat-ledger--meta) .stat-bar-row{grid-column:1 / -1 !important;padding:2px 0 0 !important}
+
+    /* 从行动区借几像素给状态面板：矮屏下按钮更紧凑 */
+    .actions{gap:5px;padding:7px}
+    .quest{padding:2px 10px 3px}
+    .talent-box{padding:0 12px}
+    .stat-ledger--meta{padding-top:0}
+  }
+
+  /* ===== v2.9.1 极矮屏（≤680px 视口高）：把像素面板压到 558px 也不裁切 =====
+     思路：只压间距与行高；属性表保持 3 列（金钱跨两列、心情独占一列），
+     行动区转 3 列；边框 / 硬阴影 / 按压位移 / 字体家族全部保持原样。 */
+  @media (max-height:680px){
+    .wrap{padding:8px 12px 10px;gap:8px}
+    .scene{height:clamp(96px,17vh,132px)}
+    .col{gap:8px}
+    main{gap:10px}
+    .panel-h{padding:2px 8px;font-size:10px;letter-spacing:.16em}
+    .panel-h .hint{font-size:9px}
+
+    .time-block{padding:2px 10px 3px}
+    .time-main{font-size:14px}
+    .time-meta{margin-top:1px;font-size:9px}
+    .bar{height:5px;margin-top:4px}
+
+    /* 8 项属性：3 列网格；金钱横跨两列、心情独占第三列（像素数字很宽，挤不下会互相压字） */
+    .stat-ledger:not(.stat-ledger--meta){
+      grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+      column-gap:8px !important;
+      row-gap:0 !important;
+      padding:1px 10px 0 !important;
+    }
+    .stat-ledger:not(.stat-ledger--meta) .stat-line{
+      padding:0 !important;line-height:1.55;min-height:15px;min-width:0;
+    }
+    .stat-ledger:not(.stat-ledger--meta) .stat-v{
+      font-size:10px !important;line-height:1.55;white-space:nowrap;
+      overflow:hidden;min-width:0;
+    }
+    .stat-ledger:not(.stat-ledger--meta) .stat-k{font-size:8px !important;flex:0 0 auto}
+    /* 金钱（第 7 条）跨 1-2 列，心情（第 8 条）落第 3 列，进度条独占一行 */
+    .stat-ledger:not(.stat-ledger--meta) .stat-line:nth-of-type(7){grid-column:1 / span 2 !important}
+    .stat-ledger:not(.stat-ledger--meta) .stat-line:nth-of-type(8){grid-column:3 !important}
+    .stat-ledger:not(.stat-ledger--meta) .stat-bar-row{grid-column:1 / -1 !important;padding:2px 0 0 !important}
+
+    /* 资料区：两行铺满（一行两格时「职业·月薪」会折行压到天赋） */
+    .stat-ledger--meta{grid-template-columns:1fr !important;padding:2px 10px 0 !important;column-gap:0 !important}
+    .stat-ledger--meta .stat-line{line-height:1.6;min-width:0;min-height:16px}
+    .stat-ledger--meta .stat-line:last-child{grid-column:1 / -1 !important}
+    .stat-ledger--meta .stat-line .stat-v{
+      font-size:9px !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .stat-ledger--meta .stat-line .stat-k{font-size:8px !important;flex:0 0 auto}
+
+    .talent-box{padding:1px 10px 0;min-height:15px}
+    .talent-item b{font-size:8px;line-height:1.6}
+    .talent-head{font-size:8px;line-height:1.6}
+    .quest{padding:1px 10px 2px;gap:5px}
+    .quest-label{font-size:8px}
+    .quest-text{font-size:8px;line-height:1.25}
+
+    /* 行动区：3 列网格，13 个按钮 5 行装下 */
+    .actions{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:6px}
+    .actions.dense button.act{padding:3px 6px 3px;gap:1px}
+    .actions .act-name{font-size:12px;letter-spacing:.06em;line-height:1.25}
+    .actions .act-meta{
+      font-size:8px;line-height:1.3;letter-spacing:0;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .actions .act-days{font-size:8px}
+    .actions .act-flavor{display:none}
+    .lock-hint{padding:3px 10px;font-size:8px;line-height:1.4}
+
+    footer{padding-top:6px;gap:6px}
+    .btns{gap:6px}
+    .btns button{padding:4px 8px;font-size:10px}
+    .foot-meta{font-size:9px}
+  }
+
+  /* ===== v2.9.1 极端矮屏（≤520px 视口高）：只剩状态 + 行动也要全部可见 ===== */
+  @media (max-height:520px){
+    .wrap{padding:6px 10px 8px;gap:6px}
+    .scene{height:76px}
+    .scene .cap{font-size:9px;padding:1px 6px}
+    .panel-h{padding:1px 8px}
+
+    .time-block{padding:1px 8px 2px}
+    .time-main{font-size:12px}
+    /* 378~520px 高：日历副行与月进度条让位给属性与行动按钮 */
+    .time-block .time-meta{display:none}
+    .time-block .bar{display:none}
+
+    .stat-ledger:not(.stat-ledger--meta) .stat-v{font-size:9px !important}
+    .stat-ledger--meta .stat-line .stat-v{font-size:8px !important}
+    .talent-box{padding:0 8px}
+    .talent-item b,.talent-head{font-size:7px}
+    .quest{padding:0 8px 1px}
+    .quest-text,.quest-label{font-size:7px}
+
+    /* 行动区：收益文案单行省略，保证每个按钮都在可视区内 */
+    .actions{gap:3px;padding:5px}
+    .actions.dense button.act{padding:2px 5px}
+    .actions .act-name{font-size:11px;line-height:1.2}
+    .actions .act-meta{font-size:7px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .actions .act-days{font-size:7px}
+    .lock-hint{padding:2px 8px;font-size:7px}
+
+    footer{padding-top:4px}
+    .btns button{padding:3px 7px;font-size:9px}
+    .foot-meta{font-size:8px}
+  }
+
+  /* ===== v2.9.1 兜底档（≤420px 视口高）：窗口被压到极致时只保 8 项属性 + 行动按钮 ===== */
+  @media (max-height:420px){
+    .panel-h{padding:0 8px;font-size:9px}
+    .time-block{padding:0 8px 1px}
+    .time-main{font-size:11px}
+    .stat-ledger:not(.stat-ledger--meta) .stat-line{min-height:13px;line-height:1.4}
+    .stat-ledger:not(.stat-ledger--meta) .stat-v{font-size:9px !important;line-height:1.4}
+    .stat-ledger:not(.stat-ledger--meta) .stat-bar-row{display:none}
+    .stat-ledger--meta .stat-line{min-height:13px;line-height:1.45}
+    .talent-box{display:none}
+    .quest{padding:0 8px}
+    .quest-label{display:none}
+    .actions{gap:2px;padding:4px}
+    .actions.dense button.act{padding:1px 5px}
+    .actions .act-name{font-size:10px}
+    .actions .act-meta{display:none}
+    .actions .act-days{font-size:7px}
+    .lock-hint{display:none}
+  }
+
+  /* ===== v2.9.2：14 个行动后，状态面板不再被压扁 =====
+     状态面板保持内容高度（可长不可缩），空间不足时由行动区内部滚动兜底，
+     滚动条沿用既有的方块滑块样式。 */
+  .status-panel{flex:1 0 auto}
+  .action-panel{flex:0 1 auto}
+  .actions{overflow-y:auto;overscroll-behavior:contain}
+
+  /* ===== v3.0 婚姻家庭一行（像素风，与天赋行同规格） ===== */
+  .family-box{
+    display:flex;align-items:baseline;gap:8px;
+    padding:3px 12px 4px;border-top:2px dashed var(--ink);
+    font-size:10px;color:var(--ink);letter-spacing:.04em;
+  }
+  .family-box[hidden]{display:none}
+  .family-box .family-k{font-size:9px;letter-spacing:.16em;color:#6a6a6a;flex:0 0 auto}
+  .family-box .family-v{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  @media (max-height:680px){
+    .family-box{padding:1px 10px 2px;font-size:9px}
+    .family-box .family-k{font-size:8px}
+  }
+  @media (max-height:520px){
+    .family-box{display:none}
+  }
+
+  /* ======================================================================
+     v3.4 · S1 标题界面（独立覆盖层）
+     —— 只新增 .title-* 命名空间，不覆盖任何既有选择器；
+     —— position:fixed / inset:0，不参与 .wrap 的 flex 与 grid，故零重排。
+     —— 注意：文件上方 8-bit 重置块把 border-radius/transition/animation
+        全部 !important 归零，所以这里不做任何过渡与闪烁动画，
+        选中态用「▶ + 反色」这种静态帧表达（像素风本来就该这样）。
+     ====================================================================== */
+  .title-mask{
+    position:fixed;inset:0;z-index:80;
+    display:flex;align-items:center;justify-content:center;
+    padding:24px;
+    background-color:var(--paper);
+    background-image:repeating-linear-gradient(0deg,rgba(17,17,17,.045) 0 1px,transparent 1px 4px);
+    overflow:auto;overscroll-behavior:contain;
+  }
+  .title-mask[hidden]{display:none}
+
+  .title-frame{
+    position:relative;width:min(520px,100%);
+    max-height:100%;overflow:auto;
+    background:var(--paper);
+    border:2px solid var(--ink);
+    outline:1px solid var(--ink);outline-offset:4px;   /* 像素双框 */
+    box-shadow:8px 8px 0 rgba(17,17,17,.16);           /* 硬阴影，无模糊 */
+    padding:20px 22px 14px;
+    display:flex;flex-direction:column;gap:14px;
+  }
+
+  .title-hero{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .title-banner{
+    display:block;width:100%;height:auto;max-height:104px;
+    image-rendering:pixelated;-ms-interpolation-mode:nearest-neighbor;
+  }
+  .title-logo{
+    font-size:clamp(20px,6vw,28px);letter-spacing:.42em;text-indent:.42em;
+    font-weight:600;line-height:1.25;margin:0;
+  }
+  .title-sub{
+    font-size:9px;letter-spacing:.32em;text-indent:.32em;color:var(--soft);
+  }
+
+  .title-menu{display:flex;flex-direction:column;gap:6px}
+  .title-item{
+    appearance:none;cursor:pointer;font-family:inherit;text-align:left;
+    display:grid;grid-template-columns:16px 1fr;column-gap:8px;row-gap:2px;
+    align-items:baseline;
+    padding:8px 10px;background:var(--paper);color:var(--ink);
+    border:2px solid transparent;
+    font-size:15px;letter-spacing:.22em;
+  }
+  .title-item .title-cursor{font-size:10px;line-height:1;visibility:hidden}
+  .title-item .title-label{font-size:15px}
+  .title-item .title-hint{
+    grid-column:2;font-size:9px;letter-spacing:.04em;color:var(--soft);
+  }
+  .title-item:hover,.title-item.is-sel{
+    background:var(--ink);color:var(--paper);border-color:var(--ink);
+  }
+  .title-item:hover .title-cursor,.title-item.is-sel .title-cursor{visibility:visible}
+  .title-item:hover .title-hint,.title-item.is-sel .title-hint{color:#c9c9c9}
+  .title-item[disabled]{
+    cursor:not-allowed;background:var(--paper);color:#c2c2c2;border-color:var(--hair);
+  }
+  .title-item[disabled]:hover{background:var(--paper);color:#c2c2c2;border-color:var(--hair)}
+  .title-item[disabled] .title-cursor{visibility:hidden}
+  .title-item[disabled] .title-hint{color:#d2d2d2}
+  .title-item:focus{outline:none}
+  .title-item:focus-visible{outline:2px dashed var(--ink);outline-offset:-6px}
+
+  .title-foot{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    border-top:2px dashed var(--ink);padding-top:8px;
+    font-size:9px;letter-spacing:.08em;color:var(--soft);
+  }
+  .title-foot .title-keys{text-align:right}
+
+  /* ===== v3.5 · S5 音效开关（标题页像素小按钮） ===== */
+  .title-sfx{
+    appearance:none;cursor:pointer;font-family:inherit;
+    font-size:9px;letter-spacing:.06em;color:var(--ink);background:var(--paper);
+    border:1px solid var(--ink);padding:2px 6px;
+  }
+  .title-sfx:hover{background:var(--ink);color:var(--paper)}
+
+  @media (max-height:640px){
+    .title-mask{padding:12px}
+    .title-frame{padding:12px 14px 10px;gap:10px}
+    .title-banner{max-height:64px}
+    .title-item{padding:5px 8px}
+    .title-item .title-label{font-size:13px}
+    .title-item .title-hint{display:none}
+  }
+  @media (max-width:520px){
+    .title-mask{padding:10px}
+    .title-frame{padding:12px 12px 10px}
+    .title-logo{font-size:18px;letter-spacing:.3em;text-indent:.3em}
+    .title-sub{font-size:8px;letter-spacing:.18em}
+    .title-item .title-label{font-size:13px;letter-spacing:.14em}
+    .title-foot{flex-direction:column;align-items:flex-start;gap:3px}
+    .title-foot .title-keys{text-align:left}
+  }
+
+  /* ======================================================================
+     v3.4 · S3 开局设置页（.setup-* 独立命名空间）
+     —— 标题层内部从 #titleScreen 切到 #setupScreen，仍是同一个覆盖层；
+     —— 页面内容较多，靠 .title-frame 的 max-height + overflow:auto 兜底，
+        矮屏时由既有 @media 收紧内边距，属性表用 4 列压缩高度。
+     ====================================================================== */
+  #titleScreen[hidden],#setupScreen[hidden]{display:none}
+
+  .setup-field{display:flex;flex-direction:column;gap:4px}
+  .setup-label{font-size:10px;letter-spacing:.18em;color:#6a6a6a}
+  .setup-input{
+    width:100%;appearance:none;font-family:inherit;font-size:16px;letter-spacing:.08em;
+    color:var(--ink);background:var(--paper);border:2px solid var(--ink);padding:8px 10px;
+  }
+  .setup-input::placeholder{color:#c4c4c4;font-size:11px;letter-spacing:.02em}
+  .setup-input:focus{outline:2px dashed var(--ink);outline-offset:2px}
+  .setup-hint{font-size:9px;color:var(--soft);letter-spacing:.04em}
+
+  .setup-sex{display:flex;gap:6px}
+  .sex-btn{
+    flex:1 1 auto;appearance:none;cursor:pointer;font-family:inherit;
+    font-size:14px;letter-spacing:.28em;color:var(--ink);background:var(--paper);
+    border:2px solid var(--ink);padding:8px 0;
+  }
+  .sex-btn.is-on{background:var(--ink);color:var(--paper)}
+  .sex-btn:focus-visible{outline:2px dashed var(--ink);outline-offset:-6px}
+
+  .setup-talents{display:flex;flex-direction:column;gap:4px}
+  .setup-talent{
+    display:flex;justify-content:space-between;gap:10px;align-items:baseline;
+    border:1px solid var(--hair);padding:5px 8px;
+  }
+  .setup-talent .st-name{font-size:12px;letter-spacing:.08em}
+  .setup-talent .st-effect{color:var(--soft);font-size:9px;text-align:right}
+
+  .setup-stats{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:5px 8px;
+    border:1px solid var(--hair);padding:8px;
+  }
+  .setup-stat{display:flex;flex-direction:column;gap:1px}
+  .setup-stat .ss-k{font-size:9px;color:var(--soft);letter-spacing:.04em}
+  .setup-stat .ss-v{font-family:"SFMono-Regular",Menlo,Consolas,"Courier New",monospace;font-size:13px}
+
+  .setup-actions{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+  .setup-btn{
+    width:100%;appearance:none;cursor:pointer;font-family:inherit;
+    font-size:14px;letter-spacing:.22em;color:var(--paper);background:var(--ink);
+    border:2px solid var(--ink);padding:10px 0;
+  }
+  .setup-btn:hover{background:var(--paper);color:var(--ink)}
+  .setup-btn:focus-visible{outline:2px dashed var(--ink);outline-offset:-6px}
+  .setup-btn--ghost{background:var(--paper);color:var(--ink)}
+  .setup-btn--ghost:hover{background:var(--ink);color:var(--paper)}
+
+  @media (max-height:640px){
+    .setup-input{padding:5px 8px;font-size:14px}
+    .setup-sex .sex-btn{padding:5px 0;font-size:13px}
+    .setup-stats{grid-template-columns:repeat(4,1fr);padding:5px;gap:3px 6px}
+    .setup-stat .ss-v{font-size:11px}
+    .setup-btn{padding:7px 0;font-size:13px}
+    .setup-talent{padding:3px 6px}
+  }
+
+  /* ===== v3.7 属性飘字动效 ===== */
+  .float-num{
+    position:absolute;right:0;top:-18px;font-family:"SFMono-Regular",Menlo,Consolas,"Courier New",monospace;
+    font-size:13px;font-weight:700;pointer-events:none;white-space:nowrap;z-index:3;
+  }
+  .float-num.up{color:#2e7d32}
+  .float-num.down{color:#c62828}
+
+  /* ===== v3.7 成就图鉴 ===== */
+  .ach-list{display:flex;flex-direction:column;gap:6px;padding:12px 16px;max-height:52vh;overflow-y:auto}
+  .ach-item{display:flex;align-items:baseline;gap:10px;border:1px solid var(--hair);padding:6px 10px}
+  .ach-item.is-locked{opacity:.45}
+  .ach-item .ach-ico{font-size:14px}
+  .ach-item .ach-name{font-size:13px;letter-spacing:.08em}
+  .ach-item .ach-desc{font-size:9px;color:var(--soft);margin-left:auto;text-align:right}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <h1>人间四季</h1>
+    <div class="sub" id="nameTag">A SMALL LIFE · MVP</div>
+  </header>
+
+  <main>
+    <!-- 左侧 60%：场景 + 日志 -->
+    <div class="col left">
+      <section class="panel scene">
+        <div class="art" id="sceneArt"></div>
+        <div class="season" id="seasonChar">春</div>
+        <div class="cap" id="sceneCap">—</div>
+      </section>
+
+      <section class="panel log-wrap">
+        <div class="panel-h">
+          <span>行动日志</span>
+          <span class="hint"><span id="logMeta">16 岁 · 高中</span> · <span id="logCount">0 条</span></span>
+        </div>
+        <div class="log" id="log"></div>
+      </section>
+    </div>
+
+    <!-- 右侧 40%：状态 + 行动 -->
+    <aside class="col right">
+      <section class="panel status-panel">
+        <div class="panel-h">
+          <span>状态</span>
+          <span class="hint"><button class="dev-open" id="devOpen" type="button" title="显示测试按钮">DEV</button><span id="turnHint">—</span></span>
+        </div>
+
+        <!-- 测试快捷条：不影响正式玩法，点 × 收起 -->
+        <div class="dev-bar off" id="devBar">
+          <button class="dev-btn" type="button" data-dev="int" title="智力 +50">智力+50</button>
+          <button class="dev-btn" type="button" data-dev="intMinus" title="智力 -50">智力-50</button>
+          <button class="dev-btn" type="button" data-dev="age" title="年龄 +5">年龄+5</button>
+          <button class="dev-btn" type="button" data-dev="edu" title="学历改为本科">学历→本科</button>
+          <button class="dev-btn dev-x" type="button" data-dev="close" title="隐藏测试按钮">×</button>
+        </div>
+
+        <div class="time-block">
+          <div class="time-main num" id="dateMain">—</div>
+          <div class="time-meta"><span id="weekMain">—</span><span id="roundMain">—</span></div>
+          <div class="bar"><i id="monthBar"></i></div>
+          <div class="time-meta"><span id="monthLeft">—</span><span id="monthPct">—</span></div>
+        </div>
+
+        <!-- RPG 属性表：品名列定宽、点线填充、数值列右对齐 -->
+        <div class="stat-ledger">
+          <div class="stat-line">
+            <span class="stat-k">智力</span>
+            <span class="leader" aria-hidden="true"></span>
+            <span class="stat-v num" id="sInt">10</span>
+          </div>
+          <div class="stat-line">
+            <span class="stat-k">体质</span>
+            <span class="leader" aria-hidden="true"></span>
+            <span class="stat-v num">
+              <span id="sSta" title="体质">10</span>
+              <span class="sub-val" id="sHospCount" title="危险住院次数：累计 6 次将猝死">🏥 0/6</span>
+            </span>
+          </div>
+          <div class="stat-line">
+            <span class="stat-k">魅力</span>
+            <span class="leader" aria-hidden="true"></span>
+            <span class="stat-v num" id="sCha">10</span>
+          </div>
+          <div class="stat-line">
+            <span class="stat-k">心志</span>
+            <span class="leader" aria-hidden="true"></span>
+            <span class="stat-v num" id="sWill">10</span>
+          </div>
+          <div class="stat-line">
+            <span class="stat-k">情商</span>
+            <span class="leader" aria-hidden="true"></span>
+            <span class="stat-v num" id="sEq">10</span>
+          </div>
+          <div class="stat-line">
+            <span class="stat-k">运气</span>
+            <span class="leader" aria-hidden="true"></span>
+            <span class="stat-v num" id="sLuck">10</span>
+          </div>
+          <div class="stat-line">
+            <span class="stat-k">金钱</span>
+            <span class="leader" aria-hidden="true"></span>
+            <span class="stat-v num" id="sMoney">¥2,800</span>
+          </div>
+          <div class="stat-line">
+            <span class="stat-k">心情</span>
+            <span class="leader" aria-hidden="true"></span>
+            <span class="stat-v num" id="sMood">80 / 100</span>
+          </div>
+          <div class="stat-bar-row"><div class="bar"><i id="moodBar" style="width:80%"></i></div></div>
+        </div>
+
+        <div class="stat-ledger stat-ledger--meta">
+          <div class="stat-line">
+            <span class="stat-k">年龄·学历</span>
+            <span class="leader" aria-hidden="true"></span>
+            <span class="stat-v">
+              <span class="num" id="sAge">16 岁</span>
+              <span id="sEdu">高中</span>
+              <span class="meta-sep" aria-hidden="true"></span>
+              <span class="meta-tag">工龄</span>
+              <span class="num" id="sYears">—</span>
+              <span class="sub-val" id="sPosYears"></span>
+            </span>
+          </div>
+          <div class="stat-line">
+            <span class="stat-k">职业·月薪</span>
+            <span class="leader" aria-hidden="true"></span>
+            <span class="stat-v"><span id="sJob">无业</span> <span class="num sub-val" id="sSalary"></span></span>
+          </div>
+        </div>
+
+        <!-- 先天天赋：属性表下方、目标条上方；矮屏自动折叠成一行 -->
+        <div class="talent-box">
+          <span class="talent-head">天赋</span>
+          <span class="talent-list" id="talentList">—</span>
+        </div>
+
+        <!-- 婚姻家庭（v3.0）：未婚时隐藏，已离婚时显示次数 -->
+        <div class="family-box" id="familyBox" hidden>
+          <span class="family-k">家庭</span>
+          <span class="family-v" id="familyText">—</span>
+        </div>
+
+        <!-- 当前目标：复古 RPG 任务条，贴住面板底部，吃掉高屏留下的空白 -->
+        <div class="quest">
+          <span class="quest-icon" aria-hidden="true"></span>
+          <span class="quest-label">当前目标</span>
+          <span class="quest-text" id="goalText">—</span>
+        </div>
+
+      </section>
+
+      <section class="panel action-panel">
+        <div class="panel-h"><span>行动</span><span class="hint" id="actionHint">由 actionsData 生成</span></div>
+        <!-- 按钮由 JS 遍历 actionsData 动态生成，这里只留容器 -->
+        <div class="actions" id="actions"></div>
+        <!-- 被 hideWhenLocked 藏起来的行动，在这里留个线索 -->
+        <div class="lock-hint" id="lockHint" hidden></div>
+      </section>
+    </aside>
+  </main>
+
+  <footer>
+    <div class="btns">
+      <button class="ghost" id="btnDex" type="button">📖 图鉴</button>
+      <button class="ghost" id="btnAch" type="button">🏆 成就</button>
+      <button class="ghost" id="btnRewind" type="button">⏪ 回溯时间</button>
+      <button class="ghost" id="btnSave">保存游戏</button>
+      <button class="ghost" id="btnLoad">读取游戏</button>
+      <button class="ghost" id="btnReset">重新开始</button>
+      <button class="ghost" id="btnSfx" type="button">🔊 音效 开</button>
+    </div>
+    <div class="foot-meta">
+      <span>上次存档 <b class="num" id="savedAt">—</b></span>
+      <span>·</span>
+      <span id="dirtyTag">未保存</span>
+    </div>
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ===================== v3.4 · S1 标题界面（独立覆盖层，默认 hidden） =====================
+     设计约束：
+     · 位于 .wrap 之外、position:fixed，不参与任何 flex/grid 布局 → 不改变原有像素布局
+     · 默认 hidden：不打开时对它零存在感，回归测试的视口测量结果逐像素不变
+     · 打开时由 JS 给 .wrap 设 inert + aria-hidden（见 boot/showTitle）
+     ================================================================================ -->
+<div class="title-mask" id="titleMask" hidden>
+  <div class="title-frame" role="dialog" aria-modal="true" aria-labelledby="titleLogo">
+
+    <div id="titleScreen">
+
+    <div class="title-hero">
+      <!-- 四季像素横幅：128×32 逻辑像素，四格 32×32，crispEdges 保证放大不糊 -->
+      <svg class="title-banner" viewBox="0 0 128 32" preserveAspectRatio="xMidYMid meet"
+           shape-rendering="crispEdges" role="img" aria-label="四季：春芽、夏日、秋叶、冬雪">
+        <!-- 统一地基线（浅灰），让四格像一排立牌 -->
+        <g fill="#dcdcdc">
+          <rect x="2" y="30" width="28" height="2"/>
+          <rect x="34" y="30" width="28" height="2"/>
+          <rect x="66" y="30" width="28" height="2"/>
+          <rect x="98" y="30" width="28" height="2"/>
+          <rect x="32" y="2" width="1" height="28"/>
+          <rect x="64" y="2" width="1" height="28"/>
+          <rect x="96" y="2" width="1" height="28"/>
+        </g>
+
+        <!-- 春 · 花（四瓣 + 白心） -->
+        <g fill="#111">
+          <rect x="12" y="2"  width="8"  height="8"/>
+          <rect x="12" y="20" width="8"  height="8"/>
+          <rect x="2"  y="12" width="8"  height="8"/>
+          <rect x="20" y="12" width="8"  height="8"/>
+          <rect x="10" y="10" width="12" height="12"/>
+        </g>
+        <g fill="#fff">
+          <rect x="14" y="14" width="4"  height="4"/>
+        </g>
+
+        <!-- 夏 · 日（八边形日轮 + 四向光刺，全部相接） -->
+        <g fill="#111">
+          <rect x="42" y="10" width="12" height="4"/>
+          <rect x="40" y="14" width="16" height="4"/>
+          <rect x="40" y="18" width="16" height="4"/>
+          <rect x="42" y="22" width="12" height="4"/>
+          <rect x="47" y="2"  width="2"  height="8"/>
+          <rect x="47" y="26" width="2"  height="4"/>
+          <rect x="32" y="17" width="8"  height="2"/>
+          <rect x="56" y="17" width="8"  height="2"/>
+        </g>
+
+        <!-- 秋 · 叶（尖叶轮廓 + 叶柄 + 一片飘落） -->
+        <g fill="#111">
+          <rect x="78" y="4"  width="4"  height="2"/>
+          <rect x="76" y="6"  width="8"  height="2"/>
+          <rect x="74" y="8"  width="12" height="2"/>
+          <rect x="72" y="10" width="16" height="2"/>
+          <rect x="70" y="12" width="20" height="4"/>
+          <rect x="72" y="16" width="16" height="2"/>
+          <rect x="74" y="18" width="12" height="2"/>
+          <rect x="76" y="20" width="8"  height="2"/>
+          <rect x="78" y="22" width="4"  height="2"/>
+          <rect x="79" y="24" width="2"  height="6"/>
+        </g>
+        <g fill="#9a9a9a">
+          <rect x="90" y="18" width="4"  height="4"/>
+        </g>
+
+        <!-- 冬 · 雪（六向雪花，2px 像素笔画） -->
+        <g fill="#111">
+          <rect x="111" y="4"  width="2" height="24"/>
+          <rect x="100" y="15" width="24" height="2"/>
+          <rect x="107" y="11" width="2" height="2"/>
+          <rect x="105" y="9"  width="2" height="2"/>
+          <rect x="103" y="7"  width="2" height="2"/>
+          <rect x="101" y="5"  width="2" height="2"/>
+          <rect x="113" y="11" width="2" height="2"/>
+          <rect x="115" y="9"  width="2" height="2"/>
+          <rect x="117" y="7"  width="2" height="2"/>
+          <rect x="119" y="5"  width="2" height="2"/>
+          <rect x="107" y="19" width="2" height="2"/>
+          <rect x="105" y="21" width="2" height="2"/>
+          <rect x="103" y="23" width="2" height="2"/>
+          <rect x="101" y="25" width="2" height="2"/>
+          <rect x="113" y="19" width="2" height="2"/>
+          <rect x="115" y="21" width="2" height="2"/>
+          <rect x="117" y="23" width="2" height="2"/>
+          <rect x="119" y="25" width="2" height="2"/>
+        </g>
+        <g fill="#c9c9c9">
+          <rect x="98" y="28" width="12" height="2"/>
+          <rect x="112" y="26" width="8" height="2"/>
+        </g>
+      </svg>
+
+      <div class="title-logo" id="titleLogo">人间四季</div>
+      <div class="title-sub">A LIFE IN FOUR SEASONS</div>
+    </div>
+
+    <nav class="title-menu" id="titleMenu" aria-label="主菜单">
+      <button class="title-item is-sel" type="button" data-item="new" aria-selected="true">
+        <span class="title-cursor" aria-hidden="true">▶</span>
+        <span class="title-label">开始新人生</span>
+        <span class="title-hint">十六岁，高中，身上 2800 块</span>
+      </button>
+      <button class="title-item" type="button" data-item="continue" id="btnTitleContinue" aria-selected="false">
+        <span class="title-cursor" aria-hidden="true">▶</span>
+        <span class="title-label">继续上次人生</span>
+        <span class="title-hint" id="titleContinueHint">读取本地存档</span>
+      </button>
+      <button class="title-item" type="button" data-item="dex" aria-selected="false">
+        <span class="title-cursor" aria-hidden="true">▶</span>
+        <span class="title-label">人生图鉴</span>
+        <span class="title-hint">看看已经活出过哪些结局</span>
+      </button>
+    </nav>
+
+    <div class="title-foot">
+      <span>v3.4</span>
+      <button class="title-sfx" id="btnSfxTitle" type="button" title="音效开关">🔊 音效 开</button>
+      <span class="title-keys">↑↓ 选择 · Enter 确认 · 鼠标可直接点</span>
+    </div>
+
+    </div><!-- /#titleScreen -->
+
+    <!-- ===================== v3.4 · S3 开局设置页 ===================== -->
+    <div id="setupScreen" hidden>
+      <div class="title-hero">
+        <div class="title-logo">新的人生</div>
+        <div class="title-sub">起个名字，选定性别，然后降生</div>
+      </div>
+
+      <div class="setup-field">
+        <label class="setup-label" for="nameInput">姓名</label>
+        <input class="setup-input" id="nameInput" type="text" maxlength="8"
+               placeholder="8 字以内，留空叫「无名」" autocomplete="off">
+        <div class="setup-hint">最多 8 个字 · 留空默认「无名」</div>
+      </div>
+
+      <div class="setup-field">
+        <span class="setup-label">性别</span>
+        <div class="setup-sex" id="setupSex" role="radiogroup" aria-label="性别">
+          <button class="sex-btn" type="button" data-sex="男" aria-pressed="false">男</button>
+          <button class="sex-btn is-on" type="button" data-sex="女" aria-pressed="true">女</button>
+        </div>
+      </div>
+
+      <div class="setup-field">
+        <span class="setup-label">先天天赋</span>
+        <div class="setup-talents" id="setupTalents">—</div>
+      </div>
+
+      <div class="setup-field">
+        <span class="setup-label">初始属性</span>
+        <div class="setup-stats" id="setupStats">—</div>
+      </div>
+
+      <div class="setup-actions">
+        <button class="setup-btn setup-btn--ghost" id="btnReroll" type="button">重新抽取天赋</button>
+        <button class="setup-btn" id="btnConfirmBirth" type="button">确认降生</button>
+        <button class="setup-btn setup-btn--ghost" id="btnSetupBack" type="button">返回主菜单</button>
+      </div>
+    </div><!-- /#setupScreen -->
+
+  </div>
+</div>
+
+<!-- 人生结算面板 -->
+<div class="modal-mask" id="endMask" hidden>
+  <div class="modal end-modal" role="dialog" aria-modal="true" aria-labelledby="endTitle">
+    <div class="panel-h"><span>人生结算</span><span class="hint" id="endReason">—</span></div>
+    <div class="end-hero">
+      <div class="end-name" id="endTitle">—</div>
+      <p class="end-desc" id="endDesc">—</p>
+    </div>
+    <div class="end-stats" id="endStats"></div>
+    <div class="end-dex">
+      <div class="dex-head" id="endDexHead">📖 已解锁的人生图鉴 (0/5)</div>
+      <div class="dex-grid" id="endDex"></div>
+      <div class="dex-new" id="endDexNew" hidden>· 新结局已收入图鉴 ·</div>
+      <div class="dex-complete" id="endDexDone" hidden>恭喜你，体验了人生百态！</div>
+    </div>
+    <div class="end-actions">
+      <button class="end-btn" id="btnRebirth" type="button">重新投胎</button>
+    </div>
+  </div>
+</div>
+
+<!-- 事件弹窗：遮罩 + 居中面板，遮罩吃掉所有点击 -->
+<div class="modal-mask" id="eventMask" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="eventTitle">
+    <div class="panel-h">
+      <span>事件</span>
+      <span class="hint" id="eventDate">—</span>
+    </div>
+    <div class="event-title" id="eventTitle">—</div>
+    <p class="event-desc" id="eventDesc">—</p>
+    <div class="event-options" id="eventOptions"></div>
+    <div class="modal-note" id="eventNote" hidden></div>
+  </div>
+</div>
+
+<!-- 升学考核弹窗 -->
+<div class="modal-mask" id="examMask" hidden>
+  <div class="modal exam-modal" role="dialog" aria-modal="true" aria-labelledby="examTitle">
+    <div class="panel-h"><span>升学考核</span><span class="hint" id="examStage">—</span></div>
+    <div class="exam-hero">
+      <div class="exam-title" id="examTitle">高考</div>
+      <p class="exam-desc" id="examDesc">—</p>
+    </div>
+    <div class="exam-result" id="examResult" hidden></div>
+    <div class="exam-actions">
+      <button class="end-btn" id="btnExamGo" type="button">参加考试</button>
+    </div>
+  </div>
+</div>
+
+<!-- 图鉴弹窗（随时可看，不打断当前游戏） -->
+<div class="modal-mask" id="dexMask" hidden>
+  <div class="modal dex-modal" role="dialog" aria-modal="true" aria-labelledby="dexTitle">
+    <div class="panel-h">
+      <span id="dexTitle">人生图鉴</span>
+      <span class="hint" id="dexCount">0 / 5</span>
+    </div>
+    <div class="dex-grid dex-grid--modal" id="dexGrid"></div>
+    <div class="dex-foot">
+      <span class="dex-tip" id="dexTip">集齐 5 种结局，解锁「人生百态」</span>
+      <button class="ghost" id="btnDexClose" type="button">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="dex-pop" id="dexPop" hidden></div>
+
+<!-- ===== v3.7 成就图鉴弹窗 ===== -->
+<div class="modal-mask" id="achMask" hidden>
+  <div class="modal ach-modal" role="dialog" aria-modal="true" aria-labelledby="achTitle">
+    <div class="panel-h">
+      <span id="achTitle">🏆 成就</span>
+      <span class="hint" id="achCount">0 / 10</span>
+    </div>
+    <div class="ach-list" id="achList"></div>
+    <div class="dex-foot">
+      <span class="dex-tip" id="achTip">做过的每一件事，都被时间记住。</span>
+      <button class="ghost" id="btnAchClose" type="button">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script src="engine.js"></script>
+<script>
+'use strict';
+
+  var lastSeason = null;
+  var lastHoverLock = '';
+  var toastTimer = null;
+
+  /* ================= [引擎层] 时间工具 ================= */
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function scrollLogToBottom() {
+    var box = $('log');
+    if (!box) return;
+    box.scrollTop = box.scrollHeight;           // 直接贴底
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(function () { box.scrollTop = box.scrollHeight; }); // 布局完成后再贴一次，防止字体加载导致高度变化
+    }
+  }
+
+  function renderLog() {
+    var box = $('log');
+
+    var html = state.logs.map(function (l) {
+      var dateStr = pad2(l.m) + '-' + pad2(l.d);
+      var title = l.y + '年' + l.m + '月' + l.d + '日';
+      var tag = (l.a !== undefined || l.e)
+        ? '<span class="log-tag">' + (l.a !== undefined ? l.a + '岁' : '') + (l.e ? '·' + esc(l.e) : '') + '</span>'
+        : '';
+      return '<div class="log-line k-' + l.k + '">'
+        + '<span class="log-date num" title="' + esc(title) + '">' + dateStr + '</span>'
+        + '<span class="log-txt">' + esc(l.t) + '</span>'
+        + tag
+        + '</div>';
+    }).join('');
+
+    box.innerHTML = html;
+    $('logCount').textContent = state.logs.length + ' 条';
+    $('logMeta').textContent = getAge() + ' 岁 · ' + (state.edu || '无');   // 实时年龄 / 学历
+    scrollLogToBottom();                         // 每次新增日志后自动滚到最新一行
+  }
+
+  /* ================= [UI层] 场景（纯 CSS/SVG 黑白线框） ================= */
+  function svgScene(season) {
+    // 远景：右侧山脊 + 地平线（树站在左侧地平线上，层次分明）
+    var land = ''
+      + '<path d="M170 196 L246 136 L322 186 L398 142 L474 190 L548 152 L620 182"/>'
+      + '<line x1="0" y1="196" x2="600" y2="196"/>';
+
+    var art = '';
+
+    if (season === 'spring') {
+      art = ''
+        + '<circle cx="470" cy="64" r="22"/>'
+        + '<line x1="214" y1="70" x2="336" y2="70"/>'
+        + '<line x1="192" y1="86" x2="278" y2="86"/>'
+        + '<path d="M366 58 q11 -11 22 0"/>'
+        + '<path d="M396 50 q9 -9 18 0"/>'
+        + '<line x1="120" y1="196" x2="120" y2="126"/>'
+        + '<line x1="120" y1="152" x2="88" y2="124"/>'
+        + '<line x1="120" y1="162" x2="154" y2="132"/>'
+        + '<line x1="120" y1="138" x2="100" y2="112"/>'
+        + '<circle cx="88" cy="124" r="2.4"/><circle cx="154" cy="132" r="2.4"/>'
+        + '<circle cx="100" cy="112" r="2.4"/><circle cx="120" cy="126" r="2.4"/>';
+    } else if (season === 'summer') {
+      art = ''
+        + '<circle cx="470" cy="62" r="24"/>'
+        + '<line x1="470" y1="22" x2="470" y2="10"/>'
+        + '<line x1="470" y1="102" x2="470" y2="114"/>'
+        + '<line x1="430" y1="62" x2="418" y2="62"/>'
+        + '<line x1="510" y1="62" x2="522" y2="62"/>'
+        + '<line x1="442" y1="34" x2="434" y2="26"/>'
+        + '<line x1="498" y1="34" x2="506" y2="26"/>'
+        + '<line x1="442" y1="90" x2="434" y2="98"/>'
+        + '<line x1="498" y1="90" x2="506" y2="98"/>'
+        + '<line x1="120" y1="196" x2="120" y2="140"/>'
+        + '<circle cx="92" cy="132" r="25"/>'
+        + '<circle cx="150" cy="132" r="25"/>'
+        + '<circle cx="121" cy="108" r="24"/>'
+        + '<line x1="52" y1="196" x2="50" y2="184"/>'
+        + '<line x1="68" y1="196" x2="70" y2="186"/>'
+        + '<line x1="86" y1="196" x2="84" y2="183"/>'
+        + '<line x1="196" y1="196" x2="194" y2="186"/>'
+        + '<line x1="212" y1="196" x2="214" y2="184"/>';
+    } else if (season === 'autumn') {
+      art = ''
+        + '<circle cx="470" cy="70" r="20"/>'
+        + '<path d="M44 64 q22 -20 44 0 q22 -20 44 0"/>'
+        + '<line x1="120" y1="196" x2="120" y2="130"/>'
+        + '<line x1="120" y1="150" x2="92" y2="122"/>'
+        + '<line x1="120" y1="160" x2="152" y2="130"/>'
+        + '<line x1="120" y1="140" x2="104" y2="114"/>'
+        + '<line x1="120" y1="130" x2="136" y2="110"/>'
+        + '<line x1="200" y1="120" x2="212" y2="128"/>'
+        + '<line x1="246" y1="158" x2="258" y2="166"/>'
+        + '<line x1="330" y1="102" x2="342" y2="110"/>'
+        + '<line x1="368" y1="150" x2="380" y2="158"/>'
+        + '<line x1="288" y1="70" x2="300" y2="78"/>'
+        + '<line x1="220" y1="60" x2="232" y2="68"/>';
+    } else {
+      art = ''
+        + '<circle cx="470" cy="64" r="22"/>'
+        + '<line x1="120" y1="196" x2="120" y2="132"/>'
+        + '<line x1="120" y1="148" x2="90" y2="118"/>'
+        + '<line x1="90" y1="118" x2="78" y2="100"/>'
+        + '<line x1="90" y1="118" x2="82" y2="134"/>'
+        + '<line x1="120" y1="162" x2="150" y2="128"/>'
+        + '<line x1="150" y1="128" x2="162" y2="110"/>'
+        + '<line x1="150" y1="128" x2="168" y2="136"/>'
+        + '<line x1="120" y1="132" x2="136" y2="106"/>'
+        + '<circle cx="230" cy="80" r="1.8" fill="#111"/>'
+        + '<circle cx="284" cy="56" r="1.8" fill="#111"/>'
+        + '<circle cx="344" cy="94" r="1.8" fill="#111"/>'
+        + '<circle cx="402" cy="64" r="1.8" fill="#111"/>'
+        + '<circle cx="300" cy="134" r="1.8" fill="#111"/>'
+        + '<circle cx="372" cy="146" r="1.8" fill="#111"/>'
+        + '<circle cx="200" cy="140" r="1.8" fill="#111"/>'
+        + '<circle cx="246" cy="34" r="1.8" fill="#111"/>';
+    }
+
+    return '<svg viewBox="0 0 600 250" preserveAspectRatio="xMidYMid slice">'
+      + '<g stroke="#111" fill="none" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">'
+      + land + art
+      + '</g></svg>';
+  }
+
+  function renderScene() {
+    var key = SEASON_BY_MONTH[state.m - 1];
+    var meta = SEASON[key];
+    $('seasonChar').textContent = meta.cn;
+    $('sceneCap').textContent = state.y + ' 年 ' + state.m + ' 月 · ' + meta.line;
+    if (key !== lastSeason) {
+      $('sceneArt').innerHTML = svgScene(key);
+      lastSeason = key;
+    }
+  }
+
+  /* ================= [UI层] 状态面板 ================= */
+  function renderStatus() {
+    var dim = daysInMonth(state.y, state.m);
+    var ri = roundInfo();
+
+    var tag = $('nameTag');                      // v3.4：顶部姓名徽标（只读 state.profile）
+    if (tag) {
+      var p = state.profile || {};
+      tag.textContent = (p.name || '无名') + ' · ' + (p.sex || '女');
+    }
+
+    $('dateMain').textContent = state.y + ' 年 ' + state.m + ' 月 ' + state.d + ' 日';
+    $('weekMain').textContent = weekdayOf(state.y, state.m, state.d);
+    $('roundMain').textContent = '第 ' + ri.n + ' 回合 · 剩 ' + ri.left + ' 天';
+    $('turnHint').textContent = '回合 ' + ri.n + ' / 4';
+
+    $('monthBar').style.width = (state.d / dim * 100).toFixed(1) + '%';
+    $('monthLeft').textContent = '本月 ' + state.d + ' / ' + dim + ' 天';
+    $('monthPct').textContent = Math.round(state.d / dim * 100) + '%';
+
+    $('sInt').textContent = state.int;
+    $('sSta').textContent = state.sta;
+    var hc = state.hospitalCount || 0;                     // v3.9：危险住院次数 X/6
+    var hcEl = $('sHospCount');
+    if (hcEl) {
+      hcEl.textContent = '🏥 ' + hc + '/' + HOSPITAL_DEATH;
+      hcEl.style.color = hc > 0 ? '#c62828' : '#9a9a9a';
+      hcEl.title = '危险住院次数：' + hc + '/' + HOSPITAL_DEATH + '（累计达 ' + HOSPITAL_DEATH + ' 次将猝死）';
+    }
+    $('sCha').textContent = state.cha;
+    $('sWill').textContent = state.will;
+    $('sEq').textContent = state.eq;
+    $('sLuck').textContent = state.luck;
+
+    var moneyEl = $('sMoney');
+    moneyEl.textContent = (state.money < 0 ? '−¥' : '¥') + Math.abs(state.money).toLocaleString('en-US');
+    moneyEl.classList.toggle('neg', state.money < 0);
+
+    var moodCap = moodMaxOf();                     // v3.0：上限可能是 110/115/120
+    $('sMood').textContent = state.mood + ' / ' + moodCap;
+    $('moodBar').style.width = (state.mood / moodCap * 100).toFixed(1) + '%';
+
+    $('sAge').textContent = getAge() + ' 岁';
+    $('sEdu').textContent = state.edu || '无';
+    $('sJob').textContent = state.job || '无业';
+    $('sSalary').textContent = state.salary > 0 ? '月薪 ¥' + state.salary.toLocaleString('en-US') : '';
+    if (state.salary > 0) {
+      $('sYears').textContent = state.totalWorkYears + ' 年';
+      $('sPosYears').textContent = '（当前岗位 ' + state.currentPositionYears + ' 年）';
+    } else {
+      $('sYears').textContent = '—';
+      $('sPosYears').textContent = '';
+    }
+
+    updateGoal();                                  // 当前目标条（独立函数，只读 state）
+    renderTalents();                               // 先天天赋（只读 state）
+    renderFamily();                                // v3.0：婚姻/家庭一行（只读 state）
+    warnStamina();                                 // v3.9：体质告急红字 + 音效
+  }
+
+  /* ================= [UI层] 体质告急预警（v3.9，独立函数） ================= */
+  var lastStaminaWarn = false;                     // 防抖：只在从「非低」掉到「低」时触发一次
+  function warnStamina() {
+    var low = state.sta < 20 && !state.ended;
+    if (low && !lastStaminaWarn) {
+      addLog('danger', '⚠ 极度劳累，随时可能猝死！');
+      SoundFX.play('warn');
+    }
+    lastStaminaWarn = low;
+  }
+
+  /* ================= [UI层] 当前目标（v1.1 新增，独立函数） =================
+     只读 state，不写任何数值、不触发事件，可以随时删掉不影响引擎。
+     优先级：已结束 → 体质告急 → 负债 → 高考/学历 → 就业 → 首付 → 买房 */
+  function updateGoal() {
+    var el = $('goalText');
+    if (!el) return;
+
+    var age = getAge();
+    var edu = state.edu || '无';
+    var rank = EDU_RANK[edu] || 0;
+    var hasJob = state.salary > 0;
+    var money = Math.round(state.money || 0);
+    var HOUSE = 900000;                            // 与物价表「首付 90 万」对齐
+    var text;
+
+    if (state.ended) {
+      text = '这一生已经走完，点「重新投胎」再开一局';
+    } else if (state.sta <= 5) {
+      text = '先休息把体质拉回来（当前 ' + state.sta + '）';
+    } else if (money < 0) {
+      text = '先把负债填平（欠 ¥' + Math.abs(money).toLocaleString('en-US') + '）';
+    } else if (age < 18) {
+      text = state.int > 150
+        ? '去参加高考，把本科拿下'
+        : '把智力刷到 150，高考才稳（现在 ' + state.int + '）';
+    } else if (rank < EDU_RANK['本科'] && age <= 22) {
+      text = edu === '专科'
+        ? '专升本：智力 180 以上就能升本科'
+        : '参加高考，把学历补到本科';
+    } else if (isStudentNow()) {
+      text = '安心念书，把大学读完再想出路（当前 ' + edu + '）';   // v3.7：在校本科生不提示找工作
+    } else if (!hasJob) {
+      text = money < 3000
+        ? '先打零工撑住现金流（存款 ¥' + money.toLocaleString('en-US') + '）'
+        : '找份工作，先有稳定收入';
+    } else if (money < HOUSE) {
+      text = '攒首付 ¥' + money.toLocaleString('en-US') + ' / ¥' + HOUSE.toLocaleString('en-US');
+    } else {
+      text = '去看房，把 90 万首付付掉';
+    }
+
+    el.textContent = text;
+  }
+
+  /* ================= [UI层] 先天天赋面板（v2.7） ================= */
+  var TALENT_MUL_LABEL = {
+    learning_speed: '学习',
+    work_money: '打工收益',
+    event_luck: '稀有事件',
+    mood_recover: '心情恢复'
+  };
+  var STAT_LABEL = { int: '智力', sta: '体质', cha: '魅力', will: '心志', eq: '情商', luck: '运气' };
+
+  function talentEffectText(t, lv) {
+    var parts = [], e = (t && t.level_effect) || {};
+    for (var k in TALENT_MUL_LABEL) {
+      if (!Object.prototype.hasOwnProperty.call(TALENT_MUL_LABEL, k)) continue;
+      var v = e[k];
+      if (typeof v === 'number') parts.push(TALENT_MUL_LABEL[k] + ' +' + Math.round(v * lv * 100) + '%');
+    }
+    if (e.stat_gain) {
+      for (var a in e.stat_gain) {
+        if (!Object.prototype.hasOwnProperty.call(e.stat_gain, a)) continue;
+        var n = e.stat_gain[a];
+        if (typeof n === 'number') parts.push((STAT_LABEL[a] || a) + ' +' + (n * lv));
+      }
+    }
+    return parts.join(' · ') || '—';
+  }
+
+  function renderTalents() {
+    var box = $('talentList');
+    if (!box) return;
+    var list = state.talents || [];
+    var html = '';
+    for (var i = 0; i < list.length; i++) {
+      var t = talentById(list[i] && list[i].id);
+      if (!t) continue;
+      var lv = Math.max(1, Math.min(t.max_level || 3, Math.round(Number(list[i].level) || 1)));
+      var eff = talentEffectText(t, lv);
+      html += '<span class="talent-item" title="' + esc(t.name + '：' + eff) + '">'
+        + '<b>' + esc(t.name) + '</b>'
+        + '<i class="num">Lv.' + lv + '</i>'
+        + '<em>' + esc(eff) + '</em>'
+        + '</span>';
+    }
+    box.innerHTML = html || '<span class="talent-empty">无</span>';
+  }
+
+  /* ================= [UI层] 页脚 / 提示 ================= */
+  function fmtStamp(ts) {
+    var d = new Date(ts);
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate())
+      + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+
+  function renderFoot() {
+    var stamp = null;
+    try {
+      var raw = localStorage.getItem(SAVE_KEY);
+      if (raw) {
+        var p = JSON.parse(raw);
+        if (p && p.at) stamp = p.at;
+      }
+    } catch (e) { stamp = null; }
+    $('savedAt').textContent = stamp ? fmtStamp(stamp) : '—';
+    $('dirtyTag').textContent = dirty ? '未保存' : '已保存';
+  }
+
+  function toast(msg) {
+    var el = $('toast');
+    el.textContent = msg;
+    el.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('on'); }, 1600);
+  }
+
+  function render() {
+    renderScene();
+    renderStatus();
+    updateActionStates();   // 属性变了，行动门槛可能跟着变
+    renderLog();
+    renderFoot();
+  }
+
+  /* ================= [引擎层] 核心循环（数据驱动，无 if...else） ================= */
+
+  // 属性字典：effects 里用长名，存档/内部状态用短键，两者靠这张表映射
+  // v2.7：六维（智力/体质/魅力/心志/情商/运气）+ 金钱/心情
+  function renderFamily() {
+    var box = $('familyBox');
+    if (!box) return;
+    var kids = livingChildren();
+    var kidText = '';
+    if (kids.length) {
+      var parts = [];
+      for (var i = 0; i < kids.length && i < 3; i++) parts.push(kids[i].name + ' ' + childAge(kids[i]) + ' 岁');
+      kidText = ' · 子女 ' + parts.join('、');
+    }
+    if (state.married) {
+      box.hidden = false;
+      $('familyText').textContent = state.spouse + ' · 感情 ' + state.love + ' / 100' + kidText;
+    } else if (kids.length) {
+      box.hidden = false;
+      $('familyText').textContent = (state.divorceCount > 0 ? '离异 ' : '单身 ') + kidText.replace(' · 子女 ', '子女 ');
+    } else if (state.divorceCount > 0) {
+      box.hidden = false;
+      $('familyText').textContent = '离异 ' + state.divorceCount + ' 次 · 心情上限 ' + moodMaxOf();
+    } else {
+      box.hidden = true;
+      $('familyText').textContent = '—';
+    }
+  }
+
+  /* ================= [引擎层] 结局系统 ================= */
+  // 严格按优先级从高到低判定，命中第一条即停（对应设计文档第 21 章）
+  function renderDex(currentId) {
+    var dex = loadDex();
+    var total = endingRules.length;
+    var el = $('endDex');
+    if (!el) return;
+
+    $('endDexHead').textContent = '📖 已解锁的人生图鉴 (' + dex.length + '/' + total + ')';
+    el.innerHTML = dexGridHTML(dex, currentId);
+
+    var done = $('endDexDone');
+    if (done) done.hidden = dex.length < total;
+  }
+
+  /* ---- 图鉴卡片渲染：纯 UI，数据只读 loadDex()，不写存档、不改规则 ---- */
+  function dexCardHTML(rule, index, got, currentId) {
+    var cls = 'dex-card'
+      + (got ? '' : ' is-locked')
+      + (currentId && rule.id === currentId ? ' is-current' : '');
+    return '<div class="' + cls + '" role="button" tabindex="0"'
+      + ' data-idx="' + index + '" data-id="' + esc(rule.id) + '"'
+      + ' aria-label="' + esc(got ? rule.name : '未解锁结局') + '">'
+      + '<span class="dex-icon" data-shape="' + index + '"><i></i></span>'
+      + '<span class="dex-name">' + (got ? esc(rule.name) : '？？？') + '</span>'
+      + '<span class="dex-no">' + pad2(index + 1) + '</span>'
+      + '</div>';
+  }
+
+  function dexGridHTML(dex, currentId) {
+    var map = {};
+    for (var i = 0; i < dex.length; i++) map[dex[i].id] = dex[i];
+    return endingRules.map(function (rule, i) {
+      var got = !!map[rule.id] || rule.id === currentId;
+      return dexCardHTML(rule, i, got, currentId);
+    }).join('');
+  }
+
+  /* ---- 点击卡片：像素小贴士 ---- */
+  function dexPopHTML(rule, index, rec) {
+    var got = !!rec;
+    var h = '<span class="dex-pop-icon dex-icon' + (got ? '' : ' is-locked') + '"'
+      + ' data-shape="' + index + '"><i></i></span>'
+      + '<span class="dex-pop-name">' + (got ? esc(rule.name) : '？？？') + '</span>';
+
+    if (got) {
+      var age = (typeof rec.age === 'number') ? rec.age + ' 岁' : '未知';
+      h += '<span class="dex-pop-age">达成于 ' + esc(age) + '</span>';
+      var rows = [];
+      if (rec.edu) rows.push(['学历', rec.edu]);
+      if (rec.job) rows.push(['职业', rec.job]);
+      if (typeof rec.workYears === 'number') rows.push(['总工龄', rec.workYears + ' 年']);
+      if (typeof rec.money === 'number') {
+        rows.push(['金钱', (rec.money < 0 ? '−¥' : '¥') + Math.abs(rec.money).toLocaleString('en-US')]);
+      }
+      if (typeof rec.int === 'number') rows.push(['智力', rec.int]);
+      if (typeof rec.sta === 'number') rows.push(['体质', rec.sta]);
+      if (typeof rec.mood === 'number') rows.push(['心情', rec.mood]);
+      if (rows.length) {
+        h += '<span class="dex-pop-stats">' + rows.map(function (r) {
+          return '<span class="dex-pop-row"><b>' + esc(r[0]) + '</b><i>' + esc(String(r[1])) + '</i></span>';
+        }).join('') + '</span>';
+      }
+      h += '<span class="dex-pop-hint">' + esc(rule.desc || '') + '</span>';
+    } else {
+      h += '<span class="dex-pop-hint">' + esc(rule.hint || '') + '</span>'
+        + '<span class="dex-pop-lock">尚未达成</span>';
+    }
+    return h;
+  }
+
+  var dexPopCard = null;
+
+  // 把贴士钉在卡片旁边：默认在卡片上方，空间不够翻到下方；左右夹在视口内
+  function positionDexPop(card) {
+    var pop = $('dexPop');
+    if (!pop || pop.hidden) return;
+    var cr = card.getBoundingClientRect();
+    var pw = pop.offsetWidth;
+    var ph = pop.offsetHeight;
+    var left = cr.left + cr.width / 2 - pw / 2;
+    left = Math.max(10, Math.min(left, window.innerWidth - pw - 10));
+    var below = cr.top - ph - 10 < 10;
+    var top = below ? cr.bottom + 10 : cr.top - ph - 10;
+    pop.classList.toggle('is-below', below);
+    pop.style.left = Math.round(left) + 'px';
+    pop.style.top = Math.round(top) + 'px';
+  }
+
+  function hideDexPop() {
+    var pop = $('dexPop');
+    if (pop) pop.hidden = true;
+    dexPopCard = null;
+  }
+
+  function showDexPop(card) {
+    var idx = Number(card.getAttribute('data-idx'));
+    var rule = endingRules[idx];
+    if (!rule) return;
+    var dex = loadDex();
+    var rec = null;
+    for (var i = 0; i < dex.length; i++) {
+      if (dex[i].id === rule.id) { rec = dex[i]; break; }
+    }
+
+    var pop = $('dexPop');
+    if (!pop) return;
+    pop.setAttribute('data-shape', String(idx));
+    pop.innerHTML = dexPopHTML(rule, idx, rec);
+    pop.hidden = false;
+    dexPopCard = card;
+    positionDexPop(card);
+  }
+
+  // 点空白处收起
+  function bindDexPopOnce() {
+    document.addEventListener('mousedown', function (e) {
+      var pop = $('dexPop');
+      if (!pop || pop.hidden) return;
+      if (pop.contains(e.target)) return;
+      if (closestDexCard(e.target)) return;        // 点另一张卡交给卡的 click 处理
+      hideDexPop();
+    });
+  }
+
+  function closestDexCard(node) {
+    while (node && node !== document) {
+      if (node.classList && node.classList.contains('dex-card')) return node;
+      node = node.parentNode;
+    }
+    return null;
+  }
+
+  // 图鉴弹窗：随时可看，只读一遍 localStorage，不落盘、不推进时间
+  function openDex() {
+    var dex = loadDex();
+    var total = endingRules.length;
+    hideDexPop();
+    $('dexCount').textContent = dex.length + ' / ' + total;
+    $('dexGrid').innerHTML = dexGridHTML(dex, '');
+    $('dexTip').textContent = dex.length >= total
+      ? '恭喜你，体验了人生百态！'
+      : '还差 ' + (total - dex.length) + ' 种结局集齐图鉴 · 点卡片看详情';
+    $('dexMask').hidden = false;
+  }
+
+  function closeDex() {
+    hideDexPop();
+    var mask = $('dexMask');
+    if (mask) mask.hidden = true;
+  }
+
+  function openAch() {
+    var unlocked = loadAch();
+    var box = $('achList');
+    if (box) {
+      box.innerHTML = achievementsData.map(function (a) {
+        var got = unlocked.indexOf(a.id) > -1;
+        return '<div class="ach-item' + (got ? '' : ' is-locked') + '">'
+          + '<span class="ach-ico">' + (got ? '✅' : '🔒') + '</span>'
+          + '<span class="ach-name">' + esc(a.name) + '</span>'
+          + '<span class="ach-desc">' + esc(a.desc) + '</span></div>';
+      }).join('');
+    }
+    var count = $('achCount');
+    if (count) count.textContent = unlocked.length + ' / ' + achievementsData.length;
+    var mask = $('achMask');
+    if (mask) mask.hidden = false;
+  }
+  function closeAch() { var m = $('achMask'); if (m) m.hidden = true; }
+
+  function resetGame() {
+    if (!confirm('重新开始会丢弃当前进度，确定吗？')) return;
+    $('endMask').hidden = true;                 // 上一局的结算面板要收起来
+    $('eventMask').hidden = true;
+    pendingEvent = null;                        // 丢掉上把没处理完的事件
+    deferredEventIds = [];
+    lastSeason = null;
+
+    if (TITLE_SKIP) {
+      // 测试/打桩环境（?rjs_test=1）：保持旧行为直接开新档，不弹设置页。
+      // 回归测试依赖 btnReset 清理 pendingEvent，弹设置页会让 uiLocked=true 卡死后续断言。
+      state = newState();
+      dirty = true;
+      addLog('sys', '故事开始于 ' + state.y + ' 年 ' + state.m + ' 月 ' + state.d + ' 日，' + weekdayOf(state.y, state.m, state.d) + '。');
+      addLog('sys', '初始状态：智力 10 · 体质 10 · 金钱 2800 · 心情 80');
+      addLog('sys', '点击右侧行动推进一天；' + livingCostText());
+      render();
+      toast('已重新开始');
+      return;
+    }
+
+    openSetup();                                // v3.4-S4：真实玩家 → 回设置页重新起名/抽天赋
+  }
+
+  /* ================= [UI层] 按钮渲染（遍历 actionsData） ================= */
+  function actionDays(act) { return Math.max(1, Math.round(Number(act.costDays) || 1)); }
+
+  function renderActions() {
+    var box = $('actions');
+    if (!box) return;
+
+    box.innerHTML = actionsData.map(function (act) {
+      var miss = checkRequires(act);
+      var locked = miss.length > 0;
+      var tip = locked ? miss.map(missLabel).join('；') : '';
+
+      return '<button class="act' + (locked ? ' is-locked' : '') + '" type="button"'
+        + ' data-act="' + esc(act.id) + '"'
+        + (locked ? ' aria-disabled="true" tabindex="-1" title="' + esc(tip) + '"' : '')
+        + '>'
+        + '<span class="act-top">'
+        +   '<span class="act-name">' + esc(act.name) + '</span>'
+        +   '<span class="act-days num">' + (locked ? '条件不足' : actionDays(act) + ' 天') + '</span>'
+        + '</span>'
+        + '<span class="act-meta">' + esc(effectText(act)) + '</span>'
+        + '<span class="act-flavor">' + esc(act.description || '') + '</span>'
+        + '</button>';
+    }).join('');
+
+    box.classList.toggle('dense', actionsData.length > 6);   // 行动多时自动紧凑
+    updateActionStates();                                    // 初始化隐藏/置灰
+
+  }
+
+  // 只改状态、不重建 DOM：每次渲染时同步按钮的置灰状态（避免重建导致 hover 闪烁）
+  function updateActionStates() {
+    var box = $('actions');
+    if (!box) return;
+
+    var unlocked = 0;
+    var hiddenList = [];
+    var btns = box.querySelectorAll('button.act');
+    for (var i = 0; i < btns.length; i++) {
+      var btn = btns[i];
+      var act = findAction(btn.getAttribute('data-act'));
+      if (!act) continue;
+
+      var miss = checkRequires(act);
+      var locked = miss.length > 0;
+
+      // v3.7：有正式工作后在 UI 隐藏「打工/打零工」（只藏按钮、不写 checkRequires，不影响模拟器与引擎）
+      var uiEmployed = act.uiHideWhenEmployed === true && state.salary > 0;
+
+      // hideWhenLocked：条件不足时整块隐藏，界面上只留当前可做的事
+      var hide = (locked && act.hideWhenLocked === true) || uiEmployed;
+      if (hide !== btn.hidden) btn.hidden = hide;
+
+      var showLocked = locked || uiEmployed;
+      btn.classList.toggle('is-locked', showLocked);
+      if (showLocked) {
+        btn.setAttribute('aria-disabled', 'true');
+        btn.setAttribute('tabindex', '-1');
+        btn.setAttribute('title', locked ? miss.map(missLabel).join('；') : '已有正式工作，不能再兼职打零工');
+      } else {
+        btn.removeAttribute('aria-disabled');
+        btn.removeAttribute('tabindex');
+        btn.removeAttribute('title');
+      }
+
+      var daysEl = btn.querySelector('.act-days');
+      if (daysEl) daysEl.textContent = showLocked ? '条件不足' : actionDays(act) + ' 天';
+
+      if (!showLocked) unlocked += 1;
+      if (hide) hiddenList.push({ name: act.name, tip: locked ? miss.map(missLabel).join('；') : '已有正式工作' });
+    }
+
+    $('actionHint').textContent = '可做 ' + unlocked + ' 项 · 共 ' + actionsData.length + ' 项';
+
+    // 未解锁线索：让玩家知道「还有别的路」，悬停可看缺什么
+    var hintEl = $('lockHint');
+    if (hintEl) {
+      if (!hiddenList.length) {
+        hintEl.hidden = true;
+        hintEl.innerHTML = '';
+      } else {
+        hintEl.hidden = false;
+        hintEl.innerHTML = '未解锁 ' + hiddenList.length + ' 项：'
+          + hiddenList.map(function (h) {
+              return '<span class="lock-name" title="' + esc(h.tip) + '">' + esc(h.name) + '</span>';
+            }).join(' · ');
+      }
+    }
+  }
+
+  /* ================= [UI层] 测试快捷按钮 ================= */
+  function devAddInt() {
+    state.int += 50;
+    addLog('sys', '【测试】智力 +50 → ' + state.int);
+    dirty = true;
+    render();
+    toast('智力 +50（当前 ' + state.int + '）');
+  }
+
+  function devSubInt() {
+    state.int = Math.max(0, state.int - 50);
+    addLog('sys', '【测试】智力 -50 → ' + state.int);
+    dirty = true;
+    render();
+    toast('智力 -50（当前 ' + state.int + '）');
+  }
+
+  function devAddAge(n) {
+    var add = n || 5;
+    state.age = Math.min(150, getAge() + add);
+    state.y += add;                              // v3.9：年份联动，保持年龄与日历一致
+    addLog('sys', '【测试】年龄 +' + add + ' → ' + state.age + ' 岁（年份 ' + state.y + '）。');
+    dirty = true;
+    render();
+    toast('年龄 ' + state.age + ' 岁');
+  }
+
+  function devSetEdu() {
+    state.edu = '本科';
+    addLog('sys', '【测试】学历已改为「本科」。');
+    dirty = true;
+    render();
+    toast('学历 → 本科');
+  }
+
+  function bindDevTools() {
+    var bar = $('devBar');
+    if (!bar) return;
+
+    bar.addEventListener('click', function (e) {
+      var btn = e.target;
+      while (btn && btn !== bar && !(btn.getAttribute && btn.getAttribute('data-dev'))) btn = btn.parentNode;
+      if (!btn || btn === bar) return;
+
+      var kind = btn.getAttribute('data-dev');
+      if (kind === 'int') devAddInt();
+      else if (kind === 'intMinus') devSubInt();
+      else if (kind === 'age') devAddAge(5);
+      else if (kind === 'edu') devSetEdu();
+      else if (kind === 'close') bar.classList.add('off');
+    });
+
+    $('devOpen').addEventListener('click', function () { bar.classList.remove('off'); });
+  }
+
+  /* ================= v3.4 · S2 标题启动层（时间冻结守卫） =================
+     红线说明：本区块只读 state、只决定「允不允许行动」。
+     advanceDays / monthlySettle / yearlySettle / checkRequires / pickEvent /
+     CAREER / sanitize 一律不碰。
+     与 UI 的接触只有两处：给 .wrap 加/去 inert，以及标题层自身的显隐。
+     ====================================================================== */
+  var TITLE_SKIP = /[?&]rjs_test=1(?:&|$)/.test(String(location.search || ''));
+  var screen = 'title';            // 'title' ｜ 'game'（S3 会再插 'setup'）
+  var uiLocked = true;             // true → doAction 直接返回，一天都不推进
+  var titleSel = 0;
+  var titleItems = [];
+
+  function titleHasSave() {
+    try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; }
+  }
+
+  function closestTitleItem(node, box) {
+    while (node && node !== box) {
+      if (node.getAttribute && node.getAttribute('data-item')) return node;
+      node = node.parentNode;
+    }
+    return null;
+  }
+
+  // 光标移动：跳过置灰项；越界回绕
+  function setTitleSel(idx) {
+    if (!titleItems.length) return;
+    var n = titleItems.length;
+    var i = ((idx % n) + n) % n;
+    var guard = 0;
+    while (titleItems[i].disabled && guard++ < n) i = (i + 1) % n;
+    titleSel = i;
+    for (var k = 0; k < n; k++) {
+      var on = (k === i);
+      titleItems[k].classList.toggle('is-sel', on);
+      titleItems[k].setAttribute('aria-selected', on ? 'true' : 'false');
+    }
+  }
+
+  function showTitle() {
+    var mask = $('titleMask');
+    if (!mask) return;
+    screen = 'title';
+    uiLocked = true;
+    titleItems = Array.prototype.slice.call(document.querySelectorAll('#titleMenu .title-item'));
+
+    var has = titleHasSave();
+    var cont = $('btnTitleContinue');
+    if (cont) {
+      cont.disabled = !has;                              // 无存档置灰
+      cont.setAttribute('aria-disabled', has ? 'false' : 'true');
+    }
+    var hint = $('titleContinueHint');
+    if (hint) hint.textContent = has ? '读取本地存档' : '暂无存档';
+
+    mask.hidden = false;
+    var wrap = document.querySelector('.wrap');
+    if (wrap) {
+      wrap.setAttribute('inert', '');
+      wrap.setAttribute('aria-hidden', 'true');
+      wrap.style.pointerEvents = 'none';                 // inert 不生效时的兜底
+    }
+    setTitleSel(0);
+  }
+
+  function hideTitle() {
+    var mask = $('titleMask');
+    if (mask) mask.hidden = true;
+    var wrap = document.querySelector('.wrap');
+    if (wrap) {
+      wrap.removeAttribute('inert');
+      wrap.removeAttribute('aria-hidden');
+      wrap.style.pointerEvents = '';
+    }
+    screen = 'game';
+    uiLocked = false;
+  }
+
+  function logOpening() {
+    addLog('sys', '故事开始于 ' + state.y + ' 年 ' + state.m + ' 月 ' + state.d + ' 日，' + weekdayOf(state.y, state.m, state.d) + '。');
+    addLog('sys', '初始状态：智力 10 · 体质 10 · 金钱 2800 · 心情 80');
+    addLog('sys', '点击右侧行动推进一天；' + livingCostText());
+  }
+
+  // 兼容入口：无设置页直接开局（默认姓名/性别）。标题菜单现在走 openSetup()。
+  function startNewLife() {
+    state = newState();                 // 日期此刻才取 → 菜单里挂机多久都不影响开局时间
+    state.profile = { name: '无名', sex: '女' };
+    state.logs = [];
+    pendingEvent = null;
+    deferredEventIds = [];
+    lastSeason = null;
+    dirty = true;
+    logOpening();
+    renderActions();
+    updateActionStates();
+    hideTitle();
+    render();
+    toast('新的一局开始了');
+  }
+
+  /* ================= v3.4 · S3 开局设置页 =================
+     红线：不碰 newState 内部生成逻辑，只在外部赋值 state.profile；
+     天赋重抽用既有 rollTalents(2)；属性预览只读 state，不调用任何结算函数。
+     ======================================================== */
+  function setupName() {
+    var el = $('nameInput');
+    var raw = el ? String(el.value || '') : '';
+    raw = raw.replace(/[\u0000-\u001f\u007f]/g, '').replace(/[<>&"']/g, '').trim();
+    return Array.from(raw).slice(0, 8).join('') || '无名';
+  }
+
+  function setupSex() {
+    var on = document.querySelector('#setupSex .sex-btn.is-on');
+    return on ? on.getAttribute('data-sex') : '女';
+  }
+
+  function setSetupSex(sex) {
+    var btns = document.querySelectorAll('#setupSex .sex-btn');
+    for (var i = 0; i < btns.length; i++) {
+      var on = btns[i].getAttribute('data-sex') === sex;
+      btns[i].classList.toggle('is-on', on);
+      btns[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+  }
+
+  function closestSex(node, box) {
+    while (node && node !== box) {
+      if (node.getAttribute && node.getAttribute('data-sex')) return node;
+      node = node.parentNode;
+    }
+    return null;
+  }
+
+  function renderSetupPreview() {
+    var tbox = $('setupTalents');
+    if (tbox) {
+      var list = state.talents || [];
+      tbox.innerHTML = list.map(function (r) {
+        var t = talentById(r && r.id);
+        if (!t) return '';
+        return '<div class="setup-talent"><span class="st-name">' + esc(t.name) + '</span>'
+          + '<span class="st-effect">' + esc(talentEffectText(t, (r && r.level) || 1)) + '</span></div>';
+      }).join('') || '<div class="setup-talent"><span class="st-name">—</span><span class="st-effect">无</span></div>';
+    }
+    var sbox = $('setupStats');
+    if (sbox) {
+      var rows = [
+        ['智力', state.int], ['体质', state.sta], ['魅力', state.cha], ['心志', state.will],
+        ['情商', state.eq], ['运气', state.luck], ['金钱', state.money], ['心情', state.mood + '/' + moodMaxOf()]
+      ];
+      sbox.innerHTML = rows.map(function (r) {
+        return '<div class="setup-stat"><span class="ss-k">' + r[0] + '</span><span class="ss-v">' + r[1] + '</span></div>';
+      }).join('');
+    }
+  }
+
+  function openSetup() {
+    var ts = $('titleScreen'), ss = $('setupScreen');
+    state = newState();                 // 预览档：天赋/前史/属性此刻定下，确认时原样启用
+    screen = 'setup';
+    uiLocked = true;
+    dirty = false;                      // 预览档不算正式进度，不标脏
+    var nameEl = $('nameInput');
+    if (nameEl) nameEl.value = '';
+    setSetupSex('女');
+    renderSetupPreview();
+    if (ts) ts.hidden = true;
+    if (ss) ss.hidden = false;
+    var mask = $('titleMask');
+    if (mask) mask.hidden = false;
+    var wrap = document.querySelector('.wrap');
+    if (wrap) {
+      wrap.setAttribute('inert', '');
+      wrap.setAttribute('aria-hidden', 'true');
+      wrap.style.pointerEvents = 'none';
+    }
+  }
+
+  function closeSetupBackToTitle() {
+    var ts = $('titleScreen'), ss = $('setupScreen');
+    if (ss) ss.hidden = true;
+    if (ts) ts.hidden = false;
+    showTitle();                        // 重建标题层状态（继续按钮可用性、光标归位）
+  }
+
+  function rerollTalent() {
+    state.talents = rollTalents(2);     // 只重抽天赋，不碰属性/前史/日期
+    renderSetupPreview();
+    toast('天赋已重新抽取');
+  }
+
+  function confirmBirth() {
+    var name = setupName();
+    var sex = setupSex();
+    state.profile = { name: name, sex: sex };   // 姓名性别存入 profile（外部赋值，不改 newState）
+    state.logs = [];
+    pendingEvent = null;
+    deferredEventIds = [];
+    lastSeason = null;
+    dirty = true;
+    addLog('sys', '你出生了，取名「' + name + '」（' + sex + '）。');
+    logOpening();
+    renderActions();
+    updateActionStates();
+    hideTitle();
+    render();
+    saveGameSilent();                          // v3.4-S4：刚起名立刻静默落盘，保证出生即有一份档
+    toast('「' + name + '」降生了，新的人生开始');
+  }
+
+  function bindSetup() {
+    var sex = $('setupSex');
+    if (sex) {
+      sex.addEventListener('click', function (e) {
+        var b = closestSex(e.target, sex);
+        if (b) setSetupSex(b.getAttribute('data-sex'));
+      });
+    }
+    var reroll = $('btnReroll');
+    if (reroll) reroll.addEventListener('click', rerollTalent);
+    var confirmBtn = $('btnConfirmBirth');
+    if (confirmBtn) confirmBtn.addEventListener('click', confirmBirth);
+    var back = $('btnSetupBack');
+    if (back) back.addEventListener('click', closeSetupBackToTitle);
+    var nameEl = $('nameInput');
+    if (nameEl) {
+      nameEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); confirmBirth(); }
+      });
+      nameEl.addEventListener('input', function () {
+        var v = Array.from(nameEl.value || '').slice(0, 8).join('');
+        if (v !== nameEl.value) nameEl.value = v;
+      });
+    }
+    document.addEventListener('keydown', function (e) {
+      if (screen !== 'setup') return;
+      if (e.key === 'Escape') { e.preventDefault(); closeSetupBackToTitle(); }
+    });
+  }
+
+  function continueLife() {
+    if (loadGame()) hideTitle();   // 读档成功才关菜单（v3.4-S4：改为布尔返回值，不再比对毫秒 at）
+  }
+
+  function titleAction(name) {
+    if (name === 'new') openSetup();
+    else if (name === 'continue') continueLife();
+    else if (name === 'dex') openDex();
+  }
+
+  function bindTitle() {
+    var menu = $('titleMenu');
+    if (menu) {
+      menu.addEventListener('click', function (e) {
+        var item = closestTitleItem(e.target, menu);
+        if (!item || item.disabled) return;
+        titleAction(item.getAttribute('data-item'));
+      });
+      menu.addEventListener('mouseover', function (e) {
+        var item = closestTitleItem(e.target, menu);
+        if (!item || item.disabled) return;
+        var i = titleItems.indexOf(item);
+        if (i > -1) setTitleSel(i);
+      });
+    }
+    document.addEventListener('keydown', function (e) {
+      if (screen !== 'title') return;
+      var onItem = e.target && e.target.classList && e.target.classList.contains('title-item');
+      if (e.key === 'ArrowDown') { e.preventDefault(); setTitleSel(titleSel + 1); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setTitleSel(titleSel - 1); return; }
+      if (e.key === 'Enter' || e.key === ' ') {
+        if (onItem) return;                 // 让按钮自身的 click 处理，避免触发两次
+        e.preventDefault();
+        var item = titleItems[titleSel];
+        if (item && !item.disabled) titleAction(item.getAttribute('data-item'));
+      }
+    });
+  }
+
+  /* ================= v3.5 · S5 8-bit 音效系统（Web Audio 现场合成） =================
+     红线：不引入任何外部音频文件、不使用 Base64；全部 OscillatorNode 现场合成。
+     与游戏逻辑零耦合：只读写自己的 SFX_KEY 开关，不碰任何存档字段。
+     TITLE_SKIP（测试/模拟环境）下直接静音，避免拖慢 500 局模拟。
+     ============================================================================== */
+  var SoundFX = {
+    ctx: null,
+    enabled: true,
+    unlocked: false,
+
+    init: function () {
+      try { this.enabled = localStorage.getItem(SFX_KEY) !== 'off'; }
+      catch (e) { this.enabled = true; }
+    },
+
+    ensureCtx: function () {
+      if (!this.ctx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        try { this.ctx = new AC(); } catch (e) { return null; }
+      }
+      if (this.ctx.state === 'suspended') {
+        try { this.ctx.resume(); } catch (e) {}
+      }
+      return this.ctx;
+    },
+
+    // 浏览器自动播放策略：首次用户交互（点击/按键/触摸）时激活
+    unlock: function () {
+      if (this.unlocked && this.ctx && this.ctx.state === 'running') return;
+      var ctx = this.ensureCtx();
+      if (!ctx) return;
+      this.unlocked = true;
+      if (ctx.state === 'suspended') {
+        var self = this;
+        ctx.resume().then(function () { self.unlocked = true; }, function () {});
+      }
+    },
+
+    setEnabled: function (on) {
+      this.enabled = !!on;
+      try { localStorage.setItem(SFX_KEY, this.enabled ? 'on' : 'off'); } catch (e) {}
+    },
+    toggle: function () { this.setEnabled(!this.enabled); return this.enabled; },
+
+    // 基础发声：方波/三角波 + 可选滑音 + 硬起音/指数衰减（8-bit 手感）
+    tone: function (o) {
+      var ctx = this.ensureCtx();
+      if (!ctx) return;
+      var t0 = ctx.currentTime + (o.delay || 0);
+      var dur = o.dur || 0.08;
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = o.type || 'square';
+      osc.frequency.setValueAtTime(o.f0 || 440, t0);
+      if (o.f1 && o.f1 !== o.f0) osc.frequency.linearRampToValueAtTime(o.f1, t0 + dur);
+      var peak = (o.vol === undefined ? 0.12 : o.vol);
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(peak, t0 + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.02);
+    },
+
+    play: function (type) {
+      if (!this.enabled || TITLE_SKIP) return;   // 关着 / 测试模拟环境：不出声
+      switch (type) {
+        case 'click':
+          this.tone({ type: 'square', f0: 800, dur: 0.05, vol: 0.10 });
+          break;
+        case 'coin':                                   // 马里奥金币双音阶
+          this.tone({ type: 'square', f0: 988, dur: 0.07, vol: 0.13 });
+          this.tone({ type: 'square', f0: 1318, dur: 0.10, vol: 0.13, delay: 0.07 });
+          break;
+        case 'event':                                  // 神秘上升提示音
+          this.tone({ type: 'triangle', f0: 520, f1: 880, dur: 0.16, vol: 0.13 });
+          this.tone({ type: 'triangle', f0: 880, f1: 1174, dur: 0.12, vol: 0.09, delay: 0.14 });
+          break;
+        case 'death':                                  // 低沉下降滑音
+          this.tone({ type: 'triangle', f0: 330, f1: 70, dur: 0.85, vol: 0.16 });
+          this.tone({ type: 'square', f0: 220, f1: 46, dur: 0.85, vol: 0.05, delay: 0.02 });
+          break;
+        case 'warn':                                   // v3.9：体质告急警报（急促双音）
+          this.tone({ type: 'square', f0: 660, dur: 0.09, vol: 0.15 });
+          this.tone({ type: 'square', f0: 440, dur: 0.09, vol: 0.15, delay: 0.10 });
+          break;
+      }
+    }
+  };
+
+  function renderSfxBtn() {
+    var label = SoundFX.enabled ? '🔊 音效 开' : '🔇 音效 关';
+    ['btnSfx', 'btnSfxTitle'].forEach(function (id) {
+      var el = $(id);
+      if (el) el.textContent = label;
+    });
+  }
+
+  function toggleSfx() {
+    var on = SoundFX.toggle();
+    renderSfxBtn();
+    if (on) SoundFX.play('click');   // 开启时给一声即时反馈
+  }
+
+  function bindAudioUnlock() {
+    var unlock = function () { SoundFX.unlock(); };
+    ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) {
+      document.addEventListener(ev, unlock, { capture: true, passive: true });
+    });
+  }
+
+  function bindGlobalClickSound() {
+    // capture 阶段统一：任何 <button> 被点击都播 click，先于业务逻辑、零散落
+    document.addEventListener('click', function (e) {
+      var n = e.target;
+      while (n && n !== document) {
+        if (n.tagName === 'BUTTON') { SoundFX.play('click'); return; }
+        n = n.parentNode;
+      }
+    }, true);
+  }
+
+  function bindSfxToggle() {
+    var b1 = $('btnSfx');
+    if (b1) b1.addEventListener('click', toggleSfx);
+    var b2 = $('btnSfxTitle');
+    if (b2) b2.addEventListener('click', toggleSfx);
+  }
+
+  function bindAutoSave() {
+    // v3.4-S4 兜底存档：关页面 / 切后台时静默落盘（仅游戏态、人生未结束时）
+    window.addEventListener('beforeunload', function () {
+      if (screen === 'game' && state && !state.ended) saveGameSilent();
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden' && screen === 'game' && state && !state.ended) saveGameSilent();
+    });
+  }
+
+  function boot() {
+    init();                                             // 既有启动流程一字未改
+    bindAutoSave();
+    SoundFX.init();                                     // v3.5：读音效开关
+    bindAudioUnlock();
+    bindGlobalClickSound();
+    bindSfxToggle();
+    renderSfxBtn();
+    var mask = $('titleMask');
+    var auto = TITLE_SKIP || !mask || navigator.webdriver === true;   // 测试/打桩环境直接进游戏
+    if (auto) { screen = 'game'; uiLocked = false; return; }
+    bindTitle();
+    bindSetup();
+    showTitle();
+  }
+
+  /* ================= [UI层] 启动 ================= */
+  function closestAct(node, box) {
+    while (node && node !== box) {
+      if (node.getAttribute && node.getAttribute('data-act')) return node;
+      node = node.parentNode;
+    }
+    return null;
+  }
+
+  function bind() {
+    // 事件委托：按钮是动态生成的，绑在容器上，重绘后无需重新绑定
+    var box = $('actions');
+    if (box) {
+      box.addEventListener('click', function (e) {
+        var btn = closestAct(e.target, box);
+        if (btn) doAction(btn.getAttribute('data-act'));   // 门槛校验在 doAction 内部
+      });
+
+      // 悬停置灰按钮：用气泡说明原因（同一条不重复刷屏）
+      box.addEventListener('mouseover', function (e) {
+        var btn = closestAct(e.target, box);
+        if (!btn) return;
+        var act = findAction(btn.getAttribute('data-act'));
+        if (!act) return;
+
+        var miss = checkRequires(act);
+        if (!miss.length) { lastHoverLock = ''; return; }
+
+        var key = act.id + '|' + miss.map(function (m) { return m.title; }).join(',');
+        if (key === lastHoverLock) return;
+        lastHoverLock = key;
+        toast(lockText(act, miss));
+      });
+    }
+    var rebirth = $('btnRebirth');
+    if (rebirth) {
+      rebirth.addEventListener('click', function () {
+        try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+        location.reload();
+      });
+    }
+
+    var mask = $('eventMask');
+    if (mask) {
+      $('eventOptions').addEventListener('click', function (e) {
+        var node = e.target;
+        while (node && node !== this) {
+          if (node.getAttribute && node.getAttribute('data-idx') !== null) {
+            chooseEvent(Number(node.getAttribute('data-idx')));
+            return;
+          }
+          node = node.parentNode;
+        }
+      });
+    }
+
+    bindDevTools();
+    $('btnSave').addEventListener('click', saveGame);
+    $('btnLoad').addEventListener('click', loadGame);
+    $('btnReset').addEventListener('click', resetGame);
+    // v3.7：回溯时间 + 成就图鉴
+    var btnRewind = $('btnRewind');
+    if (btnRewind) btnRewind.addEventListener('click', rewindTime);
+    var btnAch = $('btnAch');
+    if (btnAch) btnAch.addEventListener('click', openAch);
+    var btnAchClose = $('btnAchClose');
+    if (btnAchClose) btnAchClose.addEventListener('click', closeAch);
+    var achMask = $('achMask');
+    if (achMask) {
+      achMask.addEventListener('click', function (e) { if (e.target === achMask) closeAch(); });
+    }
+
+    // 升学考核：第一次点「参加考试」结算，之后点「确定」关窗
+    var btnExam = $('btnExamGo');
+    if (btnExam) {
+      btnExam.addEventListener('click', function () {
+        if (state.pendingExam) settleExam();
+        else closeExam();
+      });
+    }
+
+    // 图鉴弹窗：页脚按钮 / 关闭按钮 / 点遮罩 / Esc，四种关闭方式
+    var btnDex = $('btnDex');
+    if (btnDex) btnDex.addEventListener('click', openDex);
+    var btnDexClose = $('btnDexClose');
+    if (btnDexClose) btnDexClose.addEventListener('click', closeDex);
+    var dexMask = $('dexMask');
+    if (dexMask) {
+      dexMask.addEventListener('click', function (e) {
+        if (e.target === dexMask) closeDex();
+      });
+    }
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        var pop = $('dexPop');
+        if (pop && !pop.hidden) { hideDexPop(); return; }
+        if (dexMask && !dexMask.hidden) closeDex();
+      }
+    });
+
+    // 点卡片看详情：结算面板与独立弹窗共用一套事件委托
+    ['endDex', 'dexGrid'].forEach(function (id) {
+      var box = $(id);
+      if (!box) return;
+      box.addEventListener('click', function (e) {
+        var card = closestDexCard(e.target);
+        if (card) showDexPop(card);
+      });
+      box.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        var card = closestDexCard(e.target);
+        if (!card) return;
+        e.preventDefault();
+        showDexPop(card);
+      });
+    });
+    bindDexPopOnce();
+    // 滚动 / 改窗口大小：贴士跟着卡片重新定位，而不是直接消失
+    document.addEventListener('scroll', function () {
+      if (dexPopCard) positionDexPop(dexPopCard);
+    }, true);
+    window.addEventListener('resize', function () {
+      if (dexPopCard) positionDexPop(dexPopCard);
+    });
+  }
+
+  function init() {
+    state = newState();
+    renderActions();   // 先按数据画出按钮（含门槛置灰），再绑事件
+    bind();
+    addLog('sys', '故事开始于 ' + state.y + ' 年 ' + state.m + ' 月 ' + state.d + ' 日，' + weekdayOf(state.y, state.m, state.d) + '。');
+    addLog('sys', '初始状态：智力 10 · 体质 10 · 金钱 2800 · 心情 80');
+    addLog('sys', '点击右侧行动推进一天；' + livingCostText());
+    render();
+  }
+
+  // 控制台调试用：改完 window.actionsData 后调用 RJS.renderActions() 即可刷新按钮
+  window.RJS = {
+    get state() { return state; },
+    // ---- v3.4：标题层（只读快照 + 显隐开关，供测试与调试）----
+    get screen() { return screen; },
+    get uiLocked() { return uiLocked; },
+    showTitle: showTitle,
+    hideTitle: hideTitle,
+    startNewLife: startNewLife,
+    continueLife: continueLife,
+    openSetup: openSetup,
+    confirmBirth: confirmBirth,
+    rerollTalent: rerollTalent,
+    setSetupSex: setSetupSex,
+    renderSetupPreview: renderSetupPreview,
+    saveGameSilent: saveGameSilent,
+    advanceDaysAutoSave: advanceDaysAutoSave,
+    resetGame: resetGame,
+    // ---- v3.5：音效系统（供测试与调试）----
+    SoundFX: SoundFX,
+    toggleSfx: toggleSfx,
+    renderSfxBtn: renderSfxBtn,
+    actions: actionsData,
+    renderActions: renderActions,
+    updateActionStates: updateActionStates,
+    render: render,
+    doAction: doAction,
+    checkRequires: checkRequires,
+    inJobCrisis: inJobCrisis,
+    setLayoffRoll: function (fn) { layoffRoll = (typeof fn === 'function') ? fn : Math.random; },
+    events: eventsData,
+    eligibleEvents: function () { return eligibleEvents().map(function (e) { return e.id; }); },
+    openEvent: function (id) { var ev = eventsData.filter(function (x) { return x.id === id; })[0]; if (ev) openEvent(ev); return !!ev; },
+    getPendingEvent: function () { return pendingEvent; },
+    deferred: function () { return deferredEventIds.slice(); },
+    clearDeferred: function () { deferredEventIds = []; },
+
+    pickEvent: function () { return pickEvent(); },
+    endings: endingRules,
+    pickEnding: function () { return pickEnding(); },
+    endLife: function (reason) { return endLife(reason || 'manual'); },
+    reopenEnd: reopenEndPanel,
+    dex: function () { return loadDex(); },
+    clearDex: function () { try { localStorage.removeItem(DEX_KEY); } catch (e) {} },
+    openEventById: function (id) { var ev = findEvent(id); if (ev) openEvent(ev); return !!ev; },
+    setEventRoll: function (fn) { eventRoll = (typeof fn === 'function') ? fn : Math.random; },
+    devAddInt: devAddInt,
+    devSubInt: devSubInt,
+    devAddAge: devAddAge,
+    devSetEdu: devSetEdu,
+
+    // ---- 平衡性模拟专用：只转发既有函数，不改任何逻辑 ----
+    simPendingEvent: function () { return pendingEvent; },
+    simChoose: function (idx) { return chooseEvent(idx); },
+    simSettleExam: function () { if (state.pendingExam) { settleExam(); closeExam(); } return true; }
+  };
+
+  boot();                                          // v3.4：原 init() → boot()，唯一启动切换点
+</script>
+</body>
+</html>
