@@ -165,7 +165,7 @@
       }
     });
     ok('B6 每一个选项分支都能单独结算', errs.length === 0, 'clicks=' + clicks + ' errs=' + errs.slice(0, 3).join(' | '));
-    ok('B7 分支数覆盖全部 305 个选项', clicks === 305, clicks);
+    ok('B7 分支数覆盖全部 348 个选项', clicks === 348, clicks);
   })();
   RES.notes.push('置灰选项：基础态 ' + s1.locked + ' / 富裕态 ' + s2.locked + '；总跳转 ' + (s1.hops + s2.hops));
 

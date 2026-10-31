@@ -2937,6 +2937,7 @@
               state.sta -= 8;
               addLog('danger', '【恶化】结节似乎变大了，你终于决定去医院。');
             }
+            clampStats();
           }
         }
       ]
@@ -3079,6 +3080,436 @@
           requires: { money: { min: 5000 } },
           effects: { money: -5000, mood: -4, eq: 1 },
           result: '你给他们报了豪华团，自己继续加班，心里有点堵。'
+        }
+      ]
+    },
+
+    /* ================= v3.15 学生时期事件库（高中 10 + 大学 10）================= */
+    /* ---- 高中（education: ['高中']，minAge 16 / maxAge 18）---- */
+    {
+      id: 'E_HS_MOCK_EXAM',
+      title: '高三模拟考',
+      description: '高三第一次模拟考，你的名字排在年级倒数第三。班主任把你的卷子拍在桌上：「这就是你的态度？」',
+      weight: 6,
+      requires: { onceEver: true, education: ['高中'], minAge: 16, maxAge: 18 },
+      options: [
+        {
+          label: '熬夜刷题，下次翻盘',
+          effects: { intelligence: 6, stamina: -6, mood: -5 },
+          result: '你把错题本抄了三遍，凌晨两点的台灯比月亮还亮。'
+        },
+        {
+          label: '破罐子破摔',
+          effects: { mood: 6, intelligence: -2, will: -3 },
+          result: '你把卷子揉成一团塞进抽屉，转身去了篮球场。'
+        }
+      ]
+    },
+    {
+      id: 'E_HS_NETCAFE_CAUGHT',
+      title: '网吧被抓',
+      description: '周三下午，你翻墙去网吧打排位。屏幕刚亮，教导主任的手电筒就照在了你脸上。',
+      weight: 5,
+      requires: { onceEver: true, education: ['高中'], minAge: 16, maxAge: 18 },
+      options: [
+        {
+          label: '低头认错，写检查',
+          effects: { mood: -6, will: 3, eq: 2 },
+          result: '你在办公室站了一下午，检讨写得比作文还认真。'
+        },
+        {
+          label: '翻窗就跑',
+          effects: { stamina: -5, mood: 3, will: -2 },
+          result: '你从后窗跳出去，摔了一跤，但没被记名字。'
+        }
+      ]
+    },
+    {
+      id: 'E_HS_BULLY_WITNESS',
+      title: '走廊尽头',
+      description: '放学后，走廊尽头传来推搡声。几个高年级的把一个戴眼镜的男生堵在墙角，书包被扔在地上。',
+      weight: 5,
+      requires: { onceEver: true, education: ['高中'], minAge: 16, maxAge: 18 },
+      options: [
+        {
+          label: '上前拦住',
+          effects: { stamina: -6, mood: 5, will: 5, cha: 3 },
+          result: '你挡在那个男生前面，霸凌者问你「多管闲事？」，你说「对」。',
+          onChoose: function () {
+            if (eventRoll() < 0.3) {
+              state.sta -= 8;
+              addLog('danger', '【挨打】你被推倒在地，但那个男生从此叫你哥。');
+            }
+            clampStats();
+          }
+        },
+        {
+          label: '报告老师',
+          effects: { mood: -2, eq: 4 },
+          result: '你跑去找了班主任，事情很快压了下去。'
+        },
+        {
+          label: '视而不见',
+          effects: { mood: -10, will: -2 },
+          result: '你加快脚步，假装什么都没看见，那天晚上没睡着。'
+        }
+      ]
+    },
+    {
+      id: 'E_HS_PARENT_MEETING',
+      title: '家长会',
+      description: '期中家长会定在周五下午。你爸在电话里说「我那天有事」，你知道他又要缺席了。',
+      weight: 5,
+      requires: { onceEver: true, education: ['高中'], minAge: 16, maxAge: 18 },
+      options: [
+        {
+          label: '花钱找人冒充家长',
+          requires: { money: { min: 500 } },
+          effects: { money: -500, mood: 3, will: -2 },
+          result: '你在校门口租了个「叔叔」，他演技很好，老师一点没怀疑。'
+        },
+        {
+          label: '诚实面对，自己去',
+          effects: { mood: -4, will: 4, eq: 2 },
+          result: '你一个人坐在自己的座位上，老师多看了你几眼，什么也没说。'
+        }
+      ]
+    },
+    {
+      id: 'E_HS_LOVE_LETTER',
+      title: '收到情书',
+      description: '课桌抽屉里多了一张折成心形的信纸，字很娟秀：「如果你愿意，周五放学操场见。」',
+      weight: 6,
+      requires: { onceEver: true, education: ['高中'], minAge: 16, maxAge: 18, single: true, notTeenLove: true, cha: { min: 30 } },
+      options: [
+        {
+          label: '周五去操场',
+          effects: { mood: 12, cha: 4, eq: 3, money: -50 },
+          result: '你在梧桐树下站了很久，直到她笑着走过来。',
+          onChoose: function () { state.hadTeenLove = true; addLog('event', '【早恋】你们在一起了。'); }
+        },
+        {
+          label: '把信放回去',
+          effects: { mood: -4, will: 2, intelligence: 2 },
+          result: '你把信原样放回抽屉，第二天换成了一张「一起考同一所大学」的纸条。'
+        }
+      ]
+    },
+    {
+      id: 'E_HS_LATE_STUDY',
+      title: '一起晚自习',
+      description: '晚自习的教室只剩你们俩，她压低声音问你：「这道题……你会吗？」她的头发蹭到了你的手背。',
+      weight: 5,
+      requires: { onceEver: true, education: ['高中'], minAge: 16, maxAge: 18, single: true },
+      options: [
+        {
+          label: '认真地讲题',
+          effects: { intelligence: 4, eq: 3, mood: 6 },
+          result: '你把这道题讲了四遍，她终于懂了，你却没听清自己的心跳。',
+          onChoose: function () {
+            if (state.hadTeenLove) {
+              state.mood += 3;
+              addLog('event', '【晚自习】和早恋对象一起复习，连做题都变得有意思。');
+            }
+            clampStats();
+          }
+        },
+        {
+          label: '走神，看她',
+          effects: { mood: 4, intelligence: -1, will: -2 },
+          result: '你讲了半天不知所云，她笑了，你却慌了。'
+        }
+      ]
+    },
+    {
+      id: 'E_HS_DESK_GRAFFITI',
+      title: '课桌刻字',
+      description: '你在课桌上刻了一行字：「去更大的世界。」班主任巡检时停在你桌前，盯着那行字看了很久。',
+      weight: 3,
+      requires: { onceEver: true, education: ['高中'], minAge: 16, maxAge: 18 },
+      options: [
+        {
+          label: '坦承是自己刻的',
+          effects: { mood: -2, will: 3, eq: 2 },
+          result: '班主任没批评你，只说「那就别辜负这几个字」。'
+        },
+        {
+          label: '装不知道',
+          effects: { mood: -5, will: -1 },
+          result: '班主任没再追问，但你那天都不敢抬头。'
+        }
+      ]
+    },
+    {
+      id: 'E_HS_CANTEEN_QUEUE',
+      title: '食堂插队',
+      description: '排了二十分钟，快轮到你时，一个高个子直接插到了你前面。',
+      weight: 4,
+      requires: { onceEver: true, education: ['高中'], minAge: 16, maxAge: 18 },
+      options: [
+        {
+          label: '当场指出',
+          effects: { mood: 4, will: 3, cha: 2 },
+          result: '他回头瞪你，你把餐盘往前一推：「排队。」后面的人小声叫好。'
+        },
+        {
+          label: '忍了',
+          effects: { mood: -5, stamina: 1 },
+          result: '你多等了五分钟，饭都凉了。'
+        }
+      ]
+    },
+    {
+      id: 'E_HS_SPORTS_INJURY',
+      title: '体育课崴脚',
+      description: '三对三篮球，你起跳落地时脚踝扭了一下，疼得站不起来。',
+      weight: 4,
+      requires: { onceEver: true, education: ['高中'], minAge: 16, maxAge: 18 },
+      options: [
+        {
+          label: '去医务室',
+          effects: { stamina: -4, mood: -2, intelligence: 1 },
+          result: '校医给你缠了绷带，说「这两周别剧烈运动」。'
+        },
+        {
+          label: '咬牙继续打',
+          effects: { stamina: -10, mood: 6, will: 3 },
+          result: '你打完最后五分钟，第二天脚踝肿得像馒头。'
+        }
+      ]
+    },
+    {
+      id: 'E_HS_GRAD_PHOTO',
+      title: '毕业照',
+      description: '摄影师喊「三、二、一」的时候，你突然想起这三年的很多事。',
+      weight: 3,
+      requires: { onceEver: true, education: ['高中'], minAge: 16, maxAge: 18 },
+      options: [
+        {
+          label: '笑得最用力',
+          effects: { mood: 10, eq: 3 },
+          result: '照片洗出来，你的笑比谁都灿烂，也比谁都不舍。'
+        },
+        {
+          label: '避开镜头',
+          effects: { mood: -3, will: 2 },
+          result: '你站在最后一排角落，只露了半张脸。'
+        }
+      ]
+    },
+
+    /* ---- 大学（isStudent: true）---- */
+    {
+      id: 'E_UNI_DORM_DRAMA',
+      title: '宿舍修罗场',
+      description: '室友凌晨两点还在打游戏，外放声音。你新买的洗发水，三天见了底。',
+      weight: 5,
+      requires: { onceEver: true, isStudent: true, housing: 'dorm', minAge: 18, maxAge: 25 },
+      options: [
+        {
+          label: '摊牌，把话说清楚',
+          effects: { mood: -3, eq: 2, will: 2 },
+          result: '你拉了个宿舍群，把话说开了，气氛尴尬但规矩立住了。'
+        },
+        {
+          label: '忍，买副耳塞',
+          effects: { money: -30, mood: -4, stamina: -1 },
+          result: '你戴上耳塞，也戴上了沉默。'
+        },
+        {
+          label: '申请换宿舍',
+          effects: { mood: 4, money: -200, eq: -2 },
+          result: '新宿舍安静，但你成了别人嘴里「听说很难相处」的人。'
+        }
+      ]
+    },
+    {
+      id: 'E_UNI_EXAM_BRIBE',
+      title: '期末能不能过',
+      description: '高数期中你考了 41 分。期末前，室友神秘地说：「我认识老师，送点东西就能过。」',
+      weight: 5,
+      requires: { onceEver: true, isStudent: true, minAge: 18, maxAge: 25 },
+      options: [
+        {
+          label: '跟着去送礼',
+          requires: { money: { min: 500 } },
+          effects: { money: -500, mood: 2, eq: -2, will: -2 },
+          result: '老师说「下不为例」，你松了口气，也丢了点什么。'
+        },
+        {
+          label: '疯狂复习，靠自己',
+          effects: { intelligence: 6, stamina: -5, mood: -4 },
+          result: '你在图书馆熬了十天，考了 68 分，不高，但踏实。'
+        },
+        {
+          label: '躺平，挂了再说',
+          effects: { mood: 3, intelligence: -2 },
+          result: '你该干嘛干嘛，成绩出来那天，果然挂了。'
+        }
+      ]
+    },
+    {
+      id: 'E_UNI_CLUB_STREET',
+      title: '百团大战',
+      description: '社团招新摆了一操场。学生会说能加综测，街舞社说能认识很多人，你宿舍的床也说它能睡你。',
+      weight: 4,
+      requires: { onceEver: true, isStudent: true, minAge: 18, maxAge: 22 },
+      options: [
+        {
+          label: '加学生会',
+          effects: { eq: 5, cha: 3, mood: -2, money: -50 },
+          result: '你开始写通知、跑场地、陪笑，第二年当上了部长。'
+        },
+        {
+          label: '加街舞社',
+          effects: { cha: 6, stamina: 4, mood: 5 },
+          result: '你练了半年，第一次在迎新晚会上跳舞，台下有人尖叫。'
+        },
+        {
+          label: '宅在宿舍',
+          effects: { mood: 2, intelligence: 2, cha: -2 },
+          result: '你的大学变得很小，但也很安静。'
+        }
+      ]
+    },
+    {
+      id: 'E_UNI_INTERN_CHOICE',
+      title: '大三的岔路',
+      description: '大厂实习的名额只有三个，导师说「去了就别回来」。另一边，考研的倒计时已经开始。',
+      weight: 4,
+      requires: { onceEver: true, isStudent: true, minAge: 20, maxAge: 24 },
+      options: [
+        {
+          label: '去大厂实习',
+          effects: { money: 3000, stamina: -6, intelligence: 4 },
+          result: '你每天通勤两小时，做着最基础的活，但简历上多了一行。',
+          nextEventId: 'E_UNI_INTERN_RESULT'
+        },
+        {
+          label: '备考研究生',
+          effects: { mood: -6, money: -1500, intelligence: 6 },
+          result: '你买齐了资料，把手机壁纸换成了倒计时。'
+        }
+      ]
+    },
+    {
+      id: 'E_UNI_INTERN_RESULT',
+      title: '实习结束',
+      description: '实习结束的时候，主管把你的工牌收走，说了一句「有机会常联系」。',
+      weight: 1,
+      chainOnly: true,
+      requires: { isStudent: true },
+      options: [
+        {
+          label: '争取转正',
+          effects: {},
+          result: '你把简历又改了一遍。',
+          onChoose: function () {
+            if (eventRoll() < 0.4) {
+              state.money += 5000;
+              addLog('event', '【转正】主管说「毕业了来我们这」，你悬着的心放下了。');
+            } else {
+              state.mood -= 8;
+              addLog('sys', '【画饼】主管说「再等等」，你知道那是委婉的拒绝。');
+            }
+            clampStats();
+          }
+        }
+      ]
+    },
+    {
+      id: 'E_UNI_TUTOR_JOB',
+      title: '家教',
+      description: '中介发来消息：初中生家教，一小时八十。你看了眼下个月的生活费。',
+      weight: 4,
+      requires: { onceEver: true, isStudent: true, minAge: 18, maxAge: 25 },
+      options: [
+        {
+          label: '接，反正闲不住',
+          effects: { money: 800, stamina: -3, mood: -2, intelligence: 2 },
+          result: '你每周跑三趟，钱是挣到了，周末也没了。'
+        },
+        {
+          label: '不接，专心学业',
+          effects: { mood: 2, intelligence: 3 },
+          result: '你婉拒了，把钱省给了睡眠和绩点。'
+        }
+      ]
+    },
+    {
+      id: 'E_UNI_ROLL_CALL',
+      title: '帮我点个到',
+      description: '室友去约会，你不会被点到，但你得替他答「到」。点名时，老师突然问：「你是本人吗？」',
+      weight: 4,
+      requires: { onceEver: true, isStudent: true, minAge: 18, maxAge: 25 },
+      options: [
+        {
+          label: '硬着头皮答「是」',
+          effects: { mood: -4, eq: 2, will: -1 },
+          result: '老师盯了你两秒，说「坐下吧」，你后背全是汗。'
+        },
+        {
+          label: '坦白，替他请假',
+          effects: { mood: -2, eq: 4, cha: 2 },
+          result: '老师没生气，反而夸你「还算实诚」。'
+        }
+      ]
+    },
+    {
+      id: 'E_UNI_LONG_DISTANCE',
+      title: '异地恋',
+      description: '高中在一起的那个人，考去了另一座城市。车票越攒越多，视频通话越来越短。',
+      weight: 3,
+      requires: { onceEver: true, isStudent: true, single: true, minAge: 18, maxAge: 25 },
+      options: [
+        {
+          label: '每个月见一次',
+          effects: { money: -800, mood: 10, stamina: -2 },
+          result: '你在硬座上睡了三小时，出站时她扑过来抱住了你。'
+        },
+        {
+          label: '好聚好散',
+          effects: { mood: -8, will: 3, intelligence: 2 },
+          result: '你们把聊天记录翻了一遍，然后互相说了句「保重」。'
+        }
+      ]
+    },
+    {
+      id: 'E_UNI_THESIS',
+      title: '查重率 48%',
+      description: '查重报告出来了，48%。导师只回了两个字：「重写。」',
+      weight: 4,
+      requires: { onceEver: true, isStudent: true, minAge: 20, maxAge: 25 },
+      options: [
+        {
+          label: '熬夜自己改',
+          effects: { stamina: -6, intelligence: 5, mood: -6 },
+          result: '你改了四天，查重降到 9%，头发少了三分之一。'
+        },
+        {
+          label: '花钱找人降重',
+          requires: { money: { min: 500 } },
+          effects: { money: -500, mood: 2, intelligence: -1 },
+          result: '对方三天搞定，你拿到一份查重 5% 但你自己都读不懂的论文。'
+        }
+      ]
+    },
+    {
+      id: 'E_UNI_GRAD_PHOTO',
+      title: '学士帽',
+      description: '毕业典礼那天，你把学士帽扔向天空，风把穗子吹成了一致的角度。',
+      weight: 3,
+      requires: { onceEver: true, isStudent: true, minAge: 20, maxAge: 25 },
+      options: [
+        {
+          label: '和所有人合影',
+          effects: { mood: 12, eq: 3, cha: 2 },
+          result: '你拍了几百张照片，每一张都笑得很用力。'
+        },
+        {
+          label: '一个人走一圈',
+          effects: { mood: 4, will: 3, intelligence: 1 },
+          result: '你把校园每个角落都走了一遍，然后头也不回地离开。'
         }
       ]
     }
