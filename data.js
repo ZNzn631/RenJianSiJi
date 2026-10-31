@@ -543,6 +543,42 @@
         markJobChange();
         addLog('event', '你开了第一个直播间，前三个月月流水 9000 上下，很不稳定。');
       }
+    },
+    /* v3.22：股市投资（stockValue 只在这里与 settleStocks 里增改） */
+    {
+      id: 'buyStock',
+      name: '买入股票',
+      description: '把一万元放进大盘里，赌它下个月是牛市。',
+      costDays: 1,
+      effects: { money: -10000 },
+      displayEffects: { money: -10000 },
+      hideWhenLocked: true,
+      requires: { money: { min: 10000 }, minAge: 18 },
+      denyText: { money: '现金不足 10000，买不起。' },
+      onRun: function () {
+        state.stockValue = (state.stockValue || 0) + 10000;
+        state.money -= 100;   // v3.23：交易摩擦，买入固定手续费 100
+        addLog('event', '【股票】买入 10000 元（手续费 100），当前市值 ' + state.stockValue + ' 元。');
+      }
+    },
+    {
+      id: 'sellStock',
+      name: '卖出股票',
+      description: '把账户里的持仓全部变现，落袋为安。',
+      costDays: 1,
+      effects: {},
+      displayEffects: {},
+      hideWhenLocked: true,
+      requires: { stockValue: { min: 1 }, minAge: 18 },
+      onRun: function () {
+        var v = state.stockValue || 0;
+        if (v > 0) {
+          var fee = Math.max(1, Math.round(v * 0.01));   // v3.23：卖出 1% 手续费
+          state.money += v - fee;
+          addLog('event', '【股票】卖出全部持仓 ' + v + ' 元，扣手续费 ' + fee + '，到手 ' + (v - fee) + ' 元。');
+        }
+        state.stockValue = 0;
+      }
     }
   ];
 
@@ -5419,6 +5455,54 @@
         }
       ]
     }
+,
+
+
+    /* v3.22：股市投资——内部消息 */
+    {
+      id: 'E_STOCK_TIP',
+      title: '内部消息',
+      description: '一个在券商的朋友半夜给你打电话，说某只票下周要重组，消息来源「很可靠」。他说完就挂了，你没来得及问是真是假。',
+      weight: 5,
+      requires: { minAge: 22, stockValue: { min: 1 } },
+      options: [
+        {
+          label: '全仓梭哈，再加五万',
+          requires: { money: { min: 50000 } },
+          effects: { money: -50000 },
+          result: '你把能动的钱都转了进去，第二天开盘，手心全是汗。',
+          onChoose: function () {
+            state.stockValue = (state.stockValue || 0) + 50000;
+            if ((state.luck || 0) < 150) {
+              state.money = Math.round((state.money || 0) * 0.2);        // 现金蒸发 80%
+              state.stockValue = Math.round((state.stockValue || 0) * 0.5);
+              state.mood = Math.max(0, state.mood - 30);
+              clampStats();
+              addLog('danger', '【股灾】内幕消息是假的！现金蒸发 80%（剩 ' + state.money + ' 元），'
+                + (state.money < 0 ? '你负债了。' : '心情跌到 ' + state.mood + '。'));
+            } else {
+              addLog('event', '【股票】内幕应验，加仓 50000 元，市值 ' + state.stockValue + ' 元。');
+            }
+          }
+        },
+        {
+          label: '半信半疑，小买一万',
+          requires: { money: { min: 10000 } },
+          effects: { money: -10000 },
+          result: '你只买了一点，既怕踏空，又怕接盘。',
+          onChoose: function () {
+            state.stockValue = (state.stockValue || 0) + 10000;
+            addLog('event', '【股票】小买 10000 元，市值 ' + state.stockValue + ' 元。');
+          }
+        },
+        {
+          label: '不信，当没接过这个电话',
+          effects: { mood: 2, eq: 1 },
+          result: '你把手机翻过去继续睡。后来才知道，那天夜里确实有人一夜暴富，也有人一夜上天台。'
+        }
+      ]
+    }
+
   ];
 
   // 按 id 查行动：线性查找而不是静态索引，保证外部往 actionsData 里 push 新条目后立刻可用
@@ -5511,7 +5595,8 @@
     eq:           { key: 'eq',    label: '情商' },
     luck:         { key: 'luck',  label: '运气' },
     money:        { key: 'money', label: '金钱' },
-    mood:         { key: 'mood',  label: '心情' }
+    mood:         { key: 'mood',  label: '心情' },
+    stockValue:   { key: 'stockValue', label: '股票市值' }   // v3.22：只进 ATTRS（供 checkRequires/optionMeta），不进 ATTR_ORDER，避免 applyEffects 误结算
   };
   var ATTR_ORDER = ['intelligence', 'stamina', 'cha', 'will', 'eq', 'luck', 'money', 'mood'];
 

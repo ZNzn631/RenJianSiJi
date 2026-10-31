@@ -506,6 +506,7 @@
       luck: 10,                                        // 运气
       money: 2800,
       mood: 80,
+      stockValue: 0,        // v3.22：股票市值（买入即 +1 万成本，settleStocks 每月按运气/随机涨跌）
       housing: 'home',    // v3.5.4：居住状态 home/dorm/rent（开局住家，上大学→dorm，工作→rent）
       isStudent: false,   // v3.7：在校生（本科/专科且 <22 岁），由规则动态判定
       /* --- 婚姻系统（v3.0）：全部为新增字段，旧档由 sanitize 补默认值 --- */
@@ -786,6 +787,29 @@
     return true;
   }
 
+  // v3.23：股票每月结算。只读/写 state.stockValue，不碰 money / 生活费 / 工资。
+  // 牛市 +50%（基础 35% ± 运气加成），熊市 −60%（固定 30%），其余平稳。
+  // 长期期望为负：0.35×(+50%) + 0.30×(−60%) = +17.5% − 18% = −0.5%（不含手续费）。
+  function settleStocks() {
+    var v = state.stockValue || 0;
+    if (!(v > 0)) return;                      // 没持仓，不产生日志噪音
+
+    var roll = eventRoll();
+    var bull = 0.35 + Math.max(-0.2, Math.min(0.2, ((state.luck || 0) - 50) / 500));
+    var bear = 0.30;
+    var old = v;
+
+    if (roll < bull) {
+      state.stockValue = Math.round(v * 1.5);
+      addLog('event', '【股票】牛市！持仓 ' + old + ' → ' + state.stockValue + '（+50%）。');
+    } else if (roll < bull + bear) {
+      state.stockValue = Math.round(v * 0.4);
+      addLog('danger', '【股票】熊市！持仓 ' + old + ' → ' + state.stockValue + '（−60%）。');
+    } else {
+      addLog('sys', '【股票】本月行情平稳，持仓 ' + v + ' 不变。');
+    }
+  }
+
   function monthlySettle() {
     // 生活成本随收入水涨船高：有工作时按比例计，无业按保底（数值见 LIVING_RATE / LIVING_BASE）
     var livingCost = livingCostOf(state.salary);
@@ -835,6 +859,7 @@
       addLog('sys', '【养老金】这个月到账 ' + PENSION + ' 元。');
     }
     if (state.married || (state.children && state.children.length)) settleFamily();   // v3.1：已婚或有孩子都要家庭月结
+    settleStocks();                              // v3.22：股票每月涨跌（只动 stockValue，不碰生活费/工资）
     checkDisease();                              // v3.13：跨月疾病判定（只排队，弹窗交给 triggerMonthlyEvent）
   }
 
@@ -1947,6 +1972,7 @@
       luck: asInt(s.luck, 10, 0, 500),
       money: isFinite(Number(s.money)) ? Math.round(Number(s.money)) : 2800,
       mood: asInt(s.mood, 80, 0, moodMaxVal),
+      stockValue: asInt(s.stockValue, 0, 0, 999999999),   // v3.22：旧档缺失 → 0
       housing: (s.housing === 'dorm' || s.housing === 'rent') ? s.housing : 'home',   // v3.5.4：居住状态，旧档缺省 home
       isStudent: (s.edu === '本科' || s.edu === '专科') && (Number(s.age) || 0) < 22,   // v3.7：在校生（读档时按学历+年龄回推）
       /* --- 婚姻系统字段（v3.0）--- */
