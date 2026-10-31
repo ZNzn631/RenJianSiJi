@@ -484,6 +484,65 @@
         state.usage = {};                        // 重置每日/每周次数限制
         addLog('event', '你辞去了「' + old + '」的工作。');
       }
+    },
+
+    /* v3.19：三个新职业的入职入口（数据层新增，不改引擎；晋升/降职对平级职业自动锁死） */
+    {
+      id: 'jobTeacher',
+      name: '应聘人民教师',
+      description: '考编，然后是几十年的黑板。',
+      costDays: 1,
+      effects: { mood: -1, eq: 2 },
+      displayEffects: { mood: -1, eq: 2 },
+      hideWhenLocked: true,
+      requires: { minAge: 22, minEdu: '本科', isStudent: false, unemployed: true, eq: { min: 40 } },
+      onRun: function () {
+        state.job = '人民教师';
+        state.salary = JOBS['人民教师'].salary;
+        state.housing = 'rent';
+        state.totalWorkYears = 0;
+        state.currentPositionYears = 0;
+        markJobChange();
+        addLog('event', '你考上了编制，成了一名教师，月薪 7000。');
+      }
+    },
+    {
+      id: 'jobRider',
+      name: '注册外卖骑手',
+      description: '租车、买箱、领工服，今天就能上线。',
+      costDays: 1,
+      effects: { mood: 1, stamina: -2 },
+      displayEffects: { mood: 1, stamina: -2 },
+      hideWhenLocked: true,
+      requires: { minAge: 20, unemployed: true, stamina: { min: 50 } },
+      onRun: function () {
+        state.job = '外卖骑手';
+        state.salary = JOBS['外卖骑手'].salary;
+        state.housing = 'rent';
+        state.totalWorkYears = 0;
+        state.currentPositionYears = 0;
+        markJobChange();
+        addLog('event', '你成了众包骑手，跑得多月入 8000 上下，全靠这双腿。');
+      }
+    },
+    {
+      id: 'jobStreamer',
+      name: '开播试试',
+      description: '补光灯、声卡、一张能说会道的嘴。',
+      costDays: 1,
+      effects: { mood: 2, stamina: -1, money: -1500 },
+      displayEffects: { mood: 2, money: -1500 },
+      hideWhenLocked: true,
+      requires: { minAge: 18, unemployed: true, cha: { min: 55 }, luck: { min: 45 }, money: { min: 1500 } },
+      onRun: function () {
+        state.job = '网红主播';
+        state.salary = JOBS['网红主播'].salary;
+        state.housing = 'rent';
+        state.totalWorkYears = 0;
+        state.currentPositionYears = 0;
+        markJobChange();
+        addLog('event', '你开了第一个直播间，前三个月月流水 9000 上下，很不稳定。');
+      }
     }
   ];
 
@@ -4836,6 +4895,530 @@
         }
       ]
     }
+,
+
+    /* ================================================================
+       v3.19 · 职业专属高光与至暗时刻（16 条 + 5 条链式后续）
+       ---------------------------------------------------------------
+       四类职业：大厂程序员 / 人民教师 / 外卖骑手 / 网红主播。
+       全部事件 requires 带 job + minAge；16 条主事件进常规池，
+       5 条 chainOnly 只由 nextEventId 唤出（大厂 2、教师 1、骑手 1、主播 1）。
+       只读写既有字段与既有引擎函数（doLayoff / hospitalize / endLife / clampStats）。
+       ================================================================ */
+
+    /* ---------------- 一、大厂程序员 ---------------- */
+    {
+      id: 'E_JOB_BIGCO_P0',
+      title: '半夜的 P0',
+      description: '凌晨一点四十，告警电话把你从床上掀起来。核心接口全线超时，老板在群里连发九条消息，每条都 @你。',
+      weight: 7,
+      requires: { job: '大厂程序员', minAge: 22 },
+      options: [
+        {
+          label: '通宵定位，天亮前把窟窿堵上',
+          effects: { intelligence: 5, stamina: -10, money: 2000 },
+          result: '四点半恢复。你在工位上眯了两小时，九点照常开会，会上没人提你的名字。',
+          onChoose: function () {
+            addLog('event', '【P0】值班补贴 2000 已到账（凌晨四点的打车费另报）。');
+          }
+        },
+        {
+          label: '甩锅给测试，先在群里把话说清楚',
+          effects: { eq: -5, mood: -10 },
+          result: '你在群里列了三条时间线，字字都对。第二天测试组没人跟你说话。'
+        }
+      ]
+    },
+    {
+      id: 'E_JOB_BIGCO_NODULE',
+      title: '体检报告的结节',
+      description: '公司体检加了两项。报告上甲状腺那栏写着「结节，建议复查」，而镜子里那撮头发已经盖不住头顶。',
+      weight: 6,
+      requires: { job: '大厂程序员', minAge: 22 },
+      options: [
+        {
+          label: '花钱做手术和理疗',
+          effects: { money: -20000, stamina: 10 },
+          result: '微创，三天出院。病理是良性。你把报告拍照发给了家里，说「没事，就是切了个包」。',
+          onChoose: function () {
+            state.sta = Math.min(100, state.sta + 5);
+            clampStats();
+            addLog('event', '【健康】手术后你请了两周假，这是三年来第一次连续休息这么久。');
+          }
+        },
+        {
+          label: '顺其自然，先买顶假发',
+          effects: { money: -1000, mood: -5 },
+          result: '假发很自然，同事说「你最近气色不错」。只有你知道那是三十七块钱一顶的护理液在撑着。'
+        }
+      ]
+    },
+    {
+      id: 'E_JOB_BIGCO_35',
+      title: '35 岁的毕业通知',
+      description: 'HR 把你叫进小会议室，桌上放着一份 N+1 协议，纸角压得很平。她说「不是你的问题」。窗外是这栋楼最好的景色。',
+      weight: 8,
+      requires: { job: '大厂程序员', minAge: 35, onceEver: true },
+      options: [
+        {
+          label: '拿钱走人，去大理住两个月',
+          effects: { mood: 20 },
+          result: '签字那天你走得很慢。第二天买了张单程票，在大理住下，第一次在早上七点自然醒。',
+          onChoose: function () {
+            var pack = Math.max(0, Math.round((state.salary || 0) * 1.5)) + 50000;
+            state.money += pack;
+            doLayoff('N+1 协议');
+            state.mood = Math.min(moodMaxOf(), state.mood + 10);
+            clampStats();
+            addLog('event', '【离职】N+1 到手 ' + pack + ' 元（含补偿与年假折算），你正式失业了。');
+          }
+        },
+        {
+          label: '接受降薪 30%，留下来',
+          effects: { mood: -20, will: 3 },
+          result: '协议换成了另一份。工位从窗边挪到过道，你的名字从项目群里消失了。',
+          onChoose: function () {
+            var prevJob = (CAREER[state.job] || {}).prev;
+            state.salary = Math.max(3000, Math.round((state.salary || 0) * 0.7));
+            if (prevJob) state.job = prevJob;
+            state.currentPositionYears = 0;
+            markJobChange();
+            addLog('danger', '【降薪】月薪降到 ' + state.salary + ' 元，职级退回「'
+              + (state.job === '大厂程序员' ? '原岗（无处可退）' : state.job) + '」。');
+          },
+          nextEventId: 'E_JOB_BIGCO_EDGE'
+        }
+      ]
+    },
+    {
+      id: 'E_JOB_BIGCO_HEART',
+      title: '猝死边缘',
+      description: '连续两周凌晨两点下班。这天你刚坐下，胸口像被一只手攥住，眼前一阵一阵发白，右手还搭在键盘上。',
+      weight: 6,
+      requires: { job: '大厂程序员', minAge: 22 },
+      options: [
+        {
+          label: '立刻叫车去医院',
+          effects: { money: -5000, stamina: 5 },
+          result: '急诊做了心电图，医生说「再晚来一点就不好说」。你躺在观察室的床上，第一次觉得天花板很白。',
+          nextEventId: 'E_JOB_BIGCO_STENT'
+        },
+        {
+          label: '含两颗救心丸，先把这段敲完',
+          effects: { mood: -10 },
+          result: '你把药压在舌下，盯着屏幕上滚动的日志。手在抖，代码还在跑。',
+          onChoose: function () {
+            if (rnd(100) < 70) {
+              addLog('danger', '【猝死】这口气没能缓过来。');
+              endLife('health');
+            } else {
+              state.sta = Math.max(0, state.sta - 12);
+              state.mood = Math.max(0, state.mood - 10);
+              clampStats();
+              addLog('danger', '【警告】你熬过了这一夜，但身体已经记账了（体质 −12）。');
+            }
+          }
+        }
+      ]
+    },
+    {
+      id: 'E_JOB_BIGCO_EDGE',
+      title: '边缘化',
+      description: '留下来的第一个月，你被移出了三个项目群。新来的组长比你小六岁，安排你「把历史文档整理一下」。周报要写，会要开，活儿没有了。',
+      weight: 1,
+      chainOnly: true,
+      requires: { job: '大厂程序员', minAge: 22 },
+      options: [
+        {
+          label: '一边整理文档，一边偷偷面试',
+          effects: { mood: -6, intelligence: 3, eq: 3 },
+          result: '午休时间你在消防通道里接了三场电话面试，信号不好，但对方说「下周聊」。'
+        },
+        {
+          label: '把冷板凳坐穿，等一个机会',
+          effects: { mood: -18, will: 4 },
+          result: '你每天准时到，准时走，工位很干净。第三个月，连周报都没人找你要了。'
+        },
+        {
+          label: '主动提离职，把话说得体面',
+          effects: { mood: -8, will: 3 },
+          result: '你说「想换个环境」。组长点点头，说「理解」，然后签了字。',
+          onChoose: function () {
+            doLayoff('主动离职');
+            addLog('event', '【离职】你自己走的，没有补偿，但也没有再等。');
+          }
+        }
+      ]
+    },
+    {
+      id: 'E_JOB_BIGCO_STENT',
+      title: '一根支架',
+      description: '造影做完了，医生说血管堵了七成，建议放支架。你问了价格，又问了「能不能先吃药看看」。',
+      weight: 1,
+      chainOnly: true,
+      requires: { job: '大厂程序员', minAge: 22 },
+      options: [
+        {
+          label: '放，钱可以再挣',
+          effects: { money: -60000, stamina: 12, mood: 4 },
+          result: '手术四十分钟。醒来时你第一件事是摸手机，看见 47 条未读，一条也没回。',
+          onChoose: function () {
+            state.sta = Math.min(100, state.sta + 8);
+            clampStats();
+            addLog('event', '【手术】医保报完自付 6 万。医生说以后别熬夜了，你答应了。');
+          }
+        },
+        {
+          label: '先吃药控制，回去继续上班',
+          effects: { stamina: -6, mood: -8, money: -3000 },
+          result: '药盒一天三次，你常常在下午那顿忘记。加班的时候，胸口还是会紧一下。'
+        }
+      ]
+    },
+
+    /* ---------------- 二、人民教师 ---------------- */
+    {
+      id: 'E_JOB_TEACHER_PARENT',
+      title: '熊家长',
+      description: '学生在走廊自己跑摔了，膝盖蹭破。第二天家长堵在办公室门口，说你推了孩子，要求学校给个说法。',
+      weight: 7,
+      requires: { job: '人民教师', minAge: 22 },
+      options: [
+        {
+          label: '硬刚到底，调监控',
+          effects: { will: 5, mood: -15 },
+          result: '监控放了三遍，家长没道歉，走的时候摔了门。校长在会上说「以后注意方式方法」。'
+        },
+        {
+          label: '赔礼道歉，息事宁人',
+          effects: { money: -2000, mood: -10 },
+          result: '你买了水果上门，说了七次对不起。走出小区时天已经黑了，你在路边站了一会儿。'
+        }
+      ]
+    },
+    {
+      id: 'E_JOB_TEACHER_GIFT',
+      title: '教师节的购物卡',
+      description: '放学后，一个家长把你拉到楼梯拐角，往你手里塞了张卡，说「一点心意，孩子还得靠您多照顾」。卡面是五千。',
+      weight: 6,
+      requires: { job: '人民教师', minAge: 22 },
+      options: [
+        {
+          label: '严词拒绝，把卡塞回去',
+          effects: { will: 10, cha: 5 },
+          result: '你说「这个我不能收」，说得很大声。第二天那孩子在班里被调到了第一排——不是你的意思。'
+        },
+        {
+          label: '收下，反正没人知道',
+          effects: { money: 5000, will: -10 },
+          result: '卡进了抽屉最里层。之后再看见那个家长，你总是先笑。'
+        }
+      ]
+    },
+    {
+      id: 'E_JOB_TEACHER_TITLE',
+      title: '职称评定',
+      description: '高级职称的名额只有一个，材料要装订成册。你连着一个月熬到十二点，教案摞起来比教案本还高。',
+      weight: 6,
+      requires: { job: '人民教师', minAge: 22, onceEver: true },
+      options: [
+        {
+          label: '找人打点一下关系',
+          effects: { money: -15000, mood: -4 },
+          result: '饭局上你敬了七杯酒，说了一晚上「以后还要多请教」。',
+          onChoose: function () {
+            state.salary = (state.salary || 0) + 2000;
+            addLog('event', '【职称】材料送审通过，月薪上调 2000（现行 ' + state.salary + ' 元）。');
+          },
+          nextEventId: 'E_JOB_TEACHER_TITLE_B'
+        },
+        {
+          label: '凭实力硬卷，材料自己写到天亮',
+          effects: { intelligence: -5, stamina: -10 },
+          result: '你交上去的册子最厚。公示那天，名字不在上面。'
+        }
+      ]
+    },
+    {
+      id: 'E_JOB_TEACHER_TITLE_B',
+      title: '公示期',
+      description: '职称名单公示七天，你的名字在第三个。第五天，教育局收到一封匿名举报信，说你「材料造假」。',
+      weight: 1,
+      chainOnly: true,
+      requires: { job: '人民教师', minAge: 22 },
+      options: [
+        {
+          label: '把每一页原件都翻出来对',
+          effects: { will: 5, mood: -8, intelligence: 2 },
+          result: '查了三天，全部对得上。举报信没有署名，事情就这么过去了，但你知道是谁。'
+        },
+        {
+          label: '主动撤回，明年再报',
+          effects: { mood: -12, money: -3000 },
+          result: '撤回申请那张表，你填得比教案还工整。'
+        }
+      ]
+    },
+    {
+      id: 'E_JOB_TEACHER_STUDENT',
+      title: '叛逆期的课代表',
+      description: '你带了三年的课代表，这周逃了两节课，作业本上是别人的字。走廊尽头，你看见 TA 和一个高年级的学生站在一起。',
+      weight: 6,
+      requires: { job: '人民教师', minAge: 22 },
+      options: [
+        {
+          label: '叫家长，当着办公室批评',
+          effects: { eq: -5, mood: -4 },
+          result: '孩子站在办公室中间，一句话没说。第二天，课代表的职务被撤了，作业本再也没交过。'
+        },
+        {
+          label: '放学后单独聊聊，像朋友那样',
+          effects: { eq: 10, mood: 10 },
+          result: '你们在操场边坐了一小时。TA 说了很多，你大多时候只是听着。'
+        }
+      ]
+    },
+
+    /* ---------------- 三、外卖骑手 ---------------- */
+    {
+      id: 'E_JOB_RIDER_RAIN',
+      title: '暴雨天的超时',
+      description: '雨大到看不清路。前面路口的红灯还有 90 秒，手机上的订单只剩 2 分钟，超时罚 20，差评扣 100。',
+      weight: 7,
+      requires: { job: '外卖骑手', minAge: 22 },
+      options: [
+        {
+          label: '闯过去，逆行抄近道',
+          effects: { stamina: -5, money: 200 },
+          result: '你贴着护栏冲过去，一辆货车在身后按了很长的喇叭，雨水灌进领口。',
+          nextEventId: 'E_JOB_RIDER_NEAR'
+        },
+        {
+          label: '原地等绿灯，认罚',
+          effects: { money: -100, mood: -5 },
+          result: '订单超时四分钟。你在雨里给顾客打了三个电话，第三个被挂断。'
+        }
+      ]
+    },
+    {
+      id: 'E_JOB_RIDER_NEAR',
+      title: '擦肩',
+      description: '拐弯的一瞬间，一辆右转的车贴着你过去，后视镜刮到你的手肘。你连人带车歪在路边，餐盒没洒。',
+      weight: 1,
+      chainOnly: true,
+      requires: { job: '外卖骑手', minAge: 22 },
+      options: [
+        {
+          label: '扶起车，先把这单送了',
+          effects: { stamina: -6, mood: -8, money: 50 },
+          result: '手肘渗着血，你把餐递到门口，顾客说「怎么这么慢」。'
+        },
+        {
+          label: '坐在马路牙子上抽根烟',
+          effects: { stamina: -2, mood: 4, will: 2 },
+          result: '雨小了。你坐了十分钟，第一次觉得这条街这么宽。'
+        },
+        {
+          label: '报警，走保险流程',
+          effects: { money: -300, mood: -3, eq: 2 },
+          result: '交警来了，做了笔录。保险赔了修车钱，误工费没有。'
+        }
+      ]
+    },
+    {
+      id: 'E_JOB_RIDER_GUARD',
+      title: '高档小区的保安',
+      description: '保安拦在门口，说「外卖不许进」。顾客在电话里骂你，骂到你听见背景音里有人在笑。',
+      weight: 6,
+      requires: { job: '外卖骑手', minAge: 22 },
+      options: [
+        {
+          label: '忍下来，隔着栏杆鞠躬道歉',
+          effects: { mood: -15 },
+          result: '你把餐放在岗亭外的台阶上，对着电话说了三遍对不起。单子还是被打了差评。'
+        },
+        {
+          label: '和保安吵起来，最后动了手',
+          effects: { stamina: -10, money: -500, mood: -20 },
+          result: '两人被拉到物业办公室。你赔了五百块，站长来接你，一路上没说话。',
+          onChoose: function () {
+            addLog('danger', '【冲突】派出所做了笔录，没有拘留，但你的名字进了这个小区的黑名单。');
+          }
+        }
+      ]
+    },
+    {
+      id: 'E_JOB_RIDER_BATTERY',
+      title: '电瓶被偷了',
+      description: '下楼的时候，车还在，电瓶没了。锁挂在踏板上，被剪断的截面很新。这辆车是你分期买的，还差四期。',
+      weight: 6,
+      requires: { job: '外卖骑手', minAge: 22 },
+      options: [
+        {
+          label: '报警，等消息',
+          effects: { money: -3000, mood: -6 },
+          result: '警察做了笔录，说「有消息通知你」。你等了三个月，接到过一个回访电话。'
+        },
+        {
+          label: '咬牙花三千买个新的，今天还得跑',
+          effects: { money: -3000, mood: -10 },
+          result: '新电瓶装上，你当天跑到了晚上十一点，把这一天补回来一半。'
+        }
+      ]
+    },
+    {
+      id: 'E_JOB_RIDER_WALLET',
+      title: '捡到的包',
+      description: '送餐路上，一个黑色手包躺在绿化带边上。拉开一条缝，里面是一沓现金，目测一万多，还有身份证和几张卡。',
+      weight: 5,
+      requires: { job: '外卖骑手', minAge: 22 },
+      options: [
+        {
+          label: '交给警察',
+          effects: { luck: 10, cha: 5, mood: 6 },
+          result: '失主后来专门到站点送了面锦旗，站长把它挂在了墙上，还给你发了两百块奖金。',
+          onChoose: function () {
+            state.money += 200;
+            addLog('event', '【拾金不昧】站点奖励 200 元。');
+          }
+        },
+        {
+          label: '收起来，反正没人看见',
+          effects: { money: 10000, will: -20, mood: -8 },
+          result: '你把包塞进外卖箱最底下，一整天心跳都很快。',
+          onChoose: function () {
+            if (rnd(100) < 45) {
+              state.money -= 8000;
+              state.mood = Math.max(0, state.mood - 20);
+              clampStats();
+              addLog('danger', '【警察上门】监控拍到了，钱退了，还被罚了 8000，站点把你开了。');
+              doLayoff('涉嫌侵占');
+            } else {
+              addLog('sys', '【侥幸】这件事没有下文。只是每次路过那个路口，你都会绕开走。');
+            }
+          }
+        }
+      ]
+    },
+
+    /* ---------------- 四、网红主播 ---------------- */
+    {
+      id: 'E_JOB_STREAMER_TOP1',
+      title: '榜一大哥的邀约',
+      description: '他给你刷了十万。私信只有一句话：「周末出来吃个饭，就我们俩。」对话框上方显示「正在输入」很久。',
+      weight: 7,
+      requires: { job: '网红主播', minAge: 22 },
+      options: [
+        {
+          label: '拒绝，把话说清楚',
+          effects: { mood: 5, will: 4 },
+          result: '他退了关注，带走了半个榜。第二天直播间人气掉了三成，你照样开播。',
+          onChoose: function () {
+            state.salary = Math.max(3000, Math.round((state.salary || 0) * 0.7));
+            addLog('event', '【掉粉】榜一走了，月流水降到 ' + state.salary + ' 元。');
+          }
+        },
+        {
+          label: '赴约，把该拿的拿到手',
+          effects: { money: 50000, mood: -20, will: -5 },
+          result: '饭吃了两个小时，你几乎没动筷子。回程的车上，你把妆卸了，脸上什么表情都没有。'
+        }
+      ]
+    },
+    {
+      id: 'E_JOB_STREAMER_HATE',
+      title: '满屏的脏话',
+      description: '开播十分钟，进来两百个没有头像的号，同一句话刷了满屏。房管的禁言名单翻了三页，还是刷。',
+      weight: 6,
+      requires: { job: '网红主播', minAge: 22 },
+      options: [
+        {
+          label: '花钱请公关团队处理',
+          effects: { money: -10000, mood: -3 },
+          result: '第二天热搜撤了，那批号也消失了。团队说「这种情况一个月能来两次」。'
+        },
+        {
+          label: '当场破防，和他们对骂',
+          effects: { eq: -10, mood: -15 },
+          result: '你骂了四十分钟，直播间被封。解封通知写着「违规行为，封禁 30 天」。',
+          onChoose: function () {
+            state.salary = 0;
+            addLog('danger', '【封禁】直播间被封一个月，收入归零。');
+          }
+        }
+      ]
+    },
+    {
+      id: 'E_JOB_STREAMER_GOODS',
+      title: '带货翻车',
+      description: '你推的那款零食上了热搜：原料过期。评论区里全是「我买了三箱」「孩子已经吃了」。品牌方的电话打不通了。',
+      weight: 6,
+      requires: { job: '网红主播', minAge: 22 },
+      options: [
+        {
+          label: '全额退款，直播里公开道歉',
+          effects: { money: -50000, eq: 5, will: 3 },
+          result: '你在镜头前鞠了三个躬，退款流程贴了三遍。掉了一批粉，但留下的人更铁了。',
+          nextEventId: 'E_JOB_STREAMER_APOLOGY'
+        },
+        {
+          label: '甩锅厂家，说自己也是受害者',
+          effects: { cha: -8, mood: -10 },
+          result: '你把合同截图发出来，字都对。评论区第一条是「那你退钱吗」，你没回。',
+          onChoose: function () {
+            state.salary = Math.max(3000, Math.round((state.salary || 0) * 0.8));
+            addLog('danger', '【掉粉】月流水降到 ' + state.salary + ' 元，商务合作停了两周。');
+          }
+        }
+      ]
+    },
+    {
+      id: 'E_JOB_STREAMER_MCN',
+      title: 'MCN 的陷阱',
+      description: '三年前签的合同，你没细看。现在想解约，法务把违约金那一页推到你面前：500 万。',
+      weight: 5,
+      requires: { job: '网红主播', minAge: 22, onceEver: true },
+      options: [
+        {
+          label: '打官司，硬解',
+          effects: { money: -20000, will: 4, mood: -6 },
+          result: '官司打了一年。最后判了八十万，分期。你换了城市，重新开播，粉丝从零开始。',
+          onChoose: function () {
+            state.salary = Math.max(3000, Math.round((state.salary || 0) * 0.6));
+            addLog('event', '【解约】新账号重新起号，月流水 ' + state.salary + ' 元。');
+          }
+        },
+        {
+          label: '继续当牛做马，抽成 50%',
+          effects: { mood: -20 },
+          result: '排期表排到了明年。每个月结算那天，你看着被抽走的一半，什么也没说。',
+          onChoose: function () {
+            state.salary = Math.max(1500, Math.round((state.salary || 0) * 0.5));
+            addLog('danger', '【抽成】机构抽走 50%，月流水变成 ' + state.salary + ' 元。');
+          }
+        }
+      ]
+    },
+    {
+      id: 'E_JOB_STREAMER_APOLOGY',
+      title: '道歉直播',
+      description: '道歉直播开了三个小时。弹幕从骂声变成「算了」，最后有人刷了个嘉年华，说「下次选品上点心」。',
+      weight: 1,
+      chainOnly: true,
+      requires: { job: '网红主播', minAge: 22 },
+      options: [
+        {
+          label: '把选品流程公开，接受监督',
+          effects: { eq: 5, cha: 5, mood: 8 },
+          result: '你把检测报告挂在直播间置顶。那一周，粉丝反而涨了两万。'
+        },
+        {
+          label: '低调一个月，等风头过去',
+          effects: { mood: -6, money: -3000 },
+          result: '你停播了一个月，回来那天在线人数只有平时的四分之一。'
+        }
+      ]
+    }
   ];
 
   // 按 id 查行动：线性查找而不是静态索引，保证外部往 actionsData 里 push 新条目后立刻可用
@@ -4847,7 +5430,12 @@
     '普通程序员': { salary: 15000, next: '大厂程序员', prev: null,        requiredIntelligence: 130, req: { workYears: 2, intelligence: 180 } },
     '大厂程序员': { salary: 24000, next: '高级开发', prev: '普通程序员', requiredIntelligence: 180, req: { workYears: 2, intelligence: 250 } },
     '高级开发':   { salary: 38000, next: '架构师',   prev: '大厂程序员', requiredIntelligence: 250, req: { workYears: 3, intelligence: 350 } },
-    '架构师':     { salary: 60000, next: null,       prev: '高级开发',   requiredIntelligence: 350 }
+    '架构师':     { salary: 60000, next: null,       prev: '高级开发',   requiredIntelligence: 350 },
+
+    /* v3.19：职业专属事件需要的三个平级职业（无晋升链，靠跳槽涨薪） */
+    '人民教师':   { salary: 7000,  next: null, prev: null, requiredIntelligence: 80 },
+    '外卖骑手':   { salary: 8000,  next: null, prev: null, requiredIntelligence: 30 },
+    '网红主播':   { salary: 9000,  next: null, prev: null, requiredIntelligence: 40 }
   };
   // 兼容旧引用（入职时按职业取名薪）
   var JOBS = {};
