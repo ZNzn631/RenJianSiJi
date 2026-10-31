@@ -2,11 +2,11 @@
 
 单文件网页人生模拟游戏（纯 HTML + CSS + JS，双击即玩）。
 
-- 版本：**v3.15（学生时期事件库 +20）**
+- 版本：**v3.16.2（恋爱线 +15 / 协议离婚死链修复 / 平衡模拟提速）**
 - 日期：2026-10-31
 - 结构：`data.js`（纯数据）+ `engine.js`（核心引擎）+ `人间开发.html`（HTML/CSS/UI + 底部引入）
 - 主文件：`人间开发.html`（入口，需与 data.js / engine.js 同目录）
-- 上一版：**v3.14**（中年危机事件库 +15）
+- 上一版：**v3.16.1**（平衡模拟分批重构：500 局 31s）
 - 变更性质：**纯数据层追加**（eventsData +20 事件），引擎零改动（回归 120/120 ×5 全绿；早逝 38.7% / 平凡 34.7% 双 PASS）
 - 历史冻结版：`历史版本/v1.0_核心引擎版.html`（137,842 字节 / `0d9137a117982b12274c97c20a6265a2`，保留不动）
 - 引擎备份：`v1.0.1_瑕疵修补版.html`（引擎 JS 与本版逐字节一致，可随时对比）
@@ -1478,6 +1478,169 @@ if (!Array.isArray(p.state.children) && (Number(p.state.kids) || 0) > 0 && state
 **备注**：验收过程中一度误判「择校不生效」，实际是测试脚本只给了 7.5 万现金，而「国际学校」需要 12 万——按钮正确置灰。顺手把这条也补成断言（钱不够时「国际」必须点不了）。
 
 ---
+
+## v3.16 · 恋爱线事件库 +15 · 高阶回归 5 组（2026-10-31）
+
+纯数据层追加 15 个恋爱链式事件（`LV_*`），引擎仅追加 2 个状态字段（`inLove` / `partnerName`）与 4 处别名同步，**时间推进 / 事件抽取 / 条件校验 / 存档逻辑零改动**。
+
+### 1. 新增事件（data.js 尾部 append，eventsData 结构不变）
+
+| # | id | 标题 | 类型 | 关键条件 |
+|---|---|---|---|---|
+| 1 | `LV_FIRST_TRIP` | 第一次出远门 | 池 w6 | 交往 2 个月+ / 22–40 岁 |
+| 2 | `LV_FIRST_TRIP_B` | 旅途中吵了一架 | 链 | — |
+| 3 | `LV_MEET_PARENT` | 见家长 | 池 w7 | 交往 3 个月+ |
+| 4 | `LV_MEET_PARENT_B` | 饭桌上的三句话 | 链（长文案 214 字） | — |
+| 5 | `LV_COHABIT` | 同居试婚 | 池 w5 | 交往 9 个月+ / 24 岁+ |
+| 6 | `LV_COHABIT_B` | 谁洗碗 | 链 | — |
+| 7 | `LV_HOUSE_ARGUE` | 买房分歧 | 池 w6 | 交往 6 个月+ / 24 岁+ |
+| 8 | `LV_HOUSE_ARGUE_B` | 月供的第一个月 | 链（长文案 246 字） | — |
+| 9 | `LV_PROPOSE` | 求婚 | 池 w8 / priority / onceEver | 交往 6 个月+ |
+| 10 | `LV_PROPOSE_LATER` | 没说出口的那晚 | 链 | — |
+| 11 | `LV_WED_DAY` | 婚礼那天 | 池 w5 / onceEver | 已婚 |
+| 12 | `LV_WED_BILL` | 婚礼账单 | 池 w4 / onceEver | 已婚 |
+| 13 | `LV_MONEY_TALK` | 婚后谈钱 | 池 w5 | 已婚 / 感情 ≤ 70 |
+| 14 | `LV_COLD_WAR` | 冷战 | 池 w6 | 已婚 / 感情 ≤ 40 |
+| 15 | `LV_MAKE_UP` | 台阶 | 链 | — |
+
+链路：`FIRST_TRIP→_B`；`MEET_PARENT→_B→HOUSE_ARGUE→_B→PROPOSE`；`COHABIT→_B→HOUSE_ARGUE`；`PROPOSE→（领证 / 没说出口）→PROPOSE_LATER`；`COLD_WAR→MAKE_UP`。全库 **175 事件 = 142 池 + 33 链**，选项 394。
+
+### 2. 引擎改动（+12 行 / 5 处，纯追加）
+
+| 位置 | 改动 |
+|---|---|
+| `newState()` | 追加 `inLove: false`、`partnerName: ''` |
+| `startDating()` | 追加 `inLove = true`；`partnerName` 缺省用 `spouseName()` 取名 |
+| `marryTo()` | `spouse = partnerName \|\| spouseName()`；同步 `inLove` / `partnerName` |
+| `divorceNow()` | 同步 `inLove = false`、`partnerName = ''` |
+| `sanitize()` | 旧档缺失 `inLove` 时按 `loveState` / `married` 回推；`partnerName` 缺失时回推 `spouse`，超长截断 12 字 |
+
+存档 `v:1` 与键名不变，老档 / 图鉴 / 成就全兼容。
+
+### 3. 样式（+9 行，仍是像素风）
+
+`.modal{ max-height:calc(100vh - 48px); overflow-y:auto }` —— `80vh` 在 667px 高的小屏上会与遮罩 24px 内边距叠加后顶边，收紧到 `100vh - 48px` 后弹窗恒在视口内，长文案转内部滚动，沿用既有方块像素滚动条。
+
+### 4. 高阶回归（新增 `tests/run_extra.js` + `tests/恋爱与兼容测试.js`）
+
+| 组 | 内容 | 断言 | 结论 |
+|---|---|---|---|
+| D1 | 并发弹窗：疾病 + 求婚 + 裁员 同月撞车 | 15 | 单槽 + `deferredEventIds` 顺延；疾病优先、裁员即时结算、求婚次月补发；3 必发同月 1 立即 + 2 顺延，各触发一次零丢失 |
+| D2 | v3.12 老档降级 | 16 | 缺 10 个字段 → 全部回推补默认，0 报错，存读一致 |
+| D3 | 长文案多视口 | 30 | 1336×626 / 504×558 实测不越界；375 等效容器（327×619）下内容 771px 内部滚动，末按钮完整可达、点击区 48px |
+| D4 | 覆盖率 / 死链 | 8 | 断链 0 / 环 0 / 死事件 0（矩阵 216 定向 + 24000 随机；新事件最少命中 846 次） |
+| D5 | 100 连点「休息」 | 12 | 恰好 100 天、单次最大跳 1 天、4 跨月 = 4 发薪、属性不越界；弹窗开启时连点仍线性推进且不被顶替 |
+
+**汇总**：D1~D5 **162/162 通过（每视口 81 条）**，JS 错误 0；既有 `tests/run.js` **120/120**，JS 错误 0，属性越界 0。
+
+> `tests/稳定性测试.js` 的 `B7` 原断死 348 个选项，恋爱线上线后必然过期，已改为按 `eventsData` 实算分母（测试基建修正，不涉及游戏逻辑）。
+
+### 5. 已知待办
+
+- **`E_MARRIED_DIVORCE`（协议离婚）是既有死链**：`chainOnly` 但无任何 `nextEventId` 指向，永远不会触发。建议在 `E_MARRIED_QUARREL` 的「吵到要离」选项挂 `nextEventId: 'E_MARRIED_DIVORCE'` —— 属既有事件结构，待确认后再改。
+- `DEFER_LIMIT = 3`：第 4 个起不进顺延槽，但仍在池中（延后非丢失）；带 `monthIn` 窄窗口的必发事件存在跨年推迟的理论风险。
+
+---
+
+## v3.16.1 · 平衡模拟重构：500 局 31 秒跑完（2026-10-31）
+
+一次性跑 500 局会把渲染进程跑死：CPU 掉到 0、进程不退、`dump-dom` 等不到结果，实测 250 局 196s，500 局直接 16–43 分钟并闪退。根因是每个 `doAction()` 都会走 `render()` 与属性飘字 `setTimeout`，几十万个定时器 + DOM 字符串堆在同一渲染进程，V8 老生代不回收 → OOM。
+
+### 改动（3 个文件，共 8 行代码 + 1 个新脚本）
+
+| 文件 | 改动 |
+|---|---|
+| `tests/sim_500.js` | 首行置 `window.IS_SIMULATION = true`；每局结束 `s.logs.length = 0` 并兜底复位开关 |
+| `人间开发.html` | `render()` 首行 `if (window.IS_SIMULATION === true) return;`（2 行含注释） |
+| `engine.js` | `showFloatDeltas()` 首行同款短路（2 行含注释）——消灭全部飘字定时器 |
+| `tests/run_balance_batch.js` | **新增**：500 局 = 5 批 × 100，每批一个全新浏览器实例，批次结束删 `user-data-dir`（清缓存 + 释放渲染内存）；单批失败自动重试 → 对半拆批 |
+
+启动参数：`--disable-gpu --disable-extensions --disable-dev-shm-usage --disable-background-networking --disable-renderer-backgrounding --disable-application-cache --disk-cache-size=1 --no-sandbox --js-flags=--max-old-space-size=4096`，子进程 `NODE_OPTIONS=--max-old-space-size=4096`。
+`--single-process` 保留为可选（`SINGLE_PROCESS=1`），默认关闭——它与 `--dump-dom` 组合反而更容易崩。
+
+### 效果
+
+| 场景 | 改造前 | 改造后 |
+|---|---|---|
+| 500 局 | 16–43 分钟 + OOM 闪退 | **31s**（5–7s/批，**62ms/局**） |
+| `--quick` 150 局 | 92s | **7.2s** |
+
+### KPI（连跑两轮，均 500 局）
+
+| 轮次 | 早逝（20–40%） | 平凡（30–50%） | 判定 |
+|---|---|---|---|
+| 1 | 35.6% | 36.2% | 双 PASS |
+| 2 | 38.8% | 36.0% | 双 PASS |
+
+### 回归
+
+`tests/run.js` 120/120 · `tests/run_extra.js` 162/162 · JS 错误 0 · 属性越界 0。
+（`IS_SIMULATION` 只在模拟环境存在，正常游玩时该变量为 `undefined`，`render()` 行为不变。）
+
+---
+
+## v3.16.2 · 协议离婚死链修复 + 平衡闸门终稿（2026-10-31）
+
+### 1. 死链修复（唯一的数据层改动）
+
+`E_MARRIED_DIVORCE`（协议离婚）原本 `chainOnly: true`，但全库没有任何 `nextEventId` 指向它，而 `eligibleEvents()` 又会排除 `chainOnly` —— 这段剧情**永远播不到**。
+
+在 `E_MARRIED_QUARREL`（婚后争吵，weight 7）新增第 4 个选项：
+
+```js
+{
+  label: '吵到要离，把「离婚」两个字说了出来',
+  requires: { loveMax: 35 },          // 感情还过得去时置灰，不会一步走到离婚
+  effects: { mood: -12, will: 2 },
+  result: '那两个字说出口之后，屋子里安静得能听见冰箱的嗡嗡声。',
+  onChoose: function () { addLove(-10); },
+  nextEventId: 'E_MARRIED_DIVORCE'    // 死链接回
+}
+```
+
+链路闭环：`婚后争吵 → 协议离婚 → divorceNow('协议' / '净身')`。
+
+### 2. 新增 D6 测试组（`tests/恋爱与兼容测试.js`）
+
+| # | 断言 | 实测 |
+|---|---|---|
+| D6a | 「婚后争吵」可打开 | ok |
+| D6b | 低感情（love=20）选项存在且可点 | locked=false |
+| D6c | 链式进入「协议离婚」 | E_MARRIED_DIVORCE |
+| D6d | 「协议离婚」选项渲染完整 | 3 个 |
+| D6e | 离婚生效、感情态归零 | married=false / loveState=single |
+| D6f | divorceCount+1、别名同步清空 | 1 / false / "" |
+| D6g | 财产按比例分割 | 30000 → 15000 |
+| D6h | 高感情（love=80）选项置灰 | locked=true |
+| D6i | 置灰选项点了不结算、不跳链 | married=true / pending=争吵 |
+
+### 3. 回归（全绿）
+
+| 套件 | 结果 |
+|---|---|
+| `tests/run_extra.js`（D1~D6，两视口） | **180/180**，JS 错误 0 |
+| `tests/run.js`（既有稳定性） | **120/120**，JS 错误 0，属性越界 0 |
+| `tests/run_balance_batch.js 500 100` | 500/500 局，**29s** |
+
+### 4. 平衡闸门（连跑三轮，各 500 局）
+
+| 轮次 | 耗时 | 英年早逝（20–40%） | 平凡一生（30–50%） |
+|---|---|---|---|
+| 1 | 60s | 38.2% | 38.2% |
+| 2 | 29s | 40.0%（上界，闭区间 PASS） | 31.8% |
+| 3 | 29s | 37.0% | 34.6% |
+| 均值 | — | **38.4%** | **34.9%** |
+
+n=500 标准误约 2.2pp，三轮 37.0–40.0% 属正常波动。`check_balance.js` 的判定是闭区间（`>=20 && <=40`），全 PASS；本轮**未改任何平衡常量**，若要留余量可先动 `PENSION` / `LIVING_RATE`。
+
+### 5. 备注
+
+- `DEFER_LIMIT = 3` 保持原样：第 4 个必发事件不入顺延槽但仍在池中（延后非丢失），恋爱线未引入窄窗口必发事件，风险可接受。
+- 顺手把 `run_balance_batch.js` 的 KPI 判定改成与官方脚本一致的闭区间（原来写成了 `>` / `<`，40.0% 会被误判 FAIL）。
+
+---
+
+
 
 ## 一、v1.0 已包含的系统
 

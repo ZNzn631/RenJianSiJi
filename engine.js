@@ -341,6 +341,12 @@
         return { key: 'notSummerBreak', title: '暑假过渡期', detail: '刚高考完还没开学，校园生活尚未开始', suffix: true };
       }
       return null;
+    },
+    // 未购买医保（v3.13）：购买医保行动用，已买则锁定
+    noInsurance: function (v) {
+      if (v !== true) return null;
+      if (!state.hasInsurance) return null;
+      return { key: 'noInsurance', title: '已购买', detail: '你已经买过医疗保险了', suffix: true };
     }
   };
 
@@ -389,7 +395,9 @@
   function startDating() {
     state.loveState = 'dating';
     state.datingStart = nowMonth();
-    addLog('event', '【恋爱】你们正式开始交往了。');
+    state.inLove = true;                                   // v3.16：别名同步
+    if (!state.partnerName) state.partnerName = spouseName();
+    addLog('event', '【恋爱】你们正式开始交往了。' + (state.partnerName ? '（' + state.partnerName + '）' : ''));
   }
 
   // 返回「未满足条件」的数组，空数组 = 全部满足、可执行
@@ -504,12 +512,16 @@
       married: false,        // 是否已婚
       hadTeenLove: false,    // 高中是否谈过恋爱（v3.5.3：早恋互斥初恋用）
       loveState: 'single',   // v3.7：感情状态 single/dating/married
+      /* --- v3.16：恋爱线状态别名（纯追加字段，不参与任何既有判定） --- */
+      inLove: false,         // 是否在恋爱关系中（= loveState 为 dating / married）
+      partnerName: '',       // 伴侣名（交往中=对方名字，婚后 = spouse）
       datingStart: 0,        // v3.7：开始交往的绝对月数（0=未交往）
       datingLove: 0,         // v3.9：恋爱好感度 0-100
       isSummerBreak: false,  // v3.7：高考后暑假过渡态
       enteredCollegeMonth: 0,// v3.7：考入大学的绝对月数（懒初始化）
       summerBreakEnd: 0,     // v3.7：暑假结束的绝对月数
       firstSalary: false,    // v3.7：是否已触发「第一笔工资」
+      hasInsurance: false,   // v3.13：是否已购买医疗保险
       spouse: '',            // 配偶名字
       marriedAt: 0,          // 结婚绝对月数（y*12+m）
       love: 50,              // 感情值 0-100
@@ -823,6 +835,7 @@
       addLog('sys', '【养老金】这个月到账 ' + PENSION + ' 元。');
     }
     if (state.married || (state.children && state.children.length)) settleFamily();   // v3.1：已婚或有孩子都要家庭月结
+    checkDisease();                              // v3.13：跨月疾病判定（只排队，弹窗交给 triggerMonthlyEvent）
   }
 
   // 年终奖：月薪 × (1 + 总工龄×0.2)，最多 3 个月
@@ -879,7 +892,9 @@
     state.married = true;
     state.loveState = 'married';          // v3.7：感情状态机同步（marryTo 是唯一结婚入口）
     state.datingStart = 0;                // v3.7：领证后不再是「交往中」
-    state.spouse = spouseName();
+    state.spouse = state.partnerName || spouseName();
+    state.inLove = true;                                  // v3.16：别名同步
+    state.partnerName = state.spouse;
     state.marriedAt = state.y * 12 + state.m;
     state.lastMarryMonth = state.marriedAt;
     state.love = 60;
@@ -900,6 +915,8 @@
     var ex = state.spouse || '对方';
     state.married = false;
     state.loveState = 'single';           // v3.7：感情状态机同步（divorceNow 是唯一离婚入口）
+    state.inLove = false;                 // v3.16：别名同步
+    state.partnerName = '';
     state.datingStart = 0;                // v3.7：离婚后不再「交往中」
     state.spouse = '';
     state.love = 0;
@@ -1366,6 +1383,58 @@
     if ((state.hospitalCount || 0) >= HOSPITAL_DEATH) endLife('health');   // 累计负债住院达到阈值才猝死
   }
 
+  /* ================= [引擎层] 疾病与医疗系统（v3.13） ================= */
+  var DISEASE_CHANCE = 0.10;          // 每次跨月、符合条件的得病概率
+  var pendingDisease = null;          // 待弹出的疾病事件（与 pendingEvent 互斥）
+
+  // 符合条件的疾病：年龄达标 + 体质低于阈值
+  function eligibleDiseases() {
+    var age = getAge();
+    var out = [];
+    for (var i = 0; i < diseasesData.length; i++) {
+      var d = diseasesData[i];
+      if (age >= d.minAge && state.sta < d.healthLimit) out.push(d);
+    }
+    return out;
+  }
+
+  // 构造疾病事件（复用事件弹窗机制）
+  function buildDiseaseEvent(d) {
+    var pay = state.hasInsurance ? Math.round(d.cost * 0.2) : d.cost;
+    return {
+      id: 'DISEASE_' + d.id,
+      title: '生病了：' + d.name,
+      description: '你最近总觉得不舒服，去医院检查后确诊「' + d.name + '」。'
+        + (state.hasInsurance ? '（有医保，治疗费打 2 折）' : ''),
+      options: [
+        {
+          label: '去医院治病（¥' + pay + '）',
+          meta: '治疗费',
+          effects: { money: -pay, stamina: 2 },
+          result: '你住院治疗了几天，身体慢慢好转。'
+        },
+        {
+          label: '硬扛过去',
+          meta: '体质 -' + d.damage,
+          effects: { stamina: -d.damage },
+          result: '你没去医院，硬扛着，身体更差了。',
+          onChoose: function () { if (state.sta <= 0) hospitalize(); }
+        }
+      ]
+    };
+  }
+
+  // 跨月疾病判定：只在无待处理事件时进行，得病则排队
+  function checkDisease() {
+    if (state.ended) return;
+    if (pendingEvent || pendingDisease) return;   // 已有事件不叠加
+    var list = eligibleDiseases();
+    if (!list.length) return;
+    if (eventRoll() >= DISEASE_CHANCE) return;    // 90% 不得病
+    var d = list[Math.floor(eventRoll() * list.length)];
+    pendingDisease = buildDiseaseEvent(d);
+  }
+
   /* ================= [引擎层] 事件系统 ================= */
   /* ---- 教育系统运行时（v2.8） ---- */
   var examOpen = false;                          // 弹窗期间冻结时间（保险 3）
@@ -1664,6 +1733,12 @@
   function triggerMonthlyEvent() {
     if (state.ended) return;                   // 人生已结束：不再抽事件
     if (pendingEvent) return;                  // 已有未处理的事件就不叠加
+    if (pendingDisease) {                      // v3.13：疾病优先于常规随机事件
+      var dis = pendingDisease;
+      pendingDisease = null;
+      openEvent(dis);
+      return;
+    }
     var ev = pickEvent();
     if (!ev) return;                           // 没有符合条件的事件就这月无事
 
@@ -1716,6 +1791,8 @@
   // v3.7：属性飘字动效（独立 DOM 动画，只读 before/after，不碰结算逻辑）
   function showFloatDeltas(before) {
     if (!before) return;
+    // v3.16.1：模拟开关——飘字依赖 setTimeout 动画，批量跑局时会堆积成吨的定时器
+    if (window.IS_SIMULATION === true) return;
     var map = { int:'sInt', sta:'sSta', cha:'sCha', will:'sWill', eq:'sEq', luck:'sLuck', money:'sMoney', mood:'sMood' };
     for (var k in map) {
       if (!Object.prototype.hasOwnProperty.call(map, k)) continue;
@@ -1861,12 +1938,19 @@
       married: s.married === true,
       hadTeenLove: s.hadTeenLove === true,        // v3.5.3：早恋标记，旧档缺失 → false
       loveState: (s.loveState === 'dating' || s.loveState === 'married') ? s.loveState : (s.married ? 'married' : 'single'),   // v3.7：旧档按 married 回推
+      /* v3.16：旧档完全没有 inLove / partnerName 时按感情状态与 spouse 回推，缺省 false / ''，绝不抛错 */
+      inLove: (s.inLove === true)
+        || (s.inLove === undefined && (s.loveState === 'dating' || s.loveState === 'married' || s.married === true)),
+      partnerName: (typeof s.partnerName === 'string' && s.partnerName)
+        ? s.partnerName.slice(0, 12)
+        : (typeof s.spouse === 'string' ? s.spouse.slice(0, 12) : ''),
       datingStart: asInt(s.datingStart, 0, 0, 999999),   // v3.7
       datingLove: asInt(s.datingLove, 0, 0, 100),        // v3.9
       isSummerBreak: s.isSummerBreak === true,           // v3.7
       enteredCollegeMonth: asInt(s.enteredCollegeMonth, 0, 0, 999999),
       summerBreakEnd: asInt(s.summerBreakEnd, 0, 0, 999999),
       firstSalary: s.firstSalary === true,               // v3.7
+      hasInsurance: s.hasInsurance === true,             // v3.13
       spouse: typeof s.spouse === 'string' ? s.spouse.slice(0, 12) : '',
       marriedAt: asInt(s.marriedAt, 0, 0, 999999),
       love: asInt(s.love, 50, 0, 100),

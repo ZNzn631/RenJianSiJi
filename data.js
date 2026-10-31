@@ -2125,6 +2125,17 @@
           effects: { money: -800, mood: 2 },
           result: '一束花放在门口，气就消了一半。',
           onChoose: function () { addLove(10); }
+        },
+        {
+          // v3.16.2：把「协议离婚」这条死链接回主线——E_MARRIED_DIVORCE 原本是
+          // chainOnly 却没有任何 nextEventId 指向，永远播不到，现已闭环。
+          // 门槛用感情值兜底：感情还过得去（> 35）时这一步根本不会出现。
+          label: '吵到要离，把「离婚」两个字说了出来',
+          requires: { loveMax: 35 },
+          effects: { mood: -12, will: 2 },
+          result: '那两个字说出口之后，屋子里安静得能听见冰箱的嗡嗡声。',
+          onChoose: function () { addLove(-10); },
+          nextEventId: 'E_MARRIED_DIVORCE'
         }
       ]
     },
@@ -3510,6 +3521,494 @@
           label: '一个人走一圈',
           effects: { mood: 4, will: 3, intelligence: 1 },
           result: '你把校园每个角落都走了一遍，然后头也不回地离开。'
+        }
+      ]
+    },
+
+    /* ================================================================
+       v3.16 · 恋爱线事件库（15 条）
+       ---------------------------------------------------------------
+       命名空间 LV_ 前缀，与既有 E_LOVE_* / E_MARRY_* / M_* 完全不冲突。
+       结构：9 条进常规池（可被权重抽到）+ 6 条 chainOnly（只由 nextEventId 唤出）。
+       链路：LV_FIRST_TRIP → _B ／ LV_MEET_PARENT → _B → LV_HOUSE_ARGUE → _B
+             → LV_PROPOSE → （领证 marryTo ／ 没说出口 → LV_PROPOSE_LATER）
+             LV_COHABIT → _B ； LV_COLD_WAR → LV_MAKE_UP
+       只读写 state 既有字段（loveState / datingStart / datingLove / married /
+       spouse / love），不改任何引擎逻辑。
+       ================================================================ */
+    {
+      id: 'LV_FIRST_TRIP',
+      title: '第一次出远门',
+      description: '车票是她买的，行程是你排的。三天两夜，两个人在硬座上把「到时候看」说了四遍，谁也没说这算不算正式开始。',
+      weight: 6,
+      requires: { loveState: 'dating', datingMonths: 2, minAge: 22, maxAge: 40 },
+      options: [
+        {
+          label: '攒钱去一趟海边',
+          requires: { money: { min: 3000 } },
+          effects: { money: -3000, mood: 12, cha: 2 },
+          result: '海风把你们的头发都吹乱了，照片拍了七十多张，能看的只有三张。',
+          onChoose: function () {
+            state.datingLove = Math.max(0, Math.min(100, (state.datingLove || 0) + 8));
+            addLog('event', '【恋爱】好感 +8（当前 ' + state.datingLove + ' / 100）');
+          },
+          nextEventId: 'LV_FIRST_TRIP_B'
+        },
+        {
+          label: '就在城里逛一天',
+          effects: { money: -300, mood: 7, eq: 2 },
+          result: '你们坐了两站公交，在一家很吵的面馆吃完了两碗面。',
+          onChoose: function () {
+            state.datingLove = Math.max(0, Math.min(100, (state.datingLove || 0) + 4));
+            addLog('event', '【恋爱】好感 +4（当前 ' + state.datingLove + ' / 100）');
+          },
+          nextEventId: 'LV_FIRST_TRIP_B'
+        },
+        {
+          label: '各自忙，改天再说',
+          effects: { mood: -5 },
+          result: '改天到最后也没有定下来是哪一天。',
+          onChoose: function () {
+            state.datingLove = Math.max(0, Math.min(100, (state.datingLove || 0) - 6));
+            addLog('event', '【恋爱】好感 −6（当前 ' + state.datingLove + ' / 100）');
+          }
+        }
+      ]
+    },
+    {
+      id: 'LV_FIRST_TRIP_B',
+      title: '旅途中吵了一架',
+      description: '第二天晚上，为了一件很小的事——你到底是不是把地图拿反了——你们在民宿门口站了很久，楼道灯灭了又亮。',
+      weight: 1,
+      chainOnly: true,
+      options: [
+        {
+          label: '先低头，说一句是我不好',
+          effects: { mood: -3, eq: 4, will: 2 },
+          result: '她愣了一下，说「你干嘛」，语气已经软了。',
+          onChoose: function () {
+            state.datingLove = Math.max(0, Math.min(100, (state.datingLove || 0) + 6));
+            addLog('event', '【恋爱】好感 +6（当前 ' + state.datingLove + ' / 100）');
+          }
+        },
+        {
+          label: '讲道理，讲到对方不说话',
+          effects: { mood: -7, will: 3, eq: -2 },
+          result: '你赢了这场争论，回程的四个小时里谁也没开口。',
+          onChoose: function () {
+            state.datingLove = Math.max(0, Math.min(100, (state.datingLove || 0) - 9));
+            addLog('event', '【恋爱】好感 −9（当前 ' + state.datingLove + ' / 100）');
+          }
+        },
+        {
+          label: '下楼买两瓶汽水，放在门口',
+          effects: { money: -20, mood: 3, cha: 3 },
+          result: '门开了半扇，她伸手把汽水拿走了，说「冰的」。',
+          onChoose: function () {
+            state.datingLove = Math.max(0, Math.min(100, (state.datingLove || 0) + 11));
+            addLog('event', '【恋爱】好感 +11（当前 ' + state.datingLove + ' / 100）');
+          }
+        }
+      ]
+    },
+    {
+      id: 'LV_MEET_PARENT',
+      title: '见家长',
+      description: '第一次去对方家里吃饭。你在楼下便利店站了十分钟，冰柜的玻璃上印出你的脸，你想不出该买什么才算得体。',
+      weight: 7,
+      requires: { loveState: 'dating', datingMonths: 3, minAge: 22, maxAge: 45 },
+      options: [
+        {
+          label: '认真挑两样东西上门',
+          requires: { money: { min: 800 } },
+          effects: { money: -800, mood: 6, cha: 3, eq: 2 },
+          result: '一箱牛奶一盒茶叶，塑料袋换了两次，最后是拎着纸袋进的电梯。',
+          nextEventId: 'LV_MEET_PARENT_B'
+        },
+        {
+          label: '空手去，只说一句来得急',
+          effects: { mood: -2, will: 2 },
+          result: '开门的是她妈，眼神在你手上停了一下，然后把拖鞋推到你脚边。',
+          nextEventId: 'LV_MEET_PARENT_B'
+        },
+        {
+          label: '临阵脱逃，改约下周',
+          effects: { mood: -8 },
+          result: '你在小区门口绕了一圈又一圈，最后发了一条「临时加班」。',
+          onChoose: function () {
+            state.datingLove = Math.max(0, Math.min(100, (state.datingLove || 0) - 12));
+            addLog('event', '【恋爱】好感 −12（当前 ' + state.datingLove + ' / 100）');
+          }
+        }
+      ]
+    },
+    {
+      id: 'LV_MEET_PARENT_B',
+      title: '饭桌上的三句话',
+      description: '问题一个接一个：老家哪里的、父母做什么的、公积金交多少、打算什么时候买房。你答得很稳，筷子却一直没动。对方妈妈把最后一块排骨夹到你碗里，说「吃啊」，你说谢谢，声音比想象中小。饭后你去厨房帮忙洗碗，水开得太大，溅了一身。她爸在客厅问了一句「小伙子酒量怎么样」，你说一般，他笑了一声。',
+      weight: 1,
+      chainOnly: true,
+      options: [
+        {
+          label: '如实说，包括月供压力',
+          effects: { mood: -4, will: 3, eq: 5 },
+          result: '她爸沉默了一会儿，说「年轻人先苦两年」。这句话你记了很多年。',
+          nextEventId: 'LV_HOUSE_ARGUE'
+        },
+        {
+          label: '报一个体面一点的数',
+          effects: { mood: 2, eq: -2, luck: 1 },
+          result: '话说出口你就后悔了，数字比实际多了一半。',
+          nextEventId: 'LV_HOUSE_ARGUE'
+        },
+        {
+          label: '把话头引到对方小时候',
+          effects: { mood: 5, eq: 4, cha: 2 },
+          result: '她妈讲了一晚上她小时候的事，饭桌上的空气终于松了下来。',
+          onChoose: function () {
+            state.datingLove = Math.max(0, Math.min(100, (state.datingLove || 0) + 8));
+            addLog('event', '【恋爱】好感 +8（当前 ' + state.datingLove + ' / 100）');
+          },
+          nextEventId: 'LV_HOUSE_ARGUE'
+        }
+      ]
+    },
+    {
+      id: 'LV_COHABIT',
+      title: '同居试婚',
+      description: '房子是合租的次卧，衣柜只够一个人用。你们把各自的东西各寄了一半回老家，剩下的塞进两个行李箱。',
+      weight: 5,
+      requires: { loveState: 'dating', datingMonths: 9, minAge: 24, maxAge: 42 },
+      options: [
+        {
+          label: '搬到一起，房租对半',
+          requires: { money: { min: 2000 } },
+          effects: { money: -2000, mood: 8, eq: 2 },
+          result: '第一个月你们都很客气，第二个月开始为谁忘了倒垃圾说话。',
+          nextEventId: 'LV_COHABIT_B'
+        },
+        {
+          label: '把钥匙给对方一把，先过渡',
+          effects: { mood: 5, eq: 3 },
+          result: '两把钥匙，两个地址，一个说不清的中间地带。',
+          nextEventId: 'LV_COHABIT_B'
+        },
+        {
+          label: '继续各住各的',
+          effects: { mood: 2 },
+          result: '每周见两三次，每次分别都在地铁口多站一会儿。',
+          onChoose: function () {
+            state.datingLove = Math.max(0, Math.min(100, (state.datingLove || 0) - 4));
+            addLog('event', '【恋爱】好感 −4（当前 ' + state.datingLove + ' / 100）');
+          }
+        }
+      ]
+    },
+    {
+      id: 'LV_COHABIT_B',
+      title: '谁洗碗',
+      description: '为洗碗这件事，你们第一次认真算了一笔账：谁做的饭、谁拖的地、谁加班到十一点、谁周末回了自己家。',
+      weight: 1,
+      chainOnly: true,
+      options: [
+        {
+          label: '买一台洗碗机',
+          requires: { money: { min: 3000 } },
+          effects: { money: -3000, mood: 7, eq: 2 },
+          result: '机器装好那天，你们并排站着看它转，像看一台新电视。',
+          nextEventId: 'LV_HOUSE_ARGUE'
+        },
+        {
+          label: '定一张轮值表贴在冰箱上',
+          effects: { mood: 4, will: 3, eq: 4 },
+          result: '表贴了三个月，最后一个格子一直空着，谁也没提。',
+          nextEventId: 'LV_HOUSE_ARGUE'
+        },
+        {
+          label: '谁也不说话，各洗各的那只碗',
+          effects: { mood: -5, will: 1 },
+          result: '水槽里从此常常只有两只碗，一左一右。',
+          onChoose: function () {
+            state.datingLove = Math.max(0, Math.min(100, (state.datingLove || 0) - 7));
+            addLog('event', '【恋爱】好感 −7（当前 ' + state.datingLove + ' / 100）');
+          }
+        }
+      ]
+    },
+    {
+      id: 'LV_HOUSE_ARGUE',
+      title: '买房分歧',
+      description: '看房看了三个月。一套在郊区，首付刚好够；一套在市区，首付要借。中介在门口抽烟，你们站在台阶上，谁都没有先开口。',
+      weight: 6,
+      requires: { loveState: 'dating', datingMonths: 6, minAge: 24, maxAge: 45 },
+      options: [
+        {
+          label: '掏空积蓄，付郊区那套的首付',
+          requires: { money: { min: 120000 } },
+          effects: { money: -120000, mood: -6, will: 5, eq: 2 },
+          result: '签字那天你没说话，回程的地铁上她把头靠在你肩上。',
+          nextEventId: 'LV_HOUSE_ARGUE_B'
+        },
+        {
+          label: '市区那套，借钱也买',
+          requires: { money: { min: 60000 } },
+          effects: { money: -60000, mood: -10, will: 3 },
+          result: '你家借了十万，她家借了八万，两家人第一次坐在同一张桌子上。',
+          nextEventId: 'LV_HOUSE_ARGUE_B'
+        },
+        {
+          label: '租房结婚，钱先留着',
+          effects: { mood: 7, eq: 5, will: 2 },
+          result: '房东每两年涨一次价，你们每两年搬一次家，日子照样过。',
+          onChoose: function () {
+            state.datingLove = Math.max(0, Math.min(100, (state.datingLove || 0) + 6));
+            addLog('event', '【恋爱】好感 +6（当前 ' + state.datingLove + ' / 100）');
+          },
+          nextEventId: 'LV_HOUSE_ARGUE_B'
+        },
+        {
+          label: '当场吵一架，各回各家',
+          effects: { mood: -14, will: 2 },
+          result: '你在楼下站到十二点，她的窗户一直亮着，没有拉开。',
+          onChoose: function () {
+            state.datingLove = Math.max(0, Math.min(100, (state.datingLove || 0) - 15));
+            addLog('event', '【恋爱】好感 −15（当前 ' + state.datingLove + ' / 100）');
+          }
+        }
+      ]
+    },
+    {
+      id: 'LV_HOUSE_ARGUE_B',
+      title: '月供的第一个月',
+      description: '账单在手机上一张张弹出来：房贷、物业、水电、两张通勤卡、一份给父母的体检套餐。你们把截图发到同一个群里，然后谁也没有再多说一句话。那天晚上你算到一点，把「如果失业」这四个字在草稿箱里打了又删，删了又打。窗外的路灯灭了一半，楼下还有人在遛狗。你忽然想起签合同那天，销售说「这套采光好」，而你们看的是晚上八点的样板间。',
+      weight: 1,
+      chainOnly: true,
+      options: [
+        {
+          label: '跟对方摊开算一遍，把最坏的情况也写下来',
+          effects: { mood: 4, eq: 5, will: 4, intelligence: 2 },
+          result: '你们列了一张「如果失业」的表，列完之后反而睡得踏实了些。',
+          nextEventId: 'LV_PROPOSE'
+        },
+        {
+          label: '自己扛下多出来的那部分，不告诉她',
+          requires: { money: { min: 5000 } },
+          effects: { money: -5000, mood: -4, will: 5 },
+          result: '你把加班费藏了两个月，第三个月被她发现了。',
+          nextEventId: 'LV_PROPOSE'
+        },
+        {
+          label: '什么也不说，第二天照常上班',
+          effects: { mood: -8, stamina: -2 },
+          result: '地铁上你反复看那张账单，看到手机自动息屏。',
+          onChoose: function () {
+            state.datingLove = Math.max(0, Math.min(100, (state.datingLove || 0) - 5));
+            addLog('event', '【恋爱】好感 −5（当前 ' + state.datingLove + ' / 100）');
+          }
+        }
+      ]
+    },
+    {
+      id: 'LV_PROPOSE',
+      title: '求婚',
+      description: '戒指是在商场负一层买的，导购问要不要刻字。你说了两个人的名字，又说「刻小一点」。回程的公交上，那个盒子一直在口袋里硌着你的腿。',
+      weight: 8,
+      priority: true,
+      requires: { loveState: 'dating', datingMonths: 6, minAge: 22, maxAge: 45, onceEver: true },
+      options: [
+        {
+          label: '单膝跪下，把准备好的话说出来',
+          requires: { money: { min: 8000 } },
+          effects: { money: -8000, mood: 18, cha: 4, eq: 3 },
+          result: '她点头的时候，周围真的有人在鼓掌，你后来才知道是她提前叫来的朋友。',
+          onChoose: function () { marryTo('简办'); }
+        },
+        {
+          label: '把戒指放进她常喝的那只杯子底下',
+          requires: { money: { min: 8000 } },
+          effects: { money: -8000, mood: 14, eq: 5 },
+          result: '她端起来喝了一口才发现，差点把杯子放下又拿起来。',
+          onChoose: function () { marryTo('简办'); }
+        },
+        {
+          label: '最后没说出口，戒指揣回兜里',
+          effects: { mood: -12, will: 2 },
+          result: '那天你们照常吃了饭，照常道了晚安，盒子在你抽屉里放了很久。',
+          nextEventId: 'LV_PROPOSE_LATER'
+        }
+      ]
+    },
+    {
+      id: 'LV_PROPOSE_LATER',
+      title: '没说出口的那晚',
+      description: '戒指在抽屉里放了三个月。你们照常吃饭、照常道晚安，只是你开始留意她手机屏幕亮起来的次数，也开始在她说「随便」的时候多想两秒。',
+      weight: 1,
+      chainOnly: true,
+      options: [
+        {
+          label: '找个周末，把话重新说一遍',
+          effects: { mood: 5, will: 5, eq: 3 },
+          result: '你把戒指擦了一遍，放回口袋，决定这个周末不再拖。',
+          onChoose: function () {
+            state.datingLove = Math.max(0, Math.min(100, (state.datingLove || 0) + 5));
+            addLog('event', '【恋爱】好感 +5（当前 ' + state.datingLove + ' / 100）');
+          }
+        },
+        {
+          label: '把戒指退了',
+          effects: { money: 6000, mood: -9, will: 2 },
+          result: '退货窗口的姑娘问「尺寸不合适吗」，你说是。',
+          onChoose: function () {
+            state.datingLove = Math.max(0, Math.min(100, (state.datingLove || 0) - 20));
+            addLog('event', '【恋爱】好感 −20（当前 ' + state.datingLove + ' / 100）');
+          }
+        },
+        {
+          label: '什么也不做，继续这样过',
+          effects: { mood: -6, luck: -2 },
+          result: '有些话拖着拖着，就真的不用说了。',
+          onChoose: function () {
+            state.datingLove = Math.max(0, Math.min(100, (state.datingLove || 0) - 8));
+            addLog('event', '【恋爱】好感 −8（当前 ' + state.datingLove + ' / 100）');
+          }
+        }
+      ]
+    },
+    {
+      id: 'LV_WED_DAY',
+      title: '婚礼那天',
+      description: '酒店是提前三个月订的。化妆师问要不要补一下眉毛，你说不用。仪式开始前，你在走廊里深呼吸了三次，第三次的时候听见里面在放你选的那首歌。',
+      weight: 5,
+      requires: { married: true, onceEver: true, minAge: 22 },
+      options: [
+        {
+          label: '按流程走完，笑得脸都僵了',
+          effects: { mood: 13, cha: 3, eq: 3 },
+          result: '敬到第七桌的时候你已经不记得自己说过什么了，只记得一直在笑。',
+          onChoose: function () { addLove(6); }
+        },
+        {
+          label: '敬酒时多喝了两杯',
+          effects: { mood: 9, stamina: -6, cha: 2 },
+          result: '你在洗手间吐了一次，出来继续敬，谁也没看出来。',
+          onChoose: function () { addLove(3); }
+        },
+        {
+          label: '中途躲到消防通道抽了根烟',
+          effects: { mood: 6, will: 4, stamina: -2 },
+          result: '楼梯间很安静，你听见楼下有人在喊你的名字，喊了两声。',
+          onChoose: function () { addLove(2); }
+        }
+      ]
+    },
+    {
+      id: 'LV_WED_BILL',
+      title: '婚礼账单',
+      description: '账单摊在桌上：酒席、婚庆、摄影、车队、改口费、给双方父母的衣服。份子钱收了一沓，红纸上写着名字和数目，有几个名字你已经想不起脸了。',
+      weight: 4,
+      requires: { married: true, onceEver: true, minAge: 22 },
+      options: [
+        {
+          label: '一笔一笔对完，把超支的地方标出来',
+          requires: { money: { min: 20000 } },
+          effects: { money: -20000, mood: -4, eq: 4, intelligence: 2 },
+          result: '你算到半夜，发现最贵的是那束每天换一次的鲜花。',
+          onChoose: function () { addLove(3); }
+        },
+        {
+          label: '先还信用卡，剩下的慢慢还',
+          effects: { money: -8000, mood: -9, will: 3 },
+          result: '分期分了十二期，每个月十号手机都会响一下。',
+          onChoose: function () { addLove(-2); }
+        },
+        {
+          label: '让父母垫上，回头再说',
+          effects: { mood: -6, eq: -3, will: 1 },
+          result: '你妈说「不用还」，你说要还，这句话后来被提起了很多次。',
+          onChoose: function () { addLove(-4); }
+        }
+      ]
+    },
+    {
+      id: 'LV_MONEY_TALK',
+      title: '婚后谈钱',
+      description: '第一个月的水电费单子出来，她说「我们是不是该有个共同账户」。你把手机翻到余额页面，又按灭了，说了一句「都行」。',
+      weight: 5,
+      requires: { married: true, loveMax: 70, minAge: 23 },
+      options: [
+        {
+          label: '开一个共同账户，每月各打一半',
+          requires: { money: { min: 3000 } },
+          effects: { money: -3000, mood: 8, eq: 5 },
+          result: '账户名是两个人的姓，密码是领证那天。',
+          onChoose: function () { addLove(5); }
+        },
+        {
+          label: '各管各的，大件一起出',
+          effects: { mood: 4, will: 3, eq: 2 },
+          result: '你们各自有一张卡，冰箱上贴着一张「谁该付」的清单。',
+          onChoose: function () { addLove(1); }
+        },
+        {
+          label: '把钱全交出去，省事',
+          effects: { mood: 6, eq: -4 },
+          result: '每个月十号你收到一笔固定的零花，数目不大，但从来没缺过。',
+          onChoose: function () { addLove(7); }
+        }
+      ]
+    },
+    {
+      id: 'LV_COLD_WAR',
+      title: '冷战',
+      description: '这已经是第三天没说话了。昨晚你洗完碗，她在客厅把电视声音调大了一格；今天早上她出门前，把伞放在了门口的鞋柜上，而你正好没带伞。',
+      weight: 6,
+      requires: { married: true, loveMax: 40, minAge: 23 },
+      options: [
+        {
+          label: '第二天早起，做两个人份的早饭',
+          effects: { mood: 5, will: 3, eq: 4 },
+          result: '她坐下吃完了，出门前说了一句「盐放多了」。',
+          onChoose: function () { addLove(6); },
+          nextEventId: 'LV_MAKE_UP'
+        },
+        {
+          label: '等她先开口',
+          effects: { mood: -7, will: 2 },
+          result: '第七天的时候，是她先说话，说的是一句「酱油没了」。',
+          onChoose: function () { addLove(-5); }
+        },
+        {
+          label: '收拾行李，回自己家住几天',
+          effects: { mood: -10, stamina: -3, will: 3 },
+          result: '你在自己房间的床上躺了两晚，谁也没打那个电话。',
+          nextEventId: 'LV_MAKE_UP'
+        }
+      ]
+    },
+    {
+      id: 'LV_MAKE_UP',
+      title: '台阶',
+      description: '她先开了口，问你要不要吃楼下那家馄饨。你说好。两个人一起下楼，楼道里的声控灯一层一层亮起来，谁都没有提那三天。',
+      weight: 1,
+      chainOnly: true,
+      options: [
+        {
+          label: '说一句「对不起」',
+          effects: { mood: 10, eq: 5, will: 2 },
+          result: '她低头吹了吹汤，说「早说啊」，眼睛有点红。',
+          onChoose: function () { addLove(9); }
+        },
+        {
+          label: '只说「下次早点说」',
+          effects: { mood: 6, will: 3 },
+          result: '你们各吃了一碗，回去的路上她把伞往你那边偏了偏。',
+          onChoose: function () { addLove(4); }
+        },
+        {
+          label: '把话说开，旧账也一并翻完',
+          effects: { mood: -2, will: 4, eq: 6, intelligence: 1 },
+          result: '从馄饨店说到去年春节，说到最后两个人都累了，但都舒服了。',
+          onChoose: function () { addLove(2); }
         }
       ]
     }
