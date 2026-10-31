@@ -3311,7 +3311,107 @@
         },
         { label: '婉拒，风险太大', effects: { mood: -3 }, result: '朋友说你「没胆」，悻悻走了。', onChoose: function () { var bf = bestFriend(); if (bf) { bf.favor = Math.max(0, (bf.favor || 0) - 10); touchFriend(bf); } } }
       ]
+    },
+    /* ================= v3.34 技能树与副业变现事件 ================= */
+    {
+      id: 'E_SKILL_CLIENT_RUN',
+      title: '甲方跑路',
+      description: '你熬了半个月做的外包项目，甲方突然失联了。最后一笔尾款，没了着落。',
+      weight: 5,
+      requires: { skill: { coding: 50 }, minAge: 18 },
+      options: [
+        { label: '自认倒霉，就当交学费', effects: { mood: -12, will: 3 }, result: '你删掉了所有聊天记录。有些钱，注定是学费。' },
+        { label: '整理证据，试着维权', effects: { mood: -5, eq: 2, stamina: -2 }, result: '你花了一周整理证据，虽然希望渺茫，但心里没那么堵了。' }
+      ]
+    },
+    {
+      id: 'E_SKILL_NOVEL_HIT',
+      title: '网文爆火',
+      description: '你随手写的那本小说，突然上了平台的热搜榜。编辑连夜打来电话，要跟你签长约。',
+      weight: 4,
+      requires: { skill: { writing: 50 }, minAge: 18 },
+      options: [
+        { label: '签长约，吃一波红利', effects: { money: 8000, mood: 10, stamina: -3 }, result: '你签了字。第二天，银行卡里多了一笔你从没见过的数。' },
+        { label: '慢慢写，不急着变现', effects: { mood: 5, will: 5 }, result: '你把合同放进了抽屉。故事还没讲完，先别急着卖。' }
+      ]
+    },
+    {
+      id: 'E_SKILL_LATE_PAY',
+      title: '尾款拖欠',
+      description: '合作方又拖尾款了，理由是「走流程」。你已经不是第一次听到这句话。',
+      weight: 5,
+      requires: { skill: { coding: 50 }, minAge: 18 },
+      options: [
+        { label: '上门催款', effects: { money: 3000, mood: -6, stamina: -3 }, result: '你在对方公司坐了一下午，终于拿到了钱。' },
+        { label: '再等等，别撕破脸', effects: { mood: -4, eq: 2 }, result: '你回了个「好」。这一等，又是半个月。' }
+      ]
     }
   ];
   // 合并回全局 eventsData（保持引擎抽取逻辑不变）
   for (var _i = 0; _i < lifeEvents.length; _i++) eventsData.push(lifeEvents[_i]);
+
+  /* ================= v3.34 技能树与副业变现（行动） ================= */
+  var skillActions = [
+    {
+      id: 'studyCode',
+      name: '自学编程',
+      description: '对着教程敲代码，一坐就是一下午。',
+      costDays: 1,
+      effects: { mood: -3 },
+      displayEffects: { mood: -3 },
+      hideWhenLocked: false,
+      requires: { minAge: 12 },
+      onRun: function () {
+        var sk = state.skills || (state.skills = {});
+        sk.coding = (sk.coding || 0) + 10;
+        addLog('event', '【技能】你埋头敲了一下午代码（编程 +10，当前 ' + sk.coding + '）。');
+      }
+    },
+    {
+      id: 'practiceWrite',
+      name: '练习写作',
+      description: '把想说的话写下来，一个字一个字地磨。',
+      costDays: 1,
+      effects: { mood: -2 },
+      displayEffects: { mood: -2 },
+      hideWhenLocked: false,
+      requires: { minAge: 12 },
+      onRun: function () {
+        var sk = state.skills || (state.skills = {});
+        sk.writing = (sk.writing || 0) + 10;
+        addLog('event', '【技能】你写了几千字，删删改改（写作 +10，当前 ' + sk.writing + '）。');
+      }
+    },
+    {
+      id: 'freelanceCode',
+      name: '接外包私活',
+      description: '接一个外包项目，熬夜换钱。',
+      costDays: 3,
+      effects: { money: 500, stamina: -2 },
+      displayEffects: { money: 500, stamina: -2 },
+      hideWhenLocked: true,
+      requires: { skill: { coding: 50 }, minAge: 18, oncePerMonth: true },
+      denyText: { skill: '编程技能不够，先自学编程到 50 点。' },
+      onRun: function () {
+        addLog('event', '【副业】你接了个外包私活，赚了 500 元，累得腰酸背痛。');
+      }
+    },
+    {
+      id: 'writeNovel',
+      name: '写网文',
+      description: '更新你的连载小说，靠读者打赏吃饭。',
+      costDays: 2,
+      effects: { mood: -5 },
+      displayEffects: { mood: -5 },
+      hideWhenLocked: true,
+      requires: { skill: { writing: 50 }, minAge: 18, oncePerMonth: true },
+      denyText: { skill: '写作技能不够，先练习写作到 50 点。' },
+      onRun: function () {
+        var income = 200 + Math.floor(Math.random() * 1001);   // 200~1200
+        state.money += income;
+        addLog('event', '【副业】你更新了几章小说，这个月稿费 ' + income + ' 元。');
+      }
+    }
+  ];
+  // 合并回全局 actionsData（保持引擎行动渲染不变）
+  for (var _j = 0; _j < skillActions.length; _j++) actionsData.push(skillActions[_j]);

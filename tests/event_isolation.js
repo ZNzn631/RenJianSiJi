@@ -92,6 +92,7 @@
     s.kids = k.kids; s.children = k.children;
     s.friends = friendsOf(cfg.friendsMode, s.y * 12 + s.m);   // v3.32：朋友采样
     s.recentSetback = cfg.setback ? (s.y * 12 + s.m) : 0;     // v3.32：挫折采样
+    s.skills = cfg.skills || { coding: 0, writing: 0, cooking: 0 };   // v3.34：技能采样
     return s;
   }
 
@@ -105,7 +106,8 @@
       jobCooldown: Math.floor(Math.random() * 36), childrenMode: Math.floor(Math.random() * 4),
       offset: pick([0, 2, 3, 6, 9, 12]), lastMarry: 0,
       loveVal: pick([0, 15, 35, 60, 85, 100]),
-      friendsMode: Math.floor(Math.random() * 5), setback: Math.random() < 0.5
+      friendsMode: Math.floor(Math.random() * 5), setback: Math.random() < 0.5,
+      skills: Math.random() < 0.5 ? { coding: 60, writing: 60, cooking: 60 } : { coding: 0, writing: 0, cooking: 0 }
     };
   }
 
@@ -194,6 +196,13 @@
       return false;
     }
     if (key === 'setbackRecent') { s.recentSetback = 0; return true; }
+    if (key === 'skill') {
+      var sk2 = s.skills || (s.skills = {});
+      for (var sn in val) {
+        if (Object.prototype.hasOwnProperty.call(val, sn)) sk2[sn] = Math.max(0, Number(val[sn]) - 1);
+      }
+      return true;
+    }
     // 属性区间
     var MAP = { money: 'money', stamina: 'sta', mood: 'mood', intelligence: 'int', cha: 'cha', will: 'will', eq: 'eq', luck: 'luck' };
     if (MAP[key] && val && typeof val === 'object') {

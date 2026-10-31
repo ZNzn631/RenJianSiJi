@@ -82,6 +82,18 @@
         suffix: false
       };
     },
+    // 每月一次（自然月，v3.34 副业用）
+    oncePerMonth: function (v, act) {
+      if (v !== true) return null;
+      var last = state.usage[act.id];
+      var cur = state.y + '-' + state.m;
+      if (!last || last.month !== cur) return null;
+      return {
+        key: 'oncePerMonth', title: '本月已完成',
+        detail: '本月已经做过「' + act.name + '」了',
+        suffix: false
+      };
+    },
     // 在职 / 待业
     employed: function (v) {
       if (v !== true) return null;
@@ -435,6 +447,28 @@
         detail: '最近没有经历裁员、失恋或离婚',
         suffix: true
       };
+    },
+    // 技能门槛（v3.34）：skill: { coding: 50 } 或 { coding: 50, writing: 30 } 全部满足
+    skill: function (v) {
+      var sk = state.skills || {};
+      var miss = [];
+      for (var name in v) {
+        if (!Object.prototype.hasOwnProperty.call(v, name)) continue;
+        var need = Number(v[name]);
+        if (!isFinite(need)) continue;
+        if ((Number(sk[name]) || 0) < need) miss.push(name);
+      }
+      if (!miss.length) return null;
+      var label = { coding: '编程', writing: '写作', cooking: '厨艺' };
+      var parts = [];
+      for (var i = 0; i < miss.length; i++) {
+        parts.push((label[miss[i]] || miss[i]) + ' ' + (Number(sk[miss[i]]) || 0) + '/' + v[miss[i]]);
+      }
+      return {
+        key: 'skill', title: '技能不足',
+        detail: '需要 ' + parts.join('、'),
+        suffix: true
+      };
     }
   };
 
@@ -601,6 +635,7 @@
       rentType: 'home',   // v3.31：租房类型 home/share/whole/suburb（决定房租系数与通勤）
       friends: [],        // v3.32：朋友列表 [{ id, name, favor, tag, lastInteract, debt? }]
       recentSetback: 0,   // v3.32：最近一次裁员/失恋/离婚的绝对月数（深夜买醉触发用），0=无
+      skills: { coding: 0, writing: 0, cooking: 0 },   // v3.34：技能树（副业变现用），初始 0
       isStudent: false,   // v3.7：在校生（本科/专科且 <22 岁），由规则动态判定
       /* --- 婚姻系统（v3.0）：全部为新增字段，旧档由 sanitize 补默认值 --- */
       married: false,        // 是否已婚
@@ -674,8 +709,11 @@
   // 记录一次成功执行，用于 oncePerDay / oncePerWeek
   function markUsage(act) {
     var req = act.requires;
-    if (!req || (req.oncePerDay !== true && req.oncePerWeek !== true)) return;
-    state.usage[act.id] = { day: dayKey(), week: weekKey() };
+    if (!req || (req.oncePerDay !== true && req.oncePerWeek !== true && req.oncePerMonth !== true)) return;
+    var u = state.usage[act.id] || (state.usage[act.id] = {});
+    if (req.oncePerDay === true) u.day = dayKey();
+    if (req.oncePerWeek === true) u.week = weekKey();
+    if (req.oncePerMonth === true) u.month = state.y + '-' + state.m;
   }
 
   // 属性边界
@@ -882,7 +920,7 @@
   }
 
   /* ================= [引擎层] 城市 / 地域系统（v3.24） =================
-     citiesData 在 data.js 里；这里只提供单点系数查询与房价折算。
+     citiesData 在 data_core.js 里；这里只提供单点系数查询与房价折算。
      老档没有 city（或 city 不认识）→ 全部回退 1.0，绝不改变老玩家行为。 */
 
   function cityFactors() {
@@ -989,9 +1027,9 @@
     }
     if (state.married || (state.children && state.children.length)) settleFamily();   // v3.1：已婚或有孩子都要家庭月结
     settleStocks();                              // v3.22：股票每月涨跌（只动 stockValue，不碰生活费/工资）
-    settleHousing();                             // v3.31：租房/通勤每月结算（房租+通勤惩罚；函数体在 data.js，与 settleStocks 同款追加）
-    settleCityWellbeing();                       // v3.31.1：城市心情红利/北京亚健康（函数体在 data.js）
-    settleFriends();                             // v3.32：朋友好感度衰减（函数体在 data.js）
+    settleHousing();                             // v3.31：租房/通勤每月结算（房租+通勤惩罚；函数体在 data_core.js，与 settleStocks 同款追加）
+    settleCityWellbeing();                       // v3.31.1：城市心情红利/北京亚健康（函数体在 data_core.js）
+    settleFriends();                             // v3.32：朋友好感度衰减（函数体在 data_core.js）
     checkDisease();                              // v3.13：跨月疾病判定（只排队，弹窗交给 triggerMonthlyEvent）
   }
 
@@ -2115,6 +2153,11 @@
       rentType: (s.rentType === 'share' || s.rentType === 'whole' || s.rentType === 'suburb') ? s.rentType : 'home',   // v3.31：租房类型，旧档缺失 → home
       friends: (typeof normalizeFriends === 'function') ? normalizeFriends(s.friends) : [],   // v3.32：朋友列表，旧档缺失 → []
       recentSetback: asInt(s.recentSetback, 0, 0, 999999),   // v3.32：最近挫折月份，旧档缺失 → 0
+      skills: {
+        coding: asInt((s.skills && s.skills.coding), 0, 0, 9999),    // v3.34：技能树，旧档缺失 → 0
+        writing: asInt((s.skills && s.skills.writing), 0, 0, 9999),
+        cooking: asInt((s.skills && s.skills.cooking), 0, 0, 9999)
+      },
       isStudent: (s.edu === '本科' || s.edu === '专科') && (Number(s.age) || 0) < 22,   // v3.7：在校生（读档时按学历+年龄回推）
       /* --- 婚姻系统字段（v3.0）--- */
       married: s.married === true,
