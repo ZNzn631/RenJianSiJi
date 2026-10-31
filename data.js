@@ -136,6 +136,25 @@
       // 不设门槛：休息是永远可用的保底行动
     },
     {
+      id: 'buyInsurance',
+      name: '购买医保',
+      description: '每年缴一次，生病能省一大笔。',
+      costDays: 1,
+      effects: { money: -2000 },
+      displayEffects: { money: -2000 },
+      hideWhenLocked: true,
+      requires: {
+        minAge: 18,                      // v3.13：成年才买
+        money: { min: 2000 },
+        monthIn: [1],                    // v3.13：仅每年 1 月可买
+        noInsurance: true                // v3.13：已买则隐藏
+      },
+      onRun: function () {
+        state.hasInsurance = true;
+        addLog('event', '你购买了医疗保险，全年医疗费打 2 折。');
+      }
+    },
+    {
       id: 'social',
       name: '社交',
       description: '去同学家蹭一顿饭，或者陪朋友在街上逛半天。',
@@ -553,6 +572,19 @@
       level_effect: { stat_gain: { will: 1 } } },
     { talent_id: 'T_SMOOTH',  name: '会来事', category: '情商', type: '先天', max_level: 3,
       level_effect: { stat_gain: { eq: 1 } } }
+  ];
+
+  /* ================= [数据层] 疾病数据（v3.13 疾病与医疗系统） ================= */
+  // minAge 最低触发年龄；healthLimit 体质低于此值才可能得；cost 治疗费；damage 硬扛扣体质
+  var diseasesData = window.diseasesData = [
+    { id: 'D_COLD',         name: '感冒',     minAge: 0,  healthLimit: 40, cost: 300,   damage: 5 },
+    { id: 'D_GASTRO',       name: '肠胃炎',   minAge: 0,  healthLimit: 40, cost: 800,   damage: 8 },
+    { id: 'D_PNEUMONIA',    name: '肺炎',     minAge: 0,  healthLimit: 30, cost: 5000,  damage: 12 },
+    { id: 'D_FRACTURE',     name: '骨折',     minAge: 0,  healthLimit: 30, cost: 3000,  damage: 15 },
+    { id: 'D_NODULE',       name: '结节',     minAge: 30, healthLimit: 35, cost: 5000,  damage: 10 },
+    { id: 'D_HYPERTENSION', name: '高血压',   minAge: 40, healthLimit: 40, cost: 8000,  damage: 12 },
+    { id: 'D_DIABETES',     name: '糖尿病',   minAge: 40, healthLimit: 35, cost: 10000, damage: 15 },
+    { id: 'D_HEART',        name: '心脏病',   minAge: 45, healthLimit: 30, cost: 30000, damage: 20 }
   ];
 
   /* ================= [引擎层] 教育系统（v2.8） ================= */
@@ -2695,6 +2727,361 @@
       ]
     },
 
+    /* ================= v3.14 中年危机事件库（35-55 岁，15 个）================= */
+    {
+      id: 'E_LAYOFF_N1',
+      title: 'N+1 的诱惑',
+      description: 'HR 把你叫进会议室，桌上摊着一份「协商解除协议」：签了，拿 N+1；不签，下个月优化名单上见。',
+      weight: 5,
+      priority: true,
+      requires: { onceEver: true, job: 'not_null', minAge: 35, maxAge: 55 },
+      options: [
+        {
+          label: '签了，拿钱走人',
+          effects: { mood: -8, stamina: -2 },
+          result: '你签了字，抱着纸箱走出大楼，阳光有点刺眼。',
+          onChoose: function () {
+            state.money += 60000;
+            doLayoff('拿了 N+1 主动离职');
+            addLog('event', '【N+1】赔偿金到账，你正式失业，但至少还有一笔钱。');
+          }
+        },
+        {
+          label: '降薪苟活',
+          effects: { mood: -14, stamina: -3 },
+          result: '你签了降薪协议，保住了工位，也保住了房贷。',
+          onChoose: function () {
+            if (state.salary > 0) state.salary = Math.round(state.salary * 0.7);
+            addLog('sys', '【降薪】月薪降到 ' + state.salary + ' 元，但饭碗保住了。');
+          }
+        }
+      ]
+    },
+    {
+      id: 'E_MENTOR_NEWBIE',
+      title: '带新人',
+      description: '老板把一个刚毕业的年轻人塞到你手里：「你经验足，带带他。」你看着他眼里的光，想起十年前的自己。',
+      weight: 4,
+      requires: { onceEver: true, job: 'not_null', minAge: 35, maxAge: 55 },
+      options: [
+        {
+          label: '倾囊相授',
+          effects: { mood: -4, intelligence: 3, will: 2 },
+          result: '你把自己十年的经验都倒给了他，他学得很快。',
+          onChoose: function () {
+            if (eventRoll() < 0.25 && state.salary > 0) {
+              doLayoff('被自己带的徒弟顶替');
+              addLog('danger', '【被替代】公司觉得新人更便宜，你被优化了。');
+            } else {
+              addLog('sys', '【带新人】你多了一个徒弟，也多了一份被替代的风险。');
+            }
+          }
+        },
+        {
+          label: '留一手，只教皮毛',
+          effects: { mood: 3, eq: -2, will: -2 },
+          result: '你教了些无关痛痒的东西，他连门都没摸到。',
+          onChoose: function () {
+            addLog('sys', '【留一手】你保住了位置，但老板对你的评价打了折扣。');
+          }
+        }
+      ]
+    },
+    {
+      id: 'E_HEALTH_RED',
+      title: '体检报告亮红灯',
+      description: '体检报告上，几行红字触目惊心：脂肪肝、血压偏高、心电图异常。医生建议复查。',
+      weight: 4,
+      requires: { onceEver: true, minAge: 35, maxAge: 55 },
+      options: [
+        {
+          label: '花钱做全面治疗',
+          requires: { money: { min: 10000 } },
+          effects: { money: -10000, stamina: 10, mood: 4 },
+          result: '你住院调理了半个月，指标终于降下来了。'
+        },
+        {
+          label: '硬扛，先忙工作',
+          effects: { stamina: -12, mood: -8 },
+          result: '你把报告塞进抽屉，继续熬夜加班。'
+        }
+      ]
+    },
+    {
+      id: 'E_KID_CLASS',
+      title: '几万块的辅导班',
+      description: '孩子拿着辅导班传单回来：「同学都报了。」一学期三万八，你算了算卡里的余额。',
+      weight: 5,
+      requires: { onceEver: true, hasChild: true, minAge: 35, maxAge: 55 },
+      options: [
+        {
+          label: '砸锅卖铁也要报',
+          requires: { money: { min: 38000 } },
+          effects: { money: -38000, mood: -6, stamina: -2 },
+          result: '你刷了卡，孩子抱着新书包笑了，你却笑不出来。',
+          onChoose: function () { addKidRelation(10); }
+        },
+        {
+          label: '顺其自然',
+          effects: { mood: -4, will: 2 },
+          result: '你跟孩子说「不报也行」，他低着头没说话。',
+          onChoose: function () { addKidRelation(-5); }
+        }
+      ]
+    },
+    {
+      id: 'E_SPOUSE_NEGLECT',
+      title: '你就是不顾家',
+      description: '凌晨回家，桌上留着一张便签：「这个家有你没你都一样。」你站在玄关，半天没换鞋。',
+      weight: 5,
+      requires: { onceEver: true, married: true, minAge: 35, maxAge: 55 },
+      options: [
+        {
+          label: '吵一架，把憋的话都说出来',
+          effects: { mood: -10, stamina: -2 },
+          result: '你们吵到凌晨两点，最后谁也没说服谁。',
+          onChoose: function () { addLove(-8); }
+        },
+        {
+          label: '请个假，带家人出去吃饭',
+          requires: { money: { min: 2000 } },
+          effects: { money: -2000, mood: 4 },
+          result: '你破天荒请了半天假，一家人吃了顿火锅，气氛缓和了。',
+          onChoose: function () { addLove(8); }
+        }
+      ]
+    },
+    {
+      id: 'E_PARENT_BED',
+      title: '陪床',
+      description: '母亲住院了，腰椎手术。父亲在电话里说：「你不用回来，我照顾得了。」语气却不像。',
+      weight: 4,
+      requires: { onceEver: true, minAge: 35, maxAge: 55 },
+      options: [
+        {
+          label: '请假回家陪床',
+          effects: { money: -5000, mood: 5, stamina: -5 },
+          result: '你在医院陪了七天，母亲醒来第一句话是问你吃饭没。'
+        },
+        {
+          label: '花钱请护工',
+          requires: { money: { min: 8000 } },
+          effects: { money: -8000, mood: -3 },
+          result: '你请了最好的护工，但视频里母亲一直在问「你什么时候回来」。'
+        }
+      ]
+    },
+    {
+      id: 'E_RATE_HIKE',
+      title: '利率又涨了',
+      description: '银行发来短信：LPR 上调，你每个月的月供多了两千二。你盯着那条短信，把烟掐了。',
+      weight: 4,
+      requires: { onceEver: true, minAge: 35, maxAge: 55, money: { min: 50000 } },
+      options: [
+        {
+          label: '咬牙提前还一部分',
+          requires: { money: { min: 100000 } },
+          effects: { money: -100000, mood: 5, stamina: -2 },
+          result: '你还了一大笔本金，月供降了，手头也空了。'
+        },
+        {
+          label: '硬扛，慢慢还',
+          effects: { mood: -10, stamina: -2 },
+          result: '你算了算，这辈子可能都在给银行打工。'
+        }
+      ]
+    },
+    {
+      id: 'E_RELATIVE_DEBT_NEW',
+      title: '钱是借给亲戚的',
+      description: '表弟借你的三万块，说好三个月还，如今两年了。家庭聚会上，他正在朋友圈晒新买的车。',
+      weight: 4,
+      requires: { onceEver: true, minAge: 35, maxAge: 55 },
+      options: [
+        {
+          label: '饭桌上把话挑明',
+          effects: { mood: -6, eq: 2 },
+          result: '你开了口，全桌安静，表弟红着脸说下个月还。',
+          onChoose: function () {
+            state.money += 30000;
+            addLog('event', '【要账】你要回了 30000 元，但亲戚关系彻底凉了。');
+          }
+        },
+        {
+          label: '算了，就当没这亲戚',
+          effects: { mood: -12, will: 3 },
+          result: '你把这件事咽了下去，从此再没参加过家庭聚会。'
+        }
+      ]
+    },
+    {
+      id: 'E_NODULE_CHECK',
+      title: '体检发现结节',
+      description: 'B 超报告上写着「甲状腺结节，建议进一步检查」。医生说八成是良性的，但你心里还是发毛。',
+      weight: 3,
+      requires: { onceEver: true, minAge: 35, maxAge: 55 },
+      options: [
+        {
+          label: '花钱做详细检查',
+          requires: { money: { min: 8000 } },
+          effects: { money: -8000, mood: -4 },
+          result: '你预约了穿刺活检，等结果的那几天，你谁也没告诉。',
+          nextEventId: 'E_NODULE_RESULT'
+        },
+        {
+          label: '先去网上查查',
+          effects: { mood: -3, intelligence: 1 },
+          result: '你搜了一晚上，越搜越怕，最后关了电脑。',
+          onChoose: function () {
+            if (eventRoll() < 0.2) {
+              state.sta -= 8;
+              addLog('danger', '【恶化】结节似乎变大了，你终于决定去医院。');
+            }
+          }
+        }
+      ]
+    },
+    {
+      id: 'E_NODULE_RESULT',
+      title: '检查结果',
+      description: '医生把报告推过来，镜片后的眼睛看不出情绪：「我们一项一项看。」',
+      weight: 1,
+      chainOnly: true,
+      requires: { minAge: 35 },
+      options: [
+        {
+          label: '听医生说',
+          effects: {},
+          result: '你屏住了呼吸。',
+          onChoose: function () {
+            if (eventRoll() < 0.7) {
+              state.mood += 20;
+              addLog('event', '【虚惊一场】医生说是良性，定期复查就行。你走出医院，觉得天都亮了。');
+            } else {
+              state.sta -= 15;
+              state.money -= 20000;
+              state.mood -= 15;
+              addLog('danger', '【确诊重病】医生说是恶性，需要立即手术。你握着报告的手一直在抖。');
+            }
+            clampStats();
+          }
+        }
+      ]
+    },
+    {
+      id: 'E_FRIEND_INVEST',
+      title: '朋友的项目',
+      description: '老同学约你吃饭，说有个「稳赚不赔」的项目，投十万，一年翻倍。他拍着胸脯保证。',
+      weight: 4,
+      requires: { onceEver: true, minAge: 35, maxAge: 55, money: { min: 100000 } },
+      options: [
+        {
+          label: '投十万试试',
+          requires: { money: { min: 100000 } },
+          effects: { money: -100000, mood: 3 },
+          result: '你转了账，老同学说「等着数钱吧」。',
+          nextEventId: 'E_INVEST_RESULT'
+        },
+        {
+          label: '婉拒，我不懂这个',
+          effects: { mood: -2, intelligence: 2 },
+          result: '你笑着拒绝，回家路上有点后悔，又有点庆幸。'
+        }
+      ]
+    },
+    {
+      id: 'E_INVEST_RESULT',
+      title: '一年后',
+      description: '一年之期到了，项目终于有了结果。',
+      weight: 1,
+      chainOnly: true,
+      requires: { minAge: 35 },
+      options: [
+        {
+          label: '查看账户',
+          effects: {},
+          result: '你登录了那个很久没打开的 App。',
+          onChoose: function () {
+            if (eventRoll() < 0.5) {
+              state.money += 200000;
+              state.mood += 15;
+              addLog('event', '【翻倍】项目真的赚了，你的十万变成了二十万。');
+            } else {
+              state.mood -= 18;
+              addLog('danger', '【暴雷】项目暴雷，老同学失联，十万块打了水漂。');
+            }
+            clampStats();
+          }
+        }
+      ]
+    },
+    {
+      id: 'E_KID_TALENT',
+      title: '孩子的天赋',
+      description: '美术老师打来电话，说孩子画画很有天赋，建议送去专业班，一年学费五万。',
+      weight: 3,
+      requires: { onceEver: true, hasChild: true, minAge: 35, maxAge: 55 },
+      options: [
+        {
+          label: '砸钱培养',
+          requires: { money: { min: 50000 } },
+          effects: { money: -50000, mood: -3 },
+          result: '你报了班，孩子每周背着画板去上课。',
+          nextEventId: 'E_KID_TALENT_RESULT'
+        },
+        {
+          label: '顺其自然',
+          effects: { mood: -2, eq: 2 },
+          result: '你说「画画当爱好就好」，孩子接受了这个说法。',
+          onChoose: function () { addKidRelation(-3); }
+        }
+      ]
+    },
+    {
+      id: 'E_KID_TALENT_RESULT',
+      title: '三年后',
+      description: '孩子的画挂在了市青少年画展的墙上，老师说他很有希望。',
+      weight: 1,
+      chainOnly: true,
+      requires: { minAge: 35 },
+      options: [
+        {
+          label: '看他捧回奖杯',
+          effects: {},
+          result: '你站在展厅里，觉得那五万块花得值。',
+          onChoose: function () {
+            if (eventRoll() < 0.6) {
+              state.mood += 15;
+              addLog('event', '【成材】孩子拿了金奖，你眼眶红了。');
+            } else {
+              state.mood -= 8;
+              addLog('sys', '【平平】孩子没拿奖，但他真的很喜欢画画。');
+            }
+            clampStats();
+          }
+        }
+      ]
+    },
+    {
+      id: 'E_PARENT_TOUR',
+      title: '父母想出去走走',
+      description: '父亲翻着旅游杂志说：「你妈这辈子还没坐过飞机。」你看了眼堆积如山的工作。',
+      weight: 3,
+      requires: { onceEver: true, minAge: 35, maxAge: 55 },
+      options: [
+        {
+          label: '请假，带他们去',
+          effects: { money: -10000, mood: 12, stamina: -3 },
+          result: '你们在飞机上拍了张全家福，父亲一直笑。'
+        },
+        {
+          label: '给他们报个团，我就不去了',
+          requires: { money: { min: 5000 } },
+          effects: { money: -5000, mood: -4, eq: 1 },
+          result: '你给他们报了豪华团，自己继续加班，心里有点堵。'
+        }
+      ]
+    }
   ];
 
   // 按 id 查行动：线性查找而不是静态索引，保证外部往 actionsData 里 push 新条目后立刻可用
