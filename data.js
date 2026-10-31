@@ -5850,6 +5850,393 @@
         }
       ]
     }
+,
+
+    /* ================================================================
+       v3.30 · 突发事件库（15 条 + 1 条链式）
+       ---------------------------------------------------------------
+       好运 5 / 倒霉 5 / 巧合 5，全年龄段可触发（只设 minAge，不设 maxAge）。
+       权重压低（2~4），保证它们是「突发」而非日常。
+       金额克制：霉运 -500~-8000，好运 +30~+20000，避免冲击平衡。
+       ================================================================ */
+
+    /* ---------------- 好运类 ---------------- */
+    {
+      id: 'E_SUDDEN_ENVELOPE',
+      title: '地铁口的信封',
+      description: '进站口的栏杆边躺着一个没封口的信封，里面是一沓现金和一张写着门牌号的缴费单。',
+      weight: 3,
+      requires: { minAge: 6 },
+      options: [
+        {
+          label: '按地址送回去',
+          effects: { luck: 6, mood: 8, will: 2 },
+          result: '开门的是位老太太。她硬塞给你两个橘子，说「现在还有人会送回来」。'
+        },
+        {
+          label: '收起来，装作没看见',
+          effects: { money: 800, mood: -6, will: -2 },
+          result: '钱进了口袋。之后每次经过那个进站口，你都下意识加快脚步。'
+        }
+      ]
+    },
+    {
+      id: 'E_SUDDEN_REROLL',
+      title: '再来一瓶',
+      description: '拧开瓶盖，里面印着四个字：再来一瓶。你换了一瓶，又中了。',
+      weight: 3,
+      requires: { minAge: 6 },
+      options: [
+        {
+          label: '一直换下去，看能中几瓶',
+          effects: { mood: 8, stamina: -1 },
+          result: '一共中了五瓶。你抱着五瓶饮料站在便利店门口，笑得像个傻子。'
+        },
+        {
+          label: '把中的送给同事',
+          effects: { eq: 3, mood: 6 },
+          result: '一下午办公室都在开瓶盖，气氛比发工资那天还好。'
+        },
+        {
+          label: '拿去退钱',
+          effects: { money: 30, mood: 2 },
+          result: '老板看了你一眼，还是退了。三十块，一张整的。'
+        }
+      ]
+    },
+    {
+      id: 'E_SUDDEN_BENEFACTOR',
+      title: '举手之劳',
+      description: '你在路口扶了一位摔倒的老人，送到医院、垫了两百块。一周后，一辆黑色的车停在你楼下。',
+      weight: 2,
+      requires: { minAge: 12 },
+      options: [
+        {
+          label: '收下感谢费',
+          effects: { money: 5000, mood: 5 },
+          result: '对方说这是「应该的」。钱装在信封里，比你想的厚。'
+        },
+        {
+          label: '推辞，只要回那两百',
+          effects: { money: 200, will: 5, luck: 8, mood: 8 },
+          result: '老人握着你的手说了一句「好人」,声音很轻，但你记住了。'
+        },
+        {
+          label: '收一半，剩下的捐了',
+          effects: { money: 2000, eq: 3, cha: 2, mood: 6 },
+          result: '对方愣了一下，然后真的去办了。转账截图发给了你。'
+        }
+      ]
+    },
+    {
+      id: 'E_SUDDEN_INHERITANCE',
+      title: '远房亲戚',
+      description: '一个你只在户口本上见过名字的远房亲戚走了。律师打电话来，说留了一份东西给你。',
+      weight: 2,
+      requires: { minAge: 18 },
+      options: [
+        {
+          label: '全部收下',
+          effects: { money: 20000, mood: -2 },
+          result: '钱到账那天你没什么实感。那个人的样子，你其实想不起来。'
+        },
+        {
+          label: '留一半，捐一半',
+          effects: { money: 10000, mood: 6, eq: 3 },
+          result: '你捐给了一家敬老院。收据上写着你的名字，也写着他的姓。'
+        },
+        {
+          label: '全捐了，就当替他做件事',
+          effects: { mood: 12, cha: 3, luck: 6, will: 3 },
+          result: '你连收据都没留。有亲戚说你傻，你没解释。'
+        }
+      ]
+    },
+    {
+      id: 'E_SUDDEN_LOTTERY',
+      title: '刮刮乐',
+      description: '街角的彩票店，你随手买了一张十块的刮刮乐，刮开涂层的手有点抖。',
+      weight: 3,
+      requires: { minAge: 18 },
+      options: [
+        {
+          label: '中了，见好就收',
+          effects: { money: 200, mood: 8 },
+          result: '两百块。你请自己吃了顿好的，剩下的塞进了钱包夹层。'
+        },
+        {
+          label: '再买十张，趁热打铁',
+          effects: { money: -100, mood: -3, luck: -2 },
+          result: '十张全刮完了，一共中了三十。老板说「很正常」。'
+        }
+      ]
+    },
+
+    /* ---------------- 倒霉类 ---------------- */
+    {
+      id: 'E_SUDDEN_SPRAIN',
+      title: '崴脚',
+      description: '下楼梯时最后一级台阶看错了高度，脚踝「咔」了一声，你扶着栏杆半天没站直。',
+      weight: 3,
+      requires: { minAge: 6 },
+      options: [
+        {
+          label: '马上去医院拍片',
+          effects: { money: -2000, stamina: 2, mood: -3 },
+          result: '骨裂，打了石膏。医生让你一个月别乱跑，你问「能不能上班」，他看了你一眼。'
+        },
+        {
+          label: '忍一忍，回家贴膏药',
+          effects: { stamina: -8, mood: -6 },
+          result: '肿了半个月。后来每逢下雨，那只脚都会先提醒你。'
+        },
+        {
+          label: '找同事借个轮椅，撑着上班',
+          effects: { money: -500, stamina: -3, will: 2 },
+          result: '你被同事推着进会议室，全场鼓掌。你笑不出来。'
+        }
+      ]
+    },
+    {
+      id: 'E_SUDDEN_PHONE',
+      title: '手机掉进马桶',
+      description: '起身的时候手一滑，手机在空中翻了半圈，准确地、慢慢地，沉了下去。',
+      weight: 3,
+      requires: { minAge: 12 },
+      options: [
+        {
+          label: '捞出来，赶紧关机晾着',
+          effects: { stamina: -2, mood: -8, luck: -2 },
+          result: '晾了三天，开机了，但屏幕右下角多了一块永远不会消失的水渍。'
+        },
+        {
+          label: '直接买新的',
+          effects: { money: -3000, mood: -4 },
+          result: '新手机很好用。旧的那台被你扔进抽屉，一直没再打开。'
+        },
+        {
+          label: '送去修，能修就修',
+          effects: { money: -500, mood: -6 },
+          result: '师傅拆开吹了半天，说「主板没事，算你运气好」。'
+        }
+      ]
+    },
+    {
+      id: 'E_SUDDEN_FRAUD',
+      title: '陌生来电',
+      description: '一个自称「平台客服」的电话，说你的账户涉嫌违规，需要「配合核实」，还要你把钱转到「安全账户」。',
+      weight: 3,
+      requires: { minAge: 18 },
+      options: [
+        {
+          label: '直接挂断，拉黑',
+          effects: { mood: 2, will: 3 },
+          result: '你在网上搜了一下那个号码，第一条就是「诈骗」。'
+        },
+        {
+          label: '听他讲完再挂',
+          effects: { mood: -3, will: 1 },
+          result: '他说了十分钟，逻辑严密，还报出了你的名字和身份证后四位。你挂了电话，手心有点凉。',
+          nextEventId: 'E_SUDDEN_FRAUD_B'
+        },
+        {
+          label: '按他说的操作了',
+          effects: { money: -8000, mood: -15 },
+          result: '转账成功的提示弹出来那一刻，你就知道完了。',
+          nextEventId: 'E_SUDDEN_FRAUD_B'
+        }
+      ]
+    },
+    {
+      id: 'E_SUDDEN_FRAUD_B',
+      title: '追不回来的钱',
+      description: '派出所的笔录做了两个小时。民警说，这类案子追回来的概率很低，让你有个心理准备。',
+      weight: 1,
+      chainOnly: true,
+      requires: { minAge: 18 },
+      options: [
+        {
+          label: '配合调查，等消息',
+          effects: { money: 3000, mood: -8, will: 2 },
+          result: '半年后追回了一部分。你签收的时候，民警说「算运气好的」。'
+        },
+        {
+          label: '认栽，把钱当学费',
+          effects: { mood: -12, will: 4, intelligence: 2 },
+          result: '你把整件事写成了一篇长文发在家族群里，被转了很多次。'
+        },
+        {
+          label: '告诉家人，被骂了一顿',
+          effects: { eq: 3, mood: -6 },
+          result: '你妈骂了半小时，最后说「还好人没事」。你听着，眼眶有点热。'
+        }
+      ]
+    },
+    {
+      id: 'E_SUDDEN_RENT',
+      title: '黑中介',
+      description: '合同签完、押金交完、钥匙拿到手，第二天房东找上门：「我没委托过任何人出租。」',
+      weight: 3,
+      requires: { minAge: 18, housing: 'rent' },
+      options: [
+        {
+          label: '报警，走法律程序',
+          effects: { money: -500, mood: -6, will: 4 },
+          result: '中介公司第二天就注销了。案子挂在派出所，你学会了看营业执照和备案号。'
+        },
+        {
+          label: '认栽，重新找房',
+          effects: { money: -3000, mood: -10, stamina: -3 },
+          result: '押金和中介费都要不回来。你在一周内搬了两次家。'
+        },
+        {
+          label: '发动所有关系去堵那家门店',
+          effects: { money: -1000, mood: -4, cha: 3, will: 2 },
+          result: '你们六个人在门口坐了一下午。最后退了一半，剩下的打了欠条。'
+        }
+      ]
+    },
+    {
+      id: 'E_SUDDEN_DOG',
+      title: '被狗咬',
+      description: '你只是路过，那条没拴绳的狗突然冲出来，在小腿上留了两个牙印，血一下子渗了出来。',
+      weight: 3,
+      requires: { minAge: 6 },
+      options: [
+        {
+          label: '立刻去打狂犬疫苗',
+          effects: { money: -1500, stamina: -2, mood: -4 },
+          result: '一共五针，打到第三针的时候你已经能自己数着日子了。'
+        },
+        {
+          label: '找狗主人理论',
+          effects: { money: 300, mood: -6, eq: 2 },
+          result: '对方很不情愿地转了三百。疫苗还是你自己去打的。'
+        },
+        {
+          label: '忍了，回家自己清洗',
+          effects: { stamina: -4, luck: -3, mood: -6 },
+          result: '伤口结了痂。那一个月你每天都查「狂犬病潜伏期」。'
+        }
+      ]
+    },
+
+    /* ---------------- 巧合类 ---------------- */
+    {
+      id: 'E_SUDDEN_CLASSMATE',
+      title: '老同学',
+      description: '商场二楼的扶梯上，对面那个人一直盯着你看。走到一半，两个人都笑了。',
+      weight: 3,
+      requires: { minAge: 20 },
+      options: [
+        {
+          label: '一起吃个饭，聊聊这些年',
+          effects: { money: -200, mood: 10, eq: 2 },
+          result: '从毕业聊到工作，从工作聊到谁结婚了。结账的时候你们抢着扫码。'
+        },
+        {
+          label: '加个微信，说改天再约',
+          effects: { mood: 4, eq: 1 },
+          result: '「改天」这个词，你们都懂。但那天晚上你还是翻了很久 TA 的朋友圈。'
+        },
+        {
+          label: '点个头就走开',
+          effects: { mood: -3, will: 1 },
+          result: '走了十几米，你回头看了一眼，TA 也在回头。你们都装作在看别处。'
+        }
+      ]
+    },
+    {
+      id: 'E_SUDDEN_OLDCOAT',
+      title: '旧衣服里的钱',
+      description: '换季翻出一件好几年没穿的外套，手伸进内袋，摸到几张纸币——是上一个冬天的自己留下的。',
+      weight: 3,
+      requires: { minAge: 6 },
+      options: [
+        {
+          label: '收下，当是给自己的礼物',
+          effects: { money: 300, mood: 8 },
+          result: '三百块。你请自己喝了杯一直舍不得点的咖啡，剩下的留着。'
+        },
+        {
+          label: '请大家吃顿饭',
+          effects: { money: 300, mood: 10, eq: 2 },
+          result: '钱刚到手就花出去了。那顿饭吃了三个小时，很值。'
+        }
+      ]
+    },
+    {
+      id: 'E_SUDDEN_NEWS',
+      title: '上了本地新闻',
+      description: '你顺手做了件小事——把晕倒在路边的人送上救护车，然后就去上班了。三天后，记者找到了你单位。',
+      weight: 2,
+      requires: { minAge: 12 },
+      options: [
+        {
+          label: '接受采访，说几句',
+          effects: { cha: 5, luck: 4, mood: 10 },
+          result: '新闻播了四十秒，你妈录了下来，逢人就放。'
+        },
+        {
+          label: '婉拒，让记者别写名字',
+          effects: { will: 5, mood: 6, luck: 3 },
+          result: '报道里写的是「一位热心市民」。你看着这四个字，觉得比名字好。'
+        },
+        {
+          label: '配合拍摄，但别拍脸',
+          effects: { cha: 3, eq: 3, mood: 8 },
+          result: '镜头里只有一个背影和一句话：「谁遇上都会这么做」。'
+        }
+      ]
+    },
+    {
+      id: 'E_SUDDEN_UMBRELLA',
+      title: '雨里的伞',
+      description: '暴雨突至，公交站台下挤满了人。你旁边那位没带伞，手里抱着一个怕淋的纸箱。',
+      weight: 3,
+      requires: { minAge: 8 },
+      options: [
+        {
+          label: '把伞给 TA，自己淋回去',
+          effects: { stamina: -3, luck: 6, mood: 8, cha: 2 },
+          result: '你到家时全身湿透，但那天晚上睡得特别踏实。'
+        },
+        {
+          label: '两个人一起打一把伞',
+          effects: { cha: 3, eq: 2, mood: 6 },
+          result: '一路没说什么话，但到站的时候，TA 说了句「谢谢，真的」。'
+        },
+        {
+          label: '假装没看见',
+          effects: { mood: -4, will: 1 },
+          result: '车来了，你先上了。回头看时，TA 还在原地。'
+        }
+      ]
+    },
+    {
+      id: 'E_SUDDEN_LETTER',
+      title: '一封旧信',
+      description: '整理抽屉时翻出一封很久以前的信，信封已经泛黄，收信人是你，寄信人那一栏的字迹你认得。',
+      weight: 2,
+      requires: { minAge: 12 },
+      options: [
+        {
+          label: '坐下来，把它读完',
+          effects: { mood: 8, will: 2 },
+          result: '读完你在窗边坐了很久。有些话，隔了这么多年才听懂。'
+        },
+        {
+          label: '合上，放回原处',
+          effects: { mood: -4, will: 3 },
+          result: '你知道里面写了什么。你决定让它继续待在抽屉里。'
+        },
+        {
+          label: '想办法联系 TA',
+          effects: { money: -100, mood: 5, eq: 3, luck: 2 },
+          result: '电话打通了，那头愣了两秒，说「是你啊」。'
+        }
+      ]
+    }
   ];
 
   // 按 id 查行动：线性查找而不是静态索引，保证外部往 actionsData 里 push 新条目后立刻可用
