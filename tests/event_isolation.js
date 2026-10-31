@@ -215,6 +215,191 @@
     if (skipped.length) RES.stats.iso.skippedIds = skipped.slice(0, 20);
     if (leaked.length) RES.stats.iso.leakedList = leaked.slice(0, 50);
 
+  /* ---------------- ISO4 死链与孤儿 ---------------- */
+  (function () {
+    var broken = [], orphan = [];
+    var referenced = {};
+    for (var i = 0; i < EV.length; i++) {
+      var opts = EV[i].options || [];
+      for (var j = 0; j < opts.length; j++) {
+        var nx = opts[j].nextEventId;
+        if (nx) {
+          if (!ids[nx]) broken.push(EV[i].id + '\u2192' + nx);
+          referenced[nx] = true;
+        }
+      }
+    }
+    for (var k = 0; k < EV.length; k++) {
+      if (EV[k].chainOnly && !referenced[EV[k].id]) orphan.push(EV[k].id);
+    }
+    ok('ISO4a 所有 nextEventId 目标存在（无断链）', broken.length === 0,
+      broken.length ? broken.slice(0, 10).join(', ') : 'clean');
+    ok('ISO4b chainOnly 事件都有入口（无孤儿）', orphan.length === 0,
+      orphan.length ? orphan.join(', ') : 'clean');
+    RES.stats.iso.broken = broken.length;
+    RES.stats.iso.orphan = orphan.length;
+  })();
+
+  /* ---------------- ISO5 弹窗死锁（穷光蛋 + 全属性极低） ---------------- */
+  (function () {
+    function extremeCfg(age, job, love) {
+      return {
+        age: age, edu: '初中', job: job, money: 0, sta: 0, mood: 0, attr: 0,
+        love: love, housing: 'home', month: 6, tier: '普通', insurance: false,
+        teenLove: false, exam: false, posYears: 0, jobCooldown: 0,
+        childrenMode: 0, offset: 0, lastMarry: 0, loveVal: 0
+      };
+    }
+    var ages = [18, 25, 40, 65];
+    var jobs = ['无业', '外卖骑手', '普通程序员'];
+    var loves = ['single', 'married'];
+    var states = [];
+    for (var a = 0; a < ages.length; a++)
+      for (var b = 0; b < jobs.length; b++)
+        for (var c = 0; c < loves.length; c++)
+          states.push(extremeCfg(ages[a], jobs[b], loves[c]));
+
+    var dead = [];
+    var eligibleHits = 0;
+    for (var s = 0; s < states.length; s++) {
+      makeState(states[s]);
+      for (var e = 0; e < EV.length; e++) {
+        var ev = EV[e];
+        if (!ev.options || !ev.options.length) continue;
+        if (RJS.checkRequires(ev).length !== 0) continue;   // 事件本身不该出现
+        eligibleHits++;
+        var anyFree = false;
+        for (var o = 0; o < ev.options.length; o++) {
+          if (RJS.checkRequires(ev.options[o]).length === 0) { anyFree = true; break; }
+        }
+        if (!anyFree) dead.push(ev.id + '@age' + states[s].age + ':' + states[s].job + ':' + states[s].love);
+      }
+    }
+    // 去重（同一个事件在多种极端态下都可能死锁）
+    var uniq = {};
+    for (var d = 0; d < dead.length; d++) uniq[dead[d].split('@')[0]] = true;
+    var deadIds = Object.keys(uniq);
+    ok('ISO5a 穷光蛋+低属性下，所有可触发事件都至少有一个可点选项（无弹窗死锁）',
+      deadIds.length === 0,
+      deadIds.length ? deadIds.slice(0, 12).join(', ') : 'clean');
+    RES.stats.iso.deadlock = deadIds.length;
+    RES.stats.iso.deadlockScanned = eligibleHits;
+    if (deadIds.length) RES.stats.iso.deadlockList = deadIds;
+  })();
+
+  /* ---------------- ISO6 状态漂移（读档一致性 / sanitize 白名单） ---------------- */
+  (function () {
+    var SAVE_KEY = 'renjian-siji-save-v1';
+    // 构造一个「复杂状态」：已婚、有娃、生病、在职 + 尽可能多的字段
+    restoreComplex();
+    var s = S();
+    s.y = 2026; s.m = 7; s.d = 12; s.age = 34;
+    s.edu = '本科'; s.job = '大厂程序员'; s.salary = 24000;
+    s.int = 220; s.sta = 28; s.cha = 66; s.will = 77; s.eq = 88; s.luck = 55;
+    s.money = 234567; s.mood = 42; s.housing = 'rent';
+    s.married = true; s.spouse = '林知'; s.partnerName = '林知'; s.inLove = true;
+    s.loveState = 'married'; s.love = 61; s.moodMax = 115; s.marriedAt = 400;
+    s.kids = 2; s.divorceCount = 1; s.coldMonths = 1; s.familyCost = 3450;
+    s.dink = false; s.lostChild = 0; s.supportIncome = 1500;
+    s.children = [
+      { id: 'c1', name: '小禾', sex: '男', bornAt: 340, birth: '顺产', int: 90, sta: 60, cha: 55, luck: 50, edu: '小学', invest: '重点', relation: 70, alive: true, support: 0, hasChild: false, lastGrow: 0 },
+      { id: 'c2', name: '小满', sex: '女', bornAt: 120, birth: '顺产', int: 60, sta: 55, cha: 50, luck: 45, edu: '幼儿园', invest: '普通', relation: 65, alive: true, support: 0, hasChild: false, lastGrow: 0 }
+    ];
+    s.hadTeenLove = true; s.hasInsurance = true; s.hospitalCount = 2;
+    s.severancePay = 12000; s.severanceLeft = 1; s.firstSalary = true;
+    s.datingStart = 0; s.datingLove = 0; s.isSummerBreak = false;
+    s.enteredCollegeMonth = 0; s.summerBreakEnd = 0;
+    s.school = '实验中学'; s.schoolTier = '重点'; s.schoolBonus = 10;
+    s.examLog = [{ stage: 'gaokao', score: 600 }];
+    s.milestones = ['6', '12', '15', '18'];
+    s.pendingExam = null;
+    s.totalWorkYears = 9; s.currentPositionYears = 4; s.lastJobChangeMonth = 300;
+    s.studyCarry = 0.5; s.hopCount = 2; s.deathStrikes = 0;
+    s.triggeredEvents = ['E_LOST_WALLET', 'LV_MEET_PARENT'];
+    s.usage = { study: { day: '2026-7-12' } };
+    s.profile = { name: '张三丰', sex: '男' };
+    s.ended = false; s.endingId = ''; s.endReason = '';
+    s.talents = [{ id: 'T_HARDWORK', level: 2 }];
+    s.logs = [{ k: 'sys', y: 2026, m: 7, d: 1, t: '复杂态日志', a: 34, e: '本科' }];
+    s.at = 1234567890;
+
+    var keysBefore = Object.keys(s).sort();
+
+    // 走真实存档通路：btnSave → btnLoad → sanitize
+    var btnSave = document.getElementById('btnSave');
+    var btnLoad = document.getElementById('btnLoad');
+    if (btnSave) btnSave.click();
+
+    // 破坏内存态，确保读档真的从 localStorage 重建
+    var fresh = RJS.state;
+    Object.keys(fresh).forEach(function (k) { delete fresh[k]; });
+    if (btnLoad) btnLoad.click();
+
+    var after = S();
+    var keysAfter = Object.keys(after);
+    var missing = keysBefore.filter(function (k) { return keysAfter.indexOf(k) < 0; });
+
+    // 白名单：这些字段在 sanitize 中会被有意重构/重置，不算「漂移」
+    var allowlist = ['logs', 'usage', 'isStudent', 'pendingExam', 'school', 'schoolBonus', 'examLog', 'milestones', 'talents', 'at'];
+    var realMissing = missing.filter(function (k) { return allowlist.indexOf(k) < 0; });
+
+    ok('ISO6a 复杂状态（已婚/有娃/在职/住院）读档后关键字段无丢失',
+      realMissing.length === 0,
+      realMissing.length ? '丢失：' + realMissing.join(', ') : 'clean');
+    ok('ISO6b 新增字段 inLove/partnerName 在读档后保留',
+      after.inLove === true && after.partnerName === '林知',
+      after.inLove + '/' + after.partnerName);
+    ok('ISO6c 子女明细读档后完整（数量/名字/投入档）',
+      Array.isArray(after.children) && after.children.length === 2
+        && after.children[0].name === '小禾' && after.children[1].invest === '普通',
+      'children=' + (after.children || []).length);
+    ok('ISO6d 属性数值经 sanitize 夹取后仍在合法范围（不漂移成 NaN）',
+      isFinite(after.money) && isFinite(after.sta) && isFinite(after.mood)
+        && after.sta >= 0 && after.sta <= 100 && after.mood <= (after.moodMax || 100),
+      'money=' + after.money + ' sta=' + after.sta + ' mood=' + after.mood);
+
+    RES.stats.iso.missingFields = realMissing;
+    try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+
+    function restoreComplex() {
+      var src = BACKUP;
+      var st = S();
+      Object.keys(st).forEach(function (k) { delete st[k]; });
+      Object.keys(src).forEach(function (k) { st[k] = src[k]; });
+    }
+  })();
+
+  /* ---------------- ISO7 环状死循环（nextEventId 图） ---------------- */
+  (function () {
+    var color = {}, cycles = [];
+    function dfs(id, stack) {
+      if (color[id] === 1) { cycles.push(stack.concat(id).join('\u2192')); return; }
+      if (color[id] === 2) return;
+      color[id] = 1;
+      var ev = ids[id];
+      if (ev && ev.options) {
+        for (var i = 0; i < ev.options.length; i++) {
+          var nx = ev.options[i].nextEventId;
+          if (nx && ids[nx]) dfs(nx, stack.concat(id));
+        }
+      }
+      color[id] = 2;
+    }
+    for (var key in ids) if (Object.prototype.hasOwnProperty.call(ids, key) && color[key] !== 2) dfs(key, []);
+    ok('ISO7a nextEventId 网络无环（无 A→B→A 死循环）', cycles.length === 0,
+      cycles.length ? cycles.slice(0, 5).join(' / ') : 'acyclic');
+    RES.stats.iso.cycles = cycles.length;
+    if (cycles.length) RES.stats.iso.cycleList = cycles.slice(0, 10);
+  })();
+
+  // 复位
+  (function () {
+    var s = S();
+    Object.keys(s).forEach(function (x) { delete s[x]; });
+    Object.keys(BACKUP).forEach(function (x) { s[x] = BACKUP[x]; });
+    try { RJS.render(); } catch (err) {}
+  })();
+
     var pre = document.createElement('pre');
     pre.id = 'isotout';
     pre.textContent = '##ISO##' + JSON.stringify(RES) + '##END##';

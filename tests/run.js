@@ -110,8 +110,13 @@ for (let i = 0; i < VIEWS.length; i++) {
       else { fail++; console.log('FAIL  ' + g.n + (g.i ? '  :: ' + g.i : '')); }
     }
     const st = res.iso.stats && res.iso.stats.iso;
-    if (st) console.log('  扫描 ' + st.events + ' 个事件（' + st.withRequires + ' 个带条件，反证 ' + st.checks + ' 处，穿透 ' + st.leaked + ' 处）');
-    if (st && st.skipped) console.log('  无满足态跳过 ' + st.skipped + ' 个（应由 D4 兜底）' + (st.skippedIds ? '：' + st.skippedIds.join(', ') : ''));
+    if (st) {
+      console.log('  扫描 ' + st.events + ' 个事件（' + st.withRequires + ' 个带条件，反证 ' + st.checks + ' 处，穿透 ' + st.leaked + ' 处）');
+      console.log('  断链 ' + (st.broken || 0) + ' · 孤儿 ' + (st.orphan || 0) + ' · 死锁 ' + (st.deadlock || 0)
+        + '（扫到可触发 ' + (st.deadlockScanned || 0) + ' 次）· 环 ' + (st.cycles || 0)
+        + ' · 字段漂移 ' + (st.missingFields ? st.missingFields.length : 0));
+      if (st && st.skipped) console.log('  无满足态跳过 ' + st.skipped + ' 个（应由 D4 兜底）' + (st.skippedIds ? '：' + st.skippedIds.join(', ') : ''));
+    }
   }
 }
 

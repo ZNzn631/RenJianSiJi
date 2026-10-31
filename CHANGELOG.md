@@ -2,7 +2,7 @@
 
 单文件网页人生模拟游戏（纯 HTML + CSS + JS，双击即玩）。
 
-- 版本：**v3.20（自动化基建：事件穿透探针 + AGENTS.md）**
+- 版本：**v3.21（事件级自动探针扩到 6 项）**
 - 日期：2026-10-31
 - 结构：`data.js`（纯数据）+ `engine.js`（核心引擎）+ `人间开发.html`（HTML/CSS/UI + 底部引入）
 - 主文件：`人间开发.html`（入口，需与 data.js / engine.js 同目录）
@@ -1911,6 +1911,36 @@ node tests/check_balance.js 1000 100  → 早逝 35.2%（PASS）· 平凡 39.5%�
 ```
 
 ---
+
+## v3.21 · 事件级自动探针扩到 6 项（2026-10-31）
+
+在 `event_isolation.js` 里新增 4 组探针，跑 `run.js` 时自动执行。全库 225 事件，六项全绿：
+
+| # | 探针 | 本轮结果 |
+|---|---|---|
+| ISO1–3 | 穿透（单字段反证 640 处） | 穿透 0 |
+| **ISO4** | **死链 + 孤儿**（`nextEventId` 无目标 / `chainOnly` 无入口） | 断链 0 · 孤儿 0 |
+| **ISO5** | **弹窗死锁**（穷光蛋+低属性 × 24 种极端态，扫到可触发 1495 次） | 死锁 0 |
+| **ISO6** | **状态漂移**（复杂态 已婚/有娃/在职/住院 → `sanitize` 读档比对） | 丢失字段 0 |
+| **ISO7** | **环状死循环**（`nextEventId` 有向图 DFS 判环） | 环 0 |
+
+实现要点：
+
+- **死锁**：遍历 4 年龄 × 3 职业 × 2 婚姻态 = 24 个极端态，对每个「事件本身可触发」的瞬间，检查是否存在至少一个无 `requires` 的选项；1495 次可触发命中里没有任何一例是全选项锁死的。
+- **漂移**：构造一个字段尽量齐全的状态（`inLove / partnerName / children / profile / schoolTier / examLog / talents …`），走真实 `btnSave → btnLoad → sanitize` 通路，比对读档前后的字段集合；`logs / usage / isStudent / school / examLog / milestones / talents / at` 这类由 sanitize 有意重构的字段进了白名单，其余字段一个都不能少。特别断言了 `inLove / partnerName` 这两个 v3.16 新增字段读档后仍保留。
+- **环**：对全库 `nextEventId` 建图，DFS 三色标记，检测到回边即报环。
+
+### 验证
+
+```
+node tests/run.js  → 479/479（两视口 · 含 8 条新 ISO 断言）· JS 错误 0 · 属性越界 0
+```
+
+`AGENTS.md` 的「测试铁律」同步补进这 4 项，明确「任何一项报错都视为测试不通过」。
+
+---
+
+
 
 
 
