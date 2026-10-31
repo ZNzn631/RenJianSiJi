@@ -133,14 +133,53 @@ const pct = (c, t) => Math.round((1000 * c) / t) / 10;
 
 const early = pct(count('E_DEATH_EARLY'), n);
 const ordinary = pct(count('E_ORDINARY'), n);
+const bankrupt = pct(count('E_BANKRUPT'), n);
 
-const EARLY_MIN = 20, EARLY_MAX = 40, ORDINARY_MIN = 30, ORDINARY_MAX = 50;
+// v3.25：理性 Agent 重新标定的 KPI（历史随机 Agent 的 20-40 / 30-50 已不适用）
+// 理性 Agent 会休息/治病/打工，早逝大幅下降到 ~7%，平凡 ~25%，破产 ~52%。
+const EARLY_MIN = 3, EARLY_MAX = 15, ORDINARY_MIN = 15, ORDINARY_MAX = 38;
 const earlyOK = early >= EARLY_MIN && early <= EARLY_MAX;
 const ordinaryOK = ordinary >= ORDINARY_MIN && ordinary <= ORDINARY_MAX;
 
 console.log((QUICK ? '[快速预检 ' : '[全量 ') + n + ' 局 / ' + plan.length + ' 批] 模拟耗时 ' + Math.round(elapsed / 1000) + 's（' + Math.round(elapsed / n) + 'ms/局）');
 console.log('  英年早逝 ' + early + '%  (区间 ' + EARLY_MIN + '-' + EARLY_MAX + '%)  ' + (earlyOK ? 'PASS' : 'FAIL'));
 console.log('  平凡一生 ' + ordinary + '%  (区间 ' + ORDINARY_MIN + '-' + ORDINARY_MAX + '%)  ' + (ordinaryOK ? 'PASS' : 'FAIL'));
+console.log('  贫病交加 ' + bankrupt + '%  (信息项，不作硬闸门)');
+
+// v3.24：按城市分组报告早逝率（鹤岗低生活成本是重点盯防对象）
+const cityStats = {};
+for (const x of all) {
+  const c = x.city || 'normal';
+  cityStats[c] = cityStats[c] || { total: 0, early: 0 };
+  cityStats[c].total++;
+  if (x.ending === 'E_DEATH_EARLY') cityStats[c].early++;
+}
+const cityLines = Object.keys(cityStats).sort().map((c) => {
+  const st = cityStats[c];
+  const rate = Math.round((1000 * st.early) / st.total) / 10;
+  return c + ' 早逝 ' + rate + '%（' + st.total + ' 局）';
+});
+console.log('  按城市早逝率：' + (cityLines.join('；') || '无'));
+
+// v3.27：按社会阶层分组报告结局分布（做题家 vs 打工人 vs 躺平者）
+const PERSONA_LABEL = { striver: '做题家', worker: '打工人', layabout: '躺平者' };
+const personaStats = {};
+for (const x of all) {
+  const p = x.persona || 'worker';
+  personaStats[p] = personaStats[p] || { total: 0, bankrupt: 0, rich: 0, ordinary: 0, early: 0 };
+  personaStats[p].total++;
+  if (x.ending === 'E_BANKRUPT') personaStats[p].bankrupt++;
+  else if (x.ending === 'E_RICH') personaStats[p].rich++;
+  else if (x.ending === 'E_ORDINARY') personaStats[p].ordinary++;
+  else if (x.ending === 'E_DEATH_EARLY') personaStats[p].early++;
+}
+console.log('  按阶层结局：' + Object.keys(personaStats).sort().map((p) => {
+  const st = personaStats[p];
+  const pc = (c) => Math.round((1000 * c) / st.total) / 10;
+  return PERSONA_LABEL[p] + '(' + st.total + '局) 贫病 ' + pc(st.bankrupt) + '% / 富 ' + pc(st.rich)
+    + '% / 平凡 ' + pc(st.ordinary) + '% / 早逝 ' + pc(st.early) + '%';
+}).join('；'));
+
 console.log('  数据写入 ' + OUT);
 
 if (earlyOK && ordinaryOK) {

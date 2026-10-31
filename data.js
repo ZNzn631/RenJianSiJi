@@ -682,6 +682,19 @@
     { id: 'D_HEART',        name: '心脏病',   minAge: 45, healthLimit: 30, cost: 30000, damage: 20 }
   ];
 
+  /* ================= [数据层] 城市 / 地域系统（v3.24） =================
+     id / name / salaryFactor 工资系数 / livingFactor 生活成本系数 / houseFactor 房价系数。
+     'normal' 是兜底城市（老档默认），三系数全 1.0。
+     系数初版为占位值，最终以 1000 局平衡测试标定为准（见 CHANGELOG）。 */
+  var citiesData = window.citiesData = [
+    { id: 'normal',   name: '普通城市', salaryFactor: 1.0,  livingFactor: 1.0,  houseFactor: 1.0 },
+    { id: 'beijing',  name: '北京',     salaryFactor: 1.4,  livingFactor: 1.5,  houseFactor: 2.0 },
+    { id: 'chengdu',  name: '成都',     salaryFactor: 1.0,  livingFactor: 0.85, houseFactor: 1.2 },
+    { id: 'changsha', name: '长沙',     salaryFactor: 0.95, livingFactor: 0.75, houseFactor: 0.9 },
+    { id: 'hegang',   name: '鹤岗',     salaryFactor: 0.7, livingFactor: 0.45, houseFactor: 0.15 },
+    { id: 'county',   name: '小县城',   salaryFactor: 0.75, livingFactor: 0.55, houseFactor: 0.25 }
+  ];
+
   /* ================= [引擎层] 教育系统（v2.8） ================= */
   // 学校档位只影响「高考加分」与 UI，不参与 EDU_RANK / minEdu 判定
   var SCHOOL_TIERS = {
@@ -1126,13 +1139,15 @@
       title: '首付',
       description: '中介发来一套房：三十平，首付五万，月供压得人喘不过气，但「这是你自己的」。',
       weight: 2,
-      requires: { money: { min: 900000 }, minAge: 18 },
+      requires: { houseMoney: 900000, minAge: 18 },   // v3.24：首付按城市房价折算
       options: [
         {
-          label: '咬牙付首付 90 万',
-          requires: { money: { min: 900000 } },
-          effects: { money: -900000, mood: -6, stamina: -3 },
-          result: '签字那天你拍了张照，晚上就着泡面看了很久。'
+          label: '咬牙付首付',
+          meta: '首付（按城市折算）',
+          requires: { houseMoney: 900000 },
+          effects: { mood: -6, stamina: -3 },
+          result: '签字那天你拍了张照，晚上就着泡面看了很久。',
+          onChoose: function () { state.money -= houseCost(900000); addLog('event', '【买房】首付 ' + houseCost(900000) + ' 元（' + cityName() + '）。'); }
         },
         {
           label: '再等等',
@@ -1572,10 +1587,12 @@
       requires: { onceEver: true, hasChild: true, minAge: 36, maxAge: 50 },   // v3.5.5：有孩子才谈入学
       options: [
         {
-          label: '咬牙买学区房 60 万',
-          requires: { money: { min: 600000 } },
-          effects: { money: -600000, mood: 6, stamina: -3 },
+          label: '咬牙买学区房',
+          meta: '学区房（按城市折算）',
+          requires: { houseMoney: 600000 },
+          effects: { mood: 6, stamina: -3 },
           result: '你签了第二份贷款合同，孩子的名字写在了入学名单上。',
+          onChoose: function () { state.money -= houseCost(600000); addLog('event', '【学区房】支出 ' + houseCost(600000) + ' 元（' + cityName() + '）。'); },
           nextEventId: 'E_KID_STUDY_FIGHT'
         },
         { label: '就近上普通小学', effects: { mood: -6 }, result: '妻子没说什么，但那年过年她没怎么说话。' }
@@ -1760,10 +1777,10 @@
       title: '装修',
       description: '装修队给了两个方案：全包八万，或者只刷墙两万。',
       weight: 2,
-      requires: { money: { min: 180000 }, minAge: 36, maxAge: 58 },
+      requires: { houseMoney: 180000, minAge: 36, maxAge: 58 },   // v3.24：装修并入房价系数
       options: [
-        { label: '好好装，住得舒服点', requires: { money: { min: 180000 } }, effects: { money: -180000, mood: 12, stamina: 2 }, result: '新家有了阳光，你第一次觉得钱花得值。' },
-        { label: '简单刷墙就行', effects: { money: -45000, mood: 2 }, result: '墙白了，家具还是旧的。' }
+        { label: '好好装，住得舒服点', meta: '装修（按城市折算）', requires: { houseMoney: 180000 }, effects: { mood: 12, stamina: 2 }, result: '新家有了阳光，你第一次觉得钱花得值。', onChoose: function () { state.money -= houseCost(180000); addLog('event', '【装修】支出 ' + houseCost(180000) + ' 元（' + cityName() + '）。'); } },
+        { label: '简单刷墙就行', meta: '装修（按城市折算）', effects: { mood: 2 }, result: '墙白了，家具还是旧的。', onChoose: function () { state.money -= houseCost(45000); addLog('event', '【装修】支出 ' + houseCost(45000) + ' 元（' + cityName() + '）。'); } }
       ]
     },
     {
@@ -4358,16 +4375,20 @@
       options: [
         {
           label: '掏空积蓄，付掉首付',
-          requires: { money: { min: 300000 } },
-          effects: { money: -300000, mood: -10, will: 4 },
+          meta: '首付（按城市折算）',
+          requires: { houseMoney: 300000 },
+          effects: { mood: -10, will: 4 },
           result: '签完字你在售楼处门口站了很久，风把合同吹得哗啦响。',
+          onChoose: function () { state.money -= houseCost(300000); addLog('event', '【买房】首付 ' + houseCost(300000) + ' 元（' + cityName() + '）。'); },
           nextEventId: 'E_LOVE_BETROTHAL'
         },
         {
           label: '让父母先垫八万，剩下的慢慢还',
-          requires: { money: { min: 80000 } },
-          effects: { money: -80000, mood: -12, will: -2 },
+          meta: '首付（按城市折算）',
+          requires: { houseMoney: 80000 },
+          effects: { mood: -12, will: -2 },
           result: '你妈转账时只说了句「别委屈自己」。这句话后来每次过年都会被提起。',
+          onChoose: function () { state.money -= houseCost(80000); addLog('event', '【买房】首付 ' + houseCost(80000) + ' 元（' + cityName() + '）。'); },
           nextEventId: 'E_LOVE_BETROTHAL'
         },
         {
@@ -5572,7 +5593,10 @@
   var KID_LOSS_CHANCE = 0.002;    // 孩子每年意外的概率（很低，但「失孤」结局存在）
 
   function livingCostOf(salary) {
-    return Math.max(LIVING_BASE, Math.round((Number(salary) || 0) * LIVING_RATE));
+    var base = Math.max(LIVING_BASE, Math.round((Number(salary) || 0) * LIVING_RATE));
+    // v3.24：生活成本按城市系数缩放（cityFactors 定义在 engine，运行时已加载）
+    var f = (typeof cityFactors === 'function') ? cityFactors().living : 1;
+    return Math.round(base * f);
   }
 
   // 开局日志用：把上面两个数值翻译成人话，改数值不用再改文案

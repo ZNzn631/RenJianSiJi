@@ -347,6 +347,18 @@
       if (v !== true) return null;
       if (!state.hasInsurance) return null;
       return { key: 'noInsurance', title: '已购买', detail: '你已经买过医疗保险了', suffix: true };
+    },
+    // v3.24：房价门槛（方案 B）。入参 base = 名义房价，实际判定 money >= round(base × houseFactor)
+    houseMoney: function (v) {
+      var base = Number(v);
+      if (!isFinite(base) || base <= 0) return null;
+      var need = houseCost(base);
+      if (state.money >= need) return null;
+      return {
+        key: 'houseMoney', title: '首付不足',
+        detail: '需要 ' + need + ' 元（当前 ' + state.money + ' 元，已按城市房价折算）',
+        suffix: true
+      };
     }
   };
 
@@ -507,6 +519,7 @@
       money: 2800,
       mood: 80,
       stockValue: 0,        // v3.22：股票市值（买入即 +1 万成本，settleStocks 每月按运气/随机涨跌）
+      city: 'normal',       // v3.24：出生城市（默认普通城市，三系数全 1.0）
       housing: 'home',    // v3.5.4：居住状态 home/dorm/rent（开局住家，上大学→dorm，工作→rent）
       isStudent: false,   // v3.7：在校生（本科/专科且 <22 岁），由规则动态判定
       /* --- 婚姻系统（v3.0）：全部为新增字段，旧档由 sanitize 补默认值 --- */
@@ -787,6 +800,39 @@
     return true;
   }
 
+  /* ================= [引擎层] 城市 / 地域系统（v3.24） =================
+     citiesData 在 data.js 里；这里只提供单点系数查询与房价折算。
+     老档没有 city（或 city 不认识）→ 全部回退 1.0，绝不改变老玩家行为。 */
+
+  function cityFactors() {
+    var id = state.city || 'normal';
+    if (typeof citiesData === 'undefined') return { salary: 1, living: 1, house: 1 };
+    for (var i = 0; i < citiesData.length; i++) {
+      if (citiesData[i].id === id) {
+        return {
+          salary: Number(citiesData[i].salaryFactor) || 1,
+          living: Number(citiesData[i].livingFactor) || 1,
+          house: Number(citiesData[i].houseFactor) || 1
+        };
+      }
+    }
+    return { salary: 1, living: 1, house: 1 };
+  }
+
+  function houseCost(base) {
+    return Math.round((Number(base) || 0) * cityFactors().house);
+  }
+
+  function cityName() {
+    var id = state.city || 'normal';
+    if (typeof citiesData !== 'undefined') {
+      for (var i = 0; i < citiesData.length; i++) {
+        if (citiesData[i].id === id) return citiesData[i].name;
+      }
+    }
+    return '普通城市';
+  }
+
   // v3.23：股票每月结算。只读/写 state.stockValue，不碰 money / 生活费 / 工资。
   // 牛市 +50%（基础 35% ± 运气加成），熊市 −60%（固定 30%），其余平稳。
   // 长期期望为负：0.35×(+50%) + 0.30×(−60%) = +17.5% − 18% = −0.5%（不含手续费）。
@@ -824,7 +870,7 @@
 
     // 有工作：月底发薪，顺带消耗体质与心情
     if (state.salary > 0) {
-      var pay = Math.round(state.salary * talentMul('work_money'));   // 天赋：工资倍率
+      var pay = Math.round(state.salary * talentMul('work_money') * cityFactors().salary);   // 天赋：工资倍率 × 城市工资系数
       state.money += pay;
       if (state.sta >= 5) state.sta += PAY_STAMINA;
       state.mood += PAY_MOOD;
@@ -851,12 +897,14 @@
         + state.severanceLeft + ' 个月）。');
     }
     if (state.age >= 22 && !(state.salary > 0) && state.money < BENEFIT_THRESHOLD) {   // v3.2：低保
-      state.money += BENEFIT;
-      addLog('sys', '【低保】街道给了 ' + BENEFIT + ' 元临时救助。');
+      var benefit = Math.round(BENEFIT * cityFactors().salary);   // v3.26：低保随城市工资系数
+      state.money += benefit;
+      addLog('sys', '【低保】街道给了 ' + benefit + ' 元临时救助。');
     }
     if (state.age >= PENSION_AGE) {                 // v3.2：退休金（纯追加）
-      state.money += PENSION;
-      addLog('sys', '【养老金】这个月到账 ' + PENSION + ' 元。');
+      var pension = Math.round(PENSION * cityFactors().salary);   // v3.26：养老金随城市工资系数（地域折叠）
+      state.money += pension;
+      addLog('sys', '【养老金】这个月到账 ' + pension + ' 元。');
     }
     if (state.married || (state.children && state.children.length)) settleFamily();   // v3.1：已婚或有孩子都要家庭月结
     settleStocks();                              // v3.22：股票每月涨跌（只动 stockValue，不碰生活费/工资）
@@ -866,7 +914,7 @@
   // 年终奖：月薪 × (1 + 总工龄×0.2)，最多 3 个月
   function yearEndBonus() {
     var months = Math.min(3, 1 + state.totalWorkYears * 0.2);
-    return Math.round(state.salary * months);
+    return Math.round(state.salary * months * cityFactors().salary);
   }
 
   // 跨年：年龄 +1，在职则工龄 +1 并结算年终奖
@@ -1388,8 +1436,9 @@
   // 现金不足 → 负债（父母/医保垫付）且计一次「危险住院」；现金充足 → 普通住院、危险计数清零。
   function hospitalize() {
     var cash = Math.max(0, state.money || 0);
-    var cost = Math.round(cash * HOSPITAL_RATE);
-    cost = Math.max(HOSPITAL_MIN, Math.min(HOSPITAL_MAX, cost));
+    var f = cityFactors().living;                    // v3.25：医疗费随城市生活成本缩放（小县城看病便宜）
+    var cost = Math.round(cash * HOSPITAL_RATE * f);
+    cost = Math.max(Math.round(HOSPITAL_MIN * f), Math.min(Math.round(HOSPITAL_MAX * f), cost));
     var broke = state.money < cost;                          // 现金不足 → 父母/医保垫付（负债）
     state.money -= cost;
     state.sta = HOSPITAL_STA;
@@ -1441,6 +1490,7 @@
   // 构造疾病事件（复用事件弹窗机制）
   function buildDiseaseEvent(d) {
     var pay = state.hasInsurance ? Math.round(d.cost * 0.2) : d.cost;
+    pay = Math.round(pay * cityFactors().living);    // v3.25：治疗费随城市生活成本缩放
     return {
       id: 'DISEASE_' + d.id,
       title: '生病了：' + d.name,
@@ -1973,6 +2023,7 @@
       money: isFinite(Number(s.money)) ? Math.round(Number(s.money)) : 2800,
       mood: asInt(s.mood, 80, 0, moodMaxVal),
       stockValue: asInt(s.stockValue, 0, 0, 999999999),   // v3.22：旧档缺失 → 0
+      city: (typeof s.city === 'string' && s.city) ? s.city : 'normal',   // v3.24：旧档缺失/非法 → 普通城市（系数 1.0）
       housing: (s.housing === 'dorm' || s.housing === 'rent') ? s.housing : 'home',   // v3.5.4：居住状态，旧档缺省 home
       isStudent: (s.edu === '本科' || s.edu === '专科') && (Number(s.age) || 0) < 22,   // v3.7：在校生（读档时按学历+年龄回推）
       /* --- 婚姻系统字段（v3.0）--- */

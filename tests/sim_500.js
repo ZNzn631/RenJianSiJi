@@ -31,42 +31,130 @@
     if (!ev) return;
     var free = [];
     for (var i = 0; i < ev.options.length; i++) if (RJS.checkRequires(ev.options[i]).length === 0) free.push(i);
-    RJS.simChoose(free.length ? free[Math.floor(Math.random() * free.length)] : 0);
+    if (!free.length) { RJS.simChoose(0); return; }
+    var s = S();
+    // 10% 作死：偏要挑最「伤」的（硬扛疾病、冲动花大钱）
+    if (Math.random() < 0.10) {
+      var worst = free[0], worstScore = Infinity;
+      for (var w = 0; w < free.length; w++) {
+        var wfx = ev.options[free[w]].effects || {};
+        var wSta = (typeof wfx.stamina === 'number') ? wfx.stamina : 0;
+        var wMoney = (typeof wfx.money === 'number') ? wfx.money : 0;
+        var wScore = wSta * 1000 + Math.max(-500, wMoney);
+        if (wScore < worstScore) { worstScore = wScore; worst = free[w]; }
+      }
+      RJS.simChoose(worst);
+      return;
+    }
+    // 理性选择：① 优先回血；② 避开「单次扣款 > 现有现金一半」的冲动消费
+    var best = free[0], bestScore = -Infinity;
+    for (var j = 0; j < free.length; j++) {
+      var fx = ev.options[free[j]].effects || {};
+      var dSta = (typeof fx.stamina === 'number') ? fx.stamina : 0;
+      var dMoney = (typeof fx.money === 'number') ? fx.money : 0;
+      if (dMoney < 0 && Math.abs(dMoney) > s.money * 0.5 && PERSONA !== 'striver') continue;   // 打工人/躺平不买掏空自己的大件；做题家敢买房
+      var score = dSta * 1000 + Math.max(-500, dMoney);
+      if (score > bestScore) { bestScore = score; best = free[j]; }
+    }
+    RJS.simChoose(best);
   }
-  function randomAction() {
+  function randomAction(sabotage) {
+    var EXCLUDE = sabotage ? {} : { resign: 1, buyStock: 1 };
     for (var k = 0; k < 40; k++) {
       var id = ACTS[Math.floor(Math.random() * ACTS.length)];
+      if (EXCLUDE[id]) continue;
       var act = RJS.actions.filter(function (a) { return a.id === id; })[0];
       if (act && RJS.checkRequires(act).length === 0) return id;
     }
+    return 'rest';
+  }
+  function firstOk(order) {
+    for (var i = 0; i < order.length; i++) {
+      var a = RJS.actions.filter(function (x) { return x.id === order[i]; })[0];
+      if (a && RJS.checkRequires(a).length === 0) return order[i];
+    }
     return null;
+  }
+  // v3.27：分层 Agent —— 模拟「社会的参差」。
+  //   35% 内卷做题家：读书考大学 → 程序员 → 晋升 → 高收入
+  //   35% 普通打工人：不卷学历 → 文员/骑手 → 精打细算
+  //   30% 随性躺平者：长期零工 → 心情高但抗风险差
+  // 之上叠加 10% 的随机「作死」（硬扛疾病 / 冲动投资 / 裸辞）。
+  var PERSONA = 'worker';
+  function assignPersona() {
+    var r = Math.random();
+    if (r < 0.35) return 'striver';
+    if (r < 0.70) return 'worker';
+    return 'layabout';
   }
   function smartAction() {
     var s = S();
-    if (s.sta < 30 || s.mood < 20) return 'rest';
-    if (!s.salary && s.age >= 18) {
-      var c = RJS.actions.filter(function (a) { return a.id === 'clerk'; })[0];
-      if (c && RJS.checkRequires(c).length === 0) return 'clerk';
+    if (Math.random() < 0.10) return randomAction(true);   // 随机作死：跳过理性决策
+
+    if (s.mood < 12) return 'rest';
+
+    if (PERSONA === 'striver') {
+      if (!s.salary) {
+        if (s.age < 18 || (s.isStudent && s.age < 22)) return 'study';
+        if (s.sta < 50) return 'rest';
+        if (s.age >= 22) {
+          var j = firstOk(['coder', 'coderRegular', 'clerk', 'jobTeacher', 'jobRider']);
+          if (j) return j;
+        }
+        return firstOk(['oddjob']) || 'rest';
+      }
+      if (s.sta < 40) return 'rest';
+      if (firstOk(['promote'])) return 'promote';
+      if (s.int < 220) return 'study';
+      if (s.sta < 70) return 'train';
+      return randomAction();
     }
-    if (s.salary && s.money < 30000) {
-      var w = RJS.actions.filter(function (a) { return a.id === 'work'; })[0];
-      if (w && RJS.checkRequires(w).length === 0) return 'work';
+
+    if (PERSONA === 'worker') {
+      if (!s.salary) {
+        if (s.age < 18) return 'rest';                        // 不卷学历
+        if (s.sta < 50) return 'rest';
+        if (s.age >= 22) {
+          var j = firstOk(['clerk', 'jobTeacher', 'jobRider', 'coderRegular']);
+          if (j) return j;
+        }
+        return firstOk(['oddjob']) || 'rest';
+      }
+      if (s.sta < 40) return 'rest';
+      if (s.money < 30000) return 'work';                     // 精打细算
+      if (s.sta < 70) return 'train';
+      return randomAction();
     }
-    return randomAction();
+
+    // layabout：心情优先，长期零工，偶尔接骑手活
+    if (s.mood < 25) return 'rest';
+    if (s.sta < 20) return 'rest';
+    if (s.age >= 20 && s.sta >= 50 && Math.random() < 0.2) {
+      var j = firstOk(['jobRider']);
+      if (j) return j;
+    }
+    return firstOk(['oddjob']) || 'rest';
   }
 
   var MARK_AGES = [16, 18, 22, 25, 30, 35, 40, 50, 60, 70, 80];
+
+  // v3.24：城市系统 —— 每局从 citiesData 均匀抽一个出生城市，供平衡模拟按城市分组
+  var CITY_IDS = (window.citiesData || []).map(function (c) { return c.id; });
+  if (!CITY_IDS.length) CITY_IDS = ['normal'];
+  function pickCity() { return CITY_IDS[Math.floor(Math.random() * CITY_IDS.length)]; }
 
   function life(opts) {
     opts = opts || {};
     REAL_RESET.click();
     var s = S();
+    s.city = pickCity();                     // v3.24：本局出生城市（在结算前指定，系数随之生效）
+    PERSONA = assignPersona();               // v3.27：本局社会阶层人设
     if (opts.setup) opts.setup(s);
     var steps = 0, negMonths = 0, lastMonth = -1, marks = {};
     while (!s.ended && steps < 26000) {
       if (RJS.simPendingEvent()) { chooseRandom(); steps++; continue; }
       if (s.pendingExam) { RJS.simSettleExam(); steps++; continue; }
-      var id = opts.smart ? smartAction() : randomAction();
+      var id = smartAction();                 // v3.25：所有平衡模拟统一用理性 Agent
       if (!id) { steps++; continue; }
       s.logs.length = 0;
       RJS.doAction(id);
@@ -85,6 +173,8 @@
     return {
       ending: s.endingId || 'ALIVE80+', age: s.age, money: Math.round(s.money),
       negMonths: negMonths, married: s.married, kids: s.kids, edu: s.edu, tier: s.schoolTier, school: s.school,
+      city: s.city || 'normal',          // v3.24：记录本局城市，供按城市分组
+      persona: PERSONA,                   // v3.27：记录本局阶层，供按阶层分组
       marks: marks, steps: steps
     };
   }
