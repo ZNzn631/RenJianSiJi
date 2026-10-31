@@ -175,7 +175,7 @@
   /* ================= B8. 新增【社交】行动 ================= */
   (function social() {
     var act = RJS.actions.filter(function (a) { return a.id === 'social'; })[0];
-    ok('B8 社交行动已注册（共 ' + RJS.actions.length + ' 个行动）', !!act && RJS.actions.length === 20,
+    ok('B8 社交行动已注册（共 ' + RJS.actions.length + ' 个行动）', !!act && RJS.actions.length === 25,
       act ? 'costDays=' + act.costDays : '缺 social');
     if (!act) return;
     restore(PRISTINE);
@@ -517,7 +517,7 @@
 
     // 陪伴行动
     var comp = RJS.actions.filter(function (a) { return a.id === 'companion'; })[0];
-    ok('L4 陪伴已注册（共 ' + RJS.actions.length + ' 个行动）', !!comp && RJS.actions.length === 20, RJS.actions.length);
+    ok('L4 陪伴已注册（共 ' + RJS.actions.length + ' 个行动）', !!comp && RJS.actions.length === 25, RJS.actions.length);
     restore(PRISTINE); S().age = 30;
     ok('L5 单身也能陪伴（不再锁已婚）', RJS.checkRequires(comp).length === 0, '');
     restore(PRISTINE); S().age = 30; S().married = true; S().spouse = '林晓'; S().love = 50; S().money = 5000;
@@ -829,7 +829,7 @@
       alive: true, support: 0, supportDone: false, hasChild: false, lastGrow: kc.y * 12 + kc.m }];
     kc.kids = 1;
     var kact = RJS.actions.filter(function (a) { return a.id === 'kidcare'; })[0];
-    ok('M17 陪孩子已注册（共 ' + RJS.actions.length + ' 个行动）', !!kact && RJS.actions.length === 20, RJS.actions.length);
+    ok('M17 陪孩子已注册（共 ' + RJS.actions.length + ' 个行动）', !!kact && RJS.actions.length === 25, RJS.actions.length);
     S().d = 10;                                     // 固定非月末，避免跨月结算干扰
     var kb = { money: S().money, mood: S().mood, rel: S().children[0].relation };
     RJS.doAction('kidcare');
@@ -1277,7 +1277,7 @@
       var MOODS = [0, 12, 45, 80, 100];
       var LOVES = [0, 15, 35, 60, 85, 100];
       var OFFS = [0, 2, 3, 6, 9, 12];
-      var JOBS = ['无业', '普通文员', '普通程序员', '大厂程序员'];
+      var JOBS = ['无业', '普通文员', '普通程序员', '大厂程序员', '人民教师', '外卖骑手', '网红主播'];   // v3.19：覆盖新职业，否则职业事件会被误判为死事件
       var INTS = [10, 60, 110, 160, 220, 330];      // 覆盖 int>=151 的考研线 / int>=100 的奖学金线
       var CHAS = [10, 38, 50, 90, 200];
       var EQS = [10, 38, 55, 120];
@@ -1294,6 +1294,7 @@
         s.currentPositionYears = cfg.posYears; s.lastJobChangeMonth = (s.y * 12 + s.m) - cfg.jobCooldown;
         s.datingStart = cfg.offset ? (s.y * 12 + s.m) - cfg.offset : 0;
         s.datingLove = 50; s.schoolTier = cfg.tier; s.hasInsurance = cfg.insurance;
+        s.stockValue = 10000;   // v3.22：让 E_STOCK_TIP 可被覆盖矩阵命中（stockValue 只影响股票事件）
         s.dink = cfg.dink; s.lostChild = 0;
         s.hadTeenLove = cfg.teenLove === true; s.triggeredEvents = []; s.usage = {};
         s.pendingExam = null; s.isStudent = cfg.edu === '本科' && cfg.age < 22;
@@ -1679,6 +1680,101 @@
     } catch (e) { R.push({ n: 'D7 组异常', p: false, i: e.message }); }
   })();
 
+
+  /* ========================= S · 股票投资（v3.22） ========================= */
+  (function stockTests() {
+    try {
+      // S1 买入门槛：现金不足 1 万时锁
+      dReset();
+      var s = S();
+      s.age = 25; s.money = 5000; s.stockValue = 0; s.luck = 50;
+      var buy = RJS.actions.filter(function (a) { return a.id === 'buyStock'; })[0];
+      ok('S1 现金不足 1 万时「买入股票」锁定', !!buy && RJS.checkRequires(buy).length > 0,
+        buy ? 'locked' : 'missing');
+
+      // S2 买入：现金 −10000，市值 +10000
+      dReset();
+      var s2 = S();
+      s2.age = 25; s2.money = 50000; s2.stockValue = 0; s2.d = 15;
+      ok('S2 买入成功', RJS.doAction('buyStock') === true, 'ok');
+      ok('S3 买入后 money −10100（含 100 手续费）/ stockValue +10000',
+        S().money === 39900 && S().stockValue === 10000,
+        'money=' + S().money + ' stock=' + S().stockValue);
+
+      // S4 卖出门槛：无持仓时锁
+      dReset();
+      var s4 = S();
+      s4.age = 25; s4.stockValue = 0;
+      var sell = RJS.actions.filter(function (a) { return a.id === 'sellStock'; })[0];
+      ok('S4 无持仓时「卖出股票」锁定', !!sell && RJS.checkRequires(sell).length > 0,
+        sell ? 'locked' : 'missing');
+
+      // S5 卖出变现：money +市值 −1% 手续费，市值清零
+      dReset();
+      var s5 = S();
+      s5.age = 25; s5.money = 30000; s5.stockValue = 15000; s5.d = 15;
+      RJS.doAction('sellStock');
+      ok('S5 卖出后 money +14850（15000 − 1% 手续费）/ stockValue 清零',
+        S().money === 44850 && S().stockValue === 0,
+        'money=' + S().money + ' stock=' + S().stockValue);
+
+      // S6 settleStocks：牛市 ×1.5，且不动 money（只动 stockValue）
+      dReset();
+      var s6 = S();
+      s6.age = 25; s6.money = 60000; s6.stockValue = 10000; s6.luck = 50;
+      RJS.setEventRoll(function () { return 0; });       // roll 0 < 0.35 → 牛市
+      var m6 = S().money;
+      settleStocks();
+      ok('S6 牛市：stockValue ×1.5 且 money 不变',
+        S().stockValue === 15000 && S().money === m6,
+        'stock=' + S().stockValue + ' money=' + S().money);
+
+      // S7 settleStocks：熊市 −60%（×0.4），且不动 money
+      dReset();
+      var s7 = S();
+      s7.age = 25; s7.money = 60000; s7.stockValue = 10000; s7.luck = 50;
+      RJS.setEventRoll(function () { return 0.4; });     // 0.35 ≤ 0.4 < 0.65 → 熊市
+      var m7 = S().money;
+      settleStocks();
+      ok('S7 熊市：stockValue −60% 且 money 不变',
+        S().stockValue === 4000 && S().money === m7,
+        'stock=' + S().stockValue + ' money=' + S().money);
+
+      // S8 无持仓时 settleStocks 空转（不报错、不写日志）
+      dReset();
+      var s8 = S();
+      s8.stockValue = 0; s8.logs = [];
+      settleStocks();
+      ok('S8 无持仓时 settleStocks 空转（不写日志）', S().logs.length === 0, S().logs.length);
+
+      // S9 梭哈股灾：luck < 150 → 现金蒸发 80%、心情崩溃
+      dReset();
+      var s9 = S();
+      s9.age = 30; s9.luck = 50; s9.money = 100000; s9.stockValue = 0; s9.mood = 80;
+      RJS.openEventById('E_STOCK_TIP');
+      var opt = optionByText('全仓梭哈');
+      if (opt) opt.click();
+      // effects 先 −50000 → 剩 50000，再 ×0.2 → 10000
+      ok('S9 运气 50（<150）梭哈 → 现金蒸发 80%',
+        S().money === 10000, 'money=' + S().money);
+      ok('S10 股灾后心情 −30', S().mood === 50, 'mood=' + S().mood);
+      $('eventMask').hidden = true;
+
+      // S11 梭哈幸运：luck ≥ 150 → 不触发股灾
+      dReset();
+      var s10 = S();
+      s10.age = 30; s10.luck = 200; s10.money = 100000; s10.stockValue = 0; s10.mood = 80;
+      RJS.openEventById('E_STOCK_TIP');
+      var opt2 = optionByText('全仓梭哈');
+      if (opt2) opt2.click();
+      ok('S11 运气 200（≥150）梭哈 → 现金只扣 5 万，不蒸发',
+        S().money === 50000 && S().stockValue === 50000,
+        'money=' + S().money + ' stock=' + S().stockValue);
+      $('eventMask').hidden = true;
+
+      dReset();
+    } catch (e) { R.push({ n: 'S 组异常', p: false, i: e.message }); }
+  })();
 
   RES.summary = { total: R.length, pass: R.filter(function (x) { return x.p; }).length, fail: R.filter(function (x) { return !x.p; }).length };
   var pre = document.createElement('pre');
