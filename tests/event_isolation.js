@@ -26,7 +26,7 @@
   for (var i = 0; i < EV.length; i++) ids[EV[i].id] = EV[i];
 
   /* ---------------- 基础态构造（与 D4 覆盖矩阵同源） ---------------- */
-  var AGES = [16, 18, 20, 22, 24, 26, 28, 30, 35, 40, 45, 50, 60, 70];
+  var AGES = [6, 8, 10, 12, 13, 15, 16, 18, 20, 22, 24, 26, 28, 30, 35, 40, 45, 50, 60, 70];   // v3.28：补童年/青春期
   var EDUS = ['初中', '高中', '专科', '本科', '硕士', '博士'];
   var LOVE = ['single', 'dating', 'married'];
   var HOUS = ['home', 'dorm', 'rent'];
@@ -61,6 +61,7 @@
     s.housing = cfg.housing;
     s.schoolTier = cfg.tier;
     s.hasInsurance = cfg.insurance;
+    s.stockValue = 10000;   // v3.22：覆盖股票事件的可满足性
     s.dink = false; s.lostChild = 0;
     s.isStudent = cfg.edu === '本科' && cfg.age < 22;
     s.hadTeenLove = cfg.teenLove === true;
@@ -152,6 +153,7 @@
     if (key === 'alreadyExam') { s.examLog = []; return true; }
     if (key === 'oncePerDay') { if (val !== true) return false; var dk = s.y + '-' + s.m + '-' + s.d; s.usage[ev.id] = { day: dk }; return true; }
     if (key === 'oncePerWeek') { if (val !== true) return false; s.usage[ev.id] = { week: 'X' }; return true; }
+    if (key === 'houseMoney') { s.money = houseCost(Number(val)) - 1; return true; }   // v3.24：房价门槛反证
     // 属性区间
     var MAP = { money: 'money', stamina: 'sta', mood: 'mood', intelligence: 'int', cha: 'cha', will: 'will', eq: 'eq', luck: 'luck' };
     if (MAP[key] && val && typeof val === 'object') {

@@ -5524,6 +5524,332 @@
       ]
     }
 
+,
+
+    /* ================================================================
+       v3.28 · 童年与青春期事件库（6–18 岁，12 条 + 1 条链式）
+       ---------------------------------------------------------------
+       小学 6–12（4）：外号 / 动画片 / 压岁钱 / 运动会
+       初中 13–15（4）：叛逆 / 暗恋 / 网吧（链式：叫家长）/ 被孤立
+       高中 16–18（4）：模拟考 / 体育课 / 食堂 / 文理分科
+       数值以 心情 / 心志 / 智力 为主，金钱只用于极小的日常开销（≤300）。
+       ================================================================ */
+
+    /* ---------------- 小学（6–12） ---------------- */
+    {
+      id: 'E_KID_NICKNAME',
+      title: '外号',
+      description: '你有点胖，或者有点黑，或者说话有点结巴。总之从某一天起，全班开始用另一个名字叫你。',
+      weight: 6,
+      requires: { minAge: 6, maxAge: 12, onceEver: true },
+      options: [
+        {
+          label: '冲上去打他',
+          effects: { stamina: -2, will: 3, mood: -3 },
+          result: '你们在教室后面打成一团。老师拉开你们的时候，你在流鼻血。第二天，外号还是那个外号。'
+        },
+        {
+          label: '告诉老师',
+          effects: { will: -1, eq: 2, mood: -5 },
+          result: '老师让他当面道了歉。道歉的时候他笑了一下，只有你看见了。'
+        },
+        {
+          label: '假装不在意，跟着一起笑',
+          effects: { mood: -6, eq: 3, will: 1 },
+          result: '你笑得比谁都大声。回家路上，你在河堤上坐了很久。'
+        }
+      ]
+    },
+    {
+      id: 'E_KID_CARTOON',
+      title: '动画片',
+      description: '每天六点，那个频道的动画片开播。作业本摊在旁边，一页没动，铅笔滚到了桌角。',
+      weight: 6,
+      requires: { minAge: 6, maxAge: 12 },
+      options: [
+        {
+          label: '先把这一集看完',
+          effects: { mood: 7, intelligence: -1 },
+          result: '一集看完还有下一集。作业是第二天早自习抄的。'
+        },
+        {
+          label: '关掉电视，先写作业',
+          effects: { will: 4, intelligence: 2, mood: -4 },
+          result: '你写得很快。写完的时候，隔壁的电视声还响着。'
+        },
+        {
+          label: '一边看一边写',
+          effects: { intelligence: 1, mood: 2 },
+          result: '字写得像鬼画符。第二天被老师叫去重写，写到手酸。'
+        }
+      ]
+    },
+    {
+      id: 'E_KID_LUCKY_MONEY',
+      title: '压岁钱',
+      description: '过年收了一沓红包，攥在手里还没捂热，妈妈说「先帮你存着」。',
+      weight: 5,
+      requires: { minAge: 6, maxAge: 12, onceEver: true },
+      options: [
+        {
+          label: '乖乖上交',
+          effects: { mood: -4, will: 2 },
+          result: '你看着她把红包塞进抽屉。那个抽屉后来一直锁着。'
+        },
+        {
+          label: '偷偷藏一半在书包夹层',
+          effects: { money: 300, luck: 2, will: -1, mood: 4 },
+          result: '你藏了三百，每天上学都摸一下。后来这笔钱买了漫画。'
+        },
+        {
+          label: '哭着要自己保管',
+          effects: { mood: -6, cha: 1 },
+          result: '你哭得很大声，最后拿到了一百。年夜饭桌上，没人说话。'
+        }
+      ]
+    },
+    {
+      id: 'E_KID_SPORTS',
+      title: '运动会',
+      description: '四百米决赛，你在第二个弯道被绊倒，膝盖磕在塑胶跑道上。全校都在看台上。',
+      weight: 5,
+      requires: { minAge: 6, maxAge: 12 },
+      options: [
+        {
+          label: '爬起来，把剩下的路跑完',
+          effects: { will: 5, stamina: -2, mood: -1 },
+          result: '你是最后一名。但班主任在终点抱住了你，说你很了不起。'
+        },
+        {
+          label: '坐在地上哭',
+          effects: { mood: -6, eq: -2 },
+          result: '有人来扶你，你甩开了。那天下午你一句话没说。'
+        }
+      ]
+    },
+
+    /* ---------------- 初中（13–15） ---------------- */
+    {
+      id: 'E_TEEN_REBEL',
+      title: '青春期',
+      description: '为了一件很小的事——你妈翻了你的书包——你们吵了半个小时。她说「我都是为你好」。',
+      weight: 6,
+      requires: { minAge: 13, maxAge: 15 },
+      options: [
+        {
+          label: '摔门出去，在小区花坛边坐到半夜',
+          effects: { mood: -8, will: 5 },
+          result: '她没下来找你。回家的时候，门没锁。'
+        },
+        {
+          label: '冷战，三天不跟她说话',
+          effects: { mood: -6, eq: -2 },
+          result: '第四天早上，桌上多了一碗你爱吃的面。'
+        },
+        {
+          label: '回房间，把门反锁',
+          effects: { mood: -4, intelligence: 1 },
+          result: '你在房间里把一本借来的小说看完了，看到凌晨。'
+        }
+      ]
+    },
+    {
+      id: 'E_TEEN_CRUSH',
+      title: '同桌',
+      description: '你的同桌借你橡皮的时候，头发会扫到你的胳膊。你开始盼着上数学课。',
+      weight: 6,
+      requires: { minAge: 13, maxAge: 15 },
+      options: [
+        {
+          label: '写一张纸条，折成很小的方块递过去',
+          effects: { cha: 3, mood: 6, luck: 2 },
+          result: '她看了一眼，脸红了，把纸条夹进了笔记本。'
+        },
+        {
+          label: '什么也不说，每天提早十分钟来擦她的桌子',
+          effects: { mood: 4, eq: 3, will: 2 },
+          result: '她一直以为是值日生擦的。'
+        },
+        {
+          label: '被老师发现你在看她',
+          effects: { mood: -6, will: -1 },
+          result: '你被叫起来回答问题，答错了，全班都在笑。她没有笑。'
+        }
+      ]
+    },
+    {
+      id: 'E_TEEN_NETCAFE',
+      title: '网吧',
+      description: '翻墙出去上网。第二局刚开始，教导主任的手电筒就照到了你脸上。',
+      weight: 6,
+      requires: { minAge: 13, maxAge: 15 },
+      options: [
+        {
+          label: '认罚，跟他回办公室写检查',
+          effects: { mood: -5, will: 3 },
+          result: '你写了三页检查，字写得很端正。',
+          nextEventId: 'E_TEEN_NETCAFE_PARENT'
+        },
+        {
+          label: '从后门溜掉',
+          effects: { mood: 2, luck: -2, will: 1 },
+          result: '你跑掉了。第二天班主任在班会上说「有人最好自己站出来」。'
+        },
+        {
+          label: '撒谎说是陪同学来找人',
+          effects: { eq: 2, will: -1, mood: -3 },
+          result: '主任看了你两秒，说「行，那你把他叫来」。',
+          nextEventId: 'E_TEEN_NETCAFE_PARENT'
+        }
+      ]
+    },
+    {
+      id: 'E_TEEN_NETCAFE_PARENT',
+      title: '叫家长',
+      description: '教导主任的电话打到了家里。你爸骑着摩托车到了学校门口，一路上一句话没说。',
+      weight: 1,
+      chainOnly: true,
+      requires: { minAge: 13, maxAge: 15 },
+      options: [
+        {
+          label: '到家就挨了一顿揍',
+          effects: { stamina: -4, mood: -8, will: 3 },
+          result: '皮带抽在腿上，你一声没吭。第二天上学，你走路有点瘸。'
+        },
+        {
+          label: '抱着他的腿求情',
+          effects: { eq: 3, mood: -4 },
+          result: '他的手抬起来，又放下了，只说了句「再有下次」。'
+        },
+        {
+          label: '回房间反锁门，一晚上不出来',
+          effects: { mood: -10, will: 2 },
+          result: '半夜你听见门外有脚步声，停了一会儿，走了。'
+        }
+      ]
+    },
+    {
+      id: 'E_TEEN_ISOLATED',
+      title: '被孤立',
+      description: '不知道从哪一天起，课间没人跟你说话。你走进教室，几个聚在一起的人会突然安静。',
+      weight: 5,
+      requires: { minAge: 13, maxAge: 15, onceEver: true },
+      options: [
+        {
+          label: '忍着，等他们忘了',
+          effects: { mood: -12, will: 5 },
+          result: '你学会了一个人吃饭、一个人回家。半年后，那件事没人再提。'
+        },
+        {
+          label: '主动讨好，给他们带零食',
+          effects: { eq: 3, mood: -5, money: 20 },
+          result: '他们收下了零食。课间还是没叫你。'
+        },
+        {
+          label: '跟父母说想转学',
+          effects: { mood: -6, eq: 2 },
+          result: '你妈去找了班主任。班主任在班会上念了一篇关于「团结」的文章。'
+        }
+      ]
+    },
+
+    /* ---------------- 高中（16–18） ---------------- */
+    {
+      id: 'E_HS_MOCK_FAIL',
+      title: '模拟考',
+      description: '高三第三次模拟考，你的排名又掉了一百名。成绩单贴在教室后墙，红色的名次很刺眼。',
+      weight: 6,
+      requires: { minAge: 16, maxAge: 18 },
+      options: [
+        {
+          label: '把错题抄三遍，抄到会为止',
+          effects: { intelligence: 3, stamina: -3, will: 3 },
+          result: '你抄到凌晨两点。台灯下影子拉得很长，窗外的路灯灭了一半。'
+        },
+        {
+          label: '把成绩单塞进抽屉，出去打了一场球',
+          effects: { mood: 6, intelligence: -2 },
+          result: '球场上你很猛。回教室的时候，灯已经关了。'
+        },
+        {
+          label: '找个没人的地方哭一场',
+          effects: { mood: -4, will: 2 },
+          result: '你躲在实验楼后面哭了十分钟，然后回去继续做题。'
+        }
+      ]
+    },
+    {
+      id: 'E_HS_FAINT',
+      title: '体育课',
+      description: '八百米跑到第三圈，眼前一黑。你听见有人在喊你的名字，声音越来越远。',
+      weight: 5,
+      requires: { minAge: 16, maxAge: 18 },
+      options: [
+        {
+          label: '去医务室检查',
+          effects: { stamina: 3, mood: -2 },
+          result: '校医说是低血糖，让你以后一定吃早饭。'
+        },
+        {
+          label: '灌一瓶糖水，说自己没事',
+          effects: { stamina: -3, will: 2 },
+          result: '你下午又吐了一次，什么也没跟谁说。'
+        },
+        {
+          label: '被同学扶回宿舍，睡了一下午',
+          effects: { mood: -3, eq: 1 },
+          result: '醒来的时候天已经黑了，床头上放着一瓶水。'
+        }
+      ]
+    },
+    {
+      id: 'E_HS_CANTEEN',
+      title: '食堂',
+      description: '半份土豆丝下面，躺着一只完整的、黑色的虫子。',
+      weight: 5,
+      requires: { minAge: 16, maxAge: 18 },
+      options: [
+        {
+          label: '端着盘子去找校长',
+          effects: { will: 4, cha: 1, mood: -4 },
+          result: '食堂主任道了歉，赔了你二十块。第二个星期，窗口多了个意见箱。'
+        },
+        {
+          label: '悄悄倒掉，去小卖部买泡面',
+          effects: { money: -15, stamina: -2, mood: -5 },
+          result: '泡面泡好了，你吃了两口就吃不下了。'
+        },
+        {
+          label: '拍下来发到班级群',
+          effects: { mood: 2, eq: -2, will: 2 },
+          result: '群里炸了。第二天食堂门口站了三个检查的。'
+        }
+      ]
+    },
+    {
+      id: 'E_HS_STREAM',
+      title: '文理分科',
+      description: '分科表发下来了，明天就要交。你爸说理科好就业，你的历史老师说你应该读文科。',
+      weight: 6,
+      requires: { minAge: 16, maxAge: 18, onceEver: true },
+      options: [
+        {
+          label: '选理科，听说好就业',
+          effects: { intelligence: 2, will: 2, mood: -2 },
+          result: '你在「理」后面打了个勾。笔尖有点钝，勾画得不太好看。'
+        },
+        {
+          label: '选文科，你喜欢那些年代',
+          effects: { mood: 4, intelligence: 2 },
+          result: '你爸没说什么。只是从那天起，晚饭桌上很少再聊学校的事。'
+        },
+        {
+          label: '跟爸妈吵了一架，最后听了他们的',
+          effects: { mood: -6, will: 2, eq: 1 },
+          result: '你选的其实是他们选的。你后来花了很多年才接受这件事。'
+        }
+      ]
+    }
   ];
 
   // 按 id 查行动：线性查找而不是静态索引，保证外部往 actionsData 里 push 新条目后立刻可用

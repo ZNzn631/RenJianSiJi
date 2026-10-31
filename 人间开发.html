@@ -1888,6 +1888,12 @@
       </div>
 
       <div class="setup-field">
+        <span class="setup-label">出生城市</span>
+        <select class="setup-input" id="citySel" aria-label="出生城市"></select>
+        <div class="setup-hint">不同城市工资、生活成本与房价系数不同</div>
+      </div>
+
+      <div class="setup-field">
         <span class="setup-label">先天天赋</span>
         <div class="setup-talents" id="setupTalents">—</div>
       </div>
@@ -1939,6 +1945,20 @@
     <p class="event-desc" id="eventDesc">—</p>
     <div class="event-options" id="eventOptions"></div>
     <div class="modal-note" id="eventNote" hidden></div>
+  </div>
+</div>
+
+<!-- 童年前史（v3.28）：只播 6–15 岁的回忆，不推进时间 -->
+<div class="modal-mask" id="prologueMask" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="prologueTitle">
+    <div class="panel-h">
+      <span>童年</span>
+      <span class="hint">前史</span>
+    </div>
+    <div class="event-title" id="prologueTitle">—</div>
+    <p class="event-desc" id="prologueDesc">—</p>
+    <div class="event-options" id="prologueOptions"></div>
+    <div class="modal-note">回忆不影响 16 岁后的时间线</div>
   </div>
 </div>
 
@@ -2173,7 +2193,7 @@
     $('sMood').textContent = state.mood + ' / ' + moodCap;
     $('moodBar').style.width = (state.mood / moodCap * 100).toFixed(1) + '%';
 
-    $('sAge').textContent = getAge() + ' 岁';
+    $('sAge').textContent = getAge() + ' 岁  [' + cityName() + ']';   // v3.24：城市标签
     $('sEdu').textContent = state.edu || '无';
     $('sJob').textContent = state.job || '无业';
     $('sSalary').textContent = state.salary > 0 ? '月薪 ¥' + state.salary.toLocaleString('en-US') : '';
@@ -2820,6 +2840,21 @@
     return on ? on.getAttribute('data-sex') : '女';
   }
 
+  function setupCity() {
+    var el = $('citySel');
+    return el ? el.value : 'normal';
+  }
+
+  function renderCityOptions() {
+    var el = $('citySel');
+    if (!el) return;
+    el.innerHTML = (citiesData || []).map(function (c) {
+      return '<option value="' + esc(c.id) + '">' + esc(c.name)
+        + '　工资×' + c.salaryFactor + ' / 生活×' + c.livingFactor + ' / 房价×' + c.houseFactor + '</option>';
+    }).join('');
+    el.value = 'normal';
+  }
+
   function setSetupSex(sex) {
     var btns = document.querySelectorAll('#setupSex .sex-btn');
     for (var i = 0; i < btns.length; i++) {
@@ -2869,6 +2904,7 @@
     var nameEl = $('nameInput');
     if (nameEl) nameEl.value = '';
     setSetupSex('女');
+    renderCityOptions();
     renderSetupPreview();
     if (ts) ts.hidden = true;
     if (ss) ss.hidden = false;
@@ -2898,6 +2934,8 @@
   function confirmBirth() {
     var name = setupName();
     var sex = setupSex();
+    var city = setupCity();
+    state.city = city;                          // v3.24：出生城市（外部赋值，不改 newState）
     state.profile = { name: name, sex: sex };   // 姓名性别存入 profile（外部赋值，不改 newState）
     state.logs = [];
     pendingEvent = null;
@@ -2912,6 +2950,106 @@
     render();
     saveGameSilent();                          // v3.4-S4：刚起名立刻静默落盘，保证出生即有一份档
     toast('「' + name + '」降生了，新的人生开始');
+    startPrologue();                           // v3.28：童年前史（播完自动接回 16 岁主循环）
+  }
+
+  /* ================= [UI层] 童年前史（v3.28） =================
+     规则：只播 6–15 岁的回忆，逐个弹窗、玩家点选项；
+           立即结算属性，但不推进游戏天数、不让金钱变负；
+           播完弹出「你 16 岁了」汇总，再解冻主循环。 */
+  var prologueQueue = [];
+  var prologueIdx = 0;
+  var prologueRunning = false;
+  var prologueBound = false;
+
+  function prologuePool() {
+    return (eventsData || []).filter(function (ev) {
+      var r = ev.requires || {};
+      return !ev.chainOnly && !ev.fallback
+        && typeof r.minAge === 'number' && r.minAge >= 6
+        && typeof r.maxAge === 'number' && r.maxAge <= 15;
+    });
+  }
+
+  function bindPrologueOnce() {
+    if (prologueBound) return;
+    var box = $('prologueOptions');
+    if (!box) return;
+    prologueBound = true;
+    box.addEventListener('click', function (e) {
+      var node = e.target;
+      while (node && node !== box) {
+        if (node.getAttribute) {
+          if (node.getAttribute('data-pidx') !== null) { choosePrologue(Number(node.getAttribute('data-pidx'))); return; }
+          if (node.getAttribute('data-done') !== null) { finishPrologue(); return; }
+        }
+        node = node.parentNode;
+      }
+    });
+  }
+
+  function startPrologue() {
+    var mask = $('prologueMask');
+    if (!mask) return;                              // 没有前史层：直接跳过（防御）
+    var pool = prologuePool();
+    if (!pool.length) { finishPrologue(); return; } // 无可播事件：直接结束
+    pool = pool.slice().sort(function () { return Math.random() - 0.5; });
+    var n = 3 + Math.floor(Math.random() * 2);      // 3 或 4 个闪回
+    prologueQueue = pool.slice(0, Math.min(n, pool.length));
+    prologueIdx = 0;
+    prologueRunning = true;
+    uiLocked = true;                                // 冻结主循环输入（时间不推进）
+    bindPrologueOnce();
+    mask.hidden = false;
+    showPrologueStep();
+  }
+
+  function showPrologueStep() {
+    if (!prologueRunning) return;
+    if (prologueIdx >= prologueQueue.length) { showPrologueSummary(); return; }
+    var ev = prologueQueue[prologueIdx];
+    // 防御：没有可选项的事件直接跳过，避免卡死
+    if (!ev || !ev.options || !ev.options.length) { prologueIdx++; showPrologueStep(); return; }
+    $('prologueTitle').textContent = '童年 · ' + ev.title;
+    $('prologueDesc').textContent = ev.description;
+    $('prologueOptions').innerHTML = ev.options.map(function (o, i) {
+      return '<button class="event-opt" type="button" data-pidx="' + i + '">'
+        + '<span class="opt-label">' + esc(o.label) + '</span>'
+        + '<span class="opt-meta">' + esc(o.meta || optionMeta(o)) + '</span>'
+        + '</button>';
+    }).join('');
+  }
+
+  function choosePrologue(idx) {
+    if (!prologueRunning) return;
+    var ev = prologueQueue[prologueIdx];
+    if (!ev || !ev.options || !ev.options[idx]) { finishPrologue(); return; }
+    var opt = ev.options[idx];
+    var before = snapshot();
+    applyEffects(opt.effects);
+    if (state.money < 0) state.money = 0;           // 前史绝不让金钱变负
+    clampStats();
+    var d = deltaText(before);
+    addLog('event', '【童年·' + ev.title + '】' + opt.label + (d && d !== '—' ? '（' + d + '）' : ''));
+    if (opt.result) addLog('sys', opt.result);
+    prologueIdx++;
+    showPrologueStep();
+  }
+
+  function showPrologueSummary() {
+    $('prologueTitle').textContent = '时间一晃而过';
+    $('prologueDesc').textContent = '你 16 岁了，即将迎来高中生活。';
+    $('prologueOptions').innerHTML = '<button class="event-opt" type="button" data-done="1">'
+      + '<span class="opt-label">走进高中</span><span class="opt-meta">开始</span></button>';
+  }
+
+  function finishPrologue() {
+    prologueRunning = false;
+    var mask = $('prologueMask');
+    if (mask) mask.hidden = true;
+    uiLocked = false;
+    try { render(); } catch (e) {}
+    try { saveGameSilent(); } catch (e) {}
   }
 
   function bindSetup() {

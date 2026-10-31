@@ -1268,7 +1268,7 @@
       s.pendingExam = null; s.ended = false;
       var hit = {}; for (i = 0; i < EV.length; i++) hit[EV[i].id] = 0;
 
-      var AGES = [16, 17, 18, 19, 21, 22, 23, 24, 26, 30, 35, 40, 45, 50, 60, 70];
+      var AGES = [6, 8, 10, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 26, 30, 35, 40, 45, 50, 60, 70];   // v3.28：补童年/青春期
       var EDUS = ['初中', '高中', '专科', '本科', '硕士', '博士'];
       var LOVE = ['single', 'dating', 'married'];
       var HOUS = ['home', 'dorm', 'rent'];
@@ -1774,6 +1774,100 @@
 
       dReset();
     } catch (e) { R.push({ n: 'S 组异常', p: false, i: e.message }); }
+  })();
+
+  /* ========================= C · 城市 / 地域系统（v3.24） ========================= */
+  (function cityTests() {
+    try {
+      // C1 老档无 city → cityFactors 全 1.0（红线兜底）
+      dReset();
+      var s = S();
+      s.city = undefined;
+      var f = cityFactors();
+      ok('C1 无 city 时系数全 1.0（老档兜底）', f.salary === 1 && f.living === 1 && f.house === 1,
+        JSON.stringify(f));
+
+      // C2 未知城市 → 也回退 1.0
+      s.city = 'atlantis';
+      var f2 = cityFactors();
+      ok('C2 未知城市回退 1.0', f2.salary === 1 && f2.living === 1 && f2.house === 1, JSON.stringify(f2));
+
+      // C3 北京：工资 1.4 / 生活 1.5 / 房价 2.0
+      s.city = 'beijing';
+      var f3 = cityFactors();
+      ok('C3 北京系数正确', f3.salary === 1.4 && f3.living === 1.5 && f3.house === 2.0, JSON.stringify(f3));
+
+      // C4 鹤岗：房价 0.15 → houseCost(300000) = 45000
+      s.city = 'hegang';
+      var f4 = cityFactors();
+      ok('C4 鹤岗系数正确（工资 0.7 / 生活 0.45 / 房价 0.15）',
+        f4.salary === 0.7 && f4.living === 0.45 && f4.house === 0.15, JSON.stringify(f4));
+      ok('C5 houseCost(300000) 在鹤岗 = 45000', houseCost(300000) === 45000, houseCost(300000));
+
+      // C6 生活费缩放：salary 15000 在鹤岗（生活 0.4）→ 原 4800 × 0.4 = 1920
+      s.salary = 15000;
+      ok('C6 生活费按城市缩放（鹤岗 15000 月薪 → 2160）', livingCostOf(15000) === 2160, livingCostOf(15000));
+
+      // C7 houseMoney 门槛：北京 300000 首付 → 需要 600000，手里 500000 不够
+      s.city = 'beijing'; s.money = 500000;
+      var ev = RJS.events.filter(function (x) { return x.id === 'E_LOVE_HOUSE'; })[0];
+      var opt = ev.options[0];   // 掏空积蓄，houseMoney 300000
+      ok('C7 houseMoney 门槛随城市缩放（北京 300000 → 需 600000，50 万不够）',
+        RJS.checkRequires(opt).length > 0, 'miss=' + RJS.checkRequires(opt).length);
+
+      // C8 存读档 city 保留
+      dReset();
+      var s8 = S();
+      s8.age = 25; s8.city = 'chengdu'; s8.money = 30000;
+      $('btnSave').click();
+      dReset();
+      $('btnLoad').click();
+      ok('C8 存读档后 city 保留（成都）', S().city === 'chengdu', S().city);
+
+      dReset();
+      try { localStorage.removeItem('renjian-siji-save-v1'); } catch (e) {}
+    } catch (e) { R.push({ n: 'C 组异常', p: false, i: e.message }); }
+  })();
+
+  /* ========================= P · 童年前史（v3.28） ========================= */
+  (function prologueTests() {
+    try {
+      dReset();
+      ok('P0 前史函数已挂载', typeof startPrologue === 'function', typeof startPrologue);
+      if (typeof startPrologue !== 'function') return;
+
+      var s = S();
+      s.age = 16; s.money = 2800; s.mood = 80;
+      startPrologue();
+
+      ok('P1 前史遮罩打开且主循环冻结',
+        $('prologueMask') && !$('prologueMask').hidden && uiLocked === true,
+        'open=' + ($('prologueMask') ? !$('prologueMask').hidden : 'no-mask'));
+
+      // 连点选项，直到出现「时间一晃而过」汇总（上限 30 次防死循环）
+      var guard = 0;
+      while (guard++ < 30 && $('prologueTitle').textContent !== '时间一晃而过') {
+        var btn = document.querySelector('#prologueOptions .event-opt');
+        if (!btn) break;
+        btn.click();
+      }
+      ok('P2 前史可连续播放到汇总（无死锁）',
+        $('prologueTitle').textContent === '时间一晃而过', $('prologueTitle').textContent);
+      ok('P3 前史全过程中金钱不为负', S().money >= 0, S().money);
+
+      var doneBtn = document.querySelector('#prologueOptions [data-done]');
+      if (doneBtn) doneBtn.click();
+      ok('P4 结束后遮罩关闭、主循环解冻',
+        $('prologueMask').hidden === true && uiLocked === false,
+        'hidden=' + $('prologueMask').hidden + ' uiLocked=' + uiLocked);
+
+      dReset();
+    } catch (e) {
+      // 兜底：无论如何都要解冻，避免污染后续用例
+      try { finishPrologue(); } catch (x) {}
+      try { uiLocked = false; if ($('prologueMask')) $('prologueMask').hidden = true; } catch (x) {}
+      R.push({ n: 'P 组异常', p: false, i: e.message });
+    }
   })();
 
   RES.summary = { total: R.length, pass: R.filter(function (x) { return x.p; }).length, fail: R.filter(function (x) { return !x.p; }).length };
