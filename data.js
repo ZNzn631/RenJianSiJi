@@ -136,25 +136,6 @@
       // 不设门槛：休息是永远可用的保底行动
     },
     {
-      id: 'buyInsurance',
-      name: '购买医保',
-      description: '每年缴一次，生病能省一大笔。',
-      costDays: 1,
-      effects: { money: -2000 },
-      displayEffects: { money: -2000 },
-      hideWhenLocked: true,
-      requires: {
-        minAge: 18,                      // v3.13：成年才买
-        money: { min: 2000 },
-        monthIn: [1],                    // v3.13：仅每年 1 月可买
-        noInsurance: true                // v3.13：已买则隐藏
-      },
-      onRun: function () {
-        state.hasInsurance = true;
-        addLog('event', '你购买了医疗保险，全年医疗费打 2 折。');
-      }
-    },
-    {
       id: 'social',
       name: '社交',
       description: '去同学家蹭一顿饭，或者陪朋友在街上逛半天。',
@@ -572,19 +553,6 @@
       level_effect: { stat_gain: { will: 1 } } },
     { talent_id: 'T_SMOOTH',  name: '会来事', category: '情商', type: '先天', max_level: 3,
       level_effect: { stat_gain: { eq: 1 } } }
-  ];
-
-  /* ================= [数据层] 疾病数据（v3.13 疾病与医疗系统） ================= */
-  // minAge 最低触发年龄；healthLimit 体质低于此值才可能得；cost 治疗费；damage 硬扛扣体质
-  var diseasesData = window.diseasesData = [
-    { id: 'D_COLD',         name: '感冒',     minAge: 0,  healthLimit: 40, cost: 300,   damage: 5 },
-    { id: 'D_GASTRO',       name: '肠胃炎',   minAge: 0,  healthLimit: 40, cost: 800,   damage: 8 },
-    { id: 'D_PNEUMONIA',    name: '肺炎',     minAge: 0,  healthLimit: 30, cost: 5000,  damage: 12 },
-    { id: 'D_FRACTURE',     name: '骨折',     minAge: 0,  healthLimit: 30, cost: 3000,  damage: 15 },
-    { id: 'D_NODULE',       name: '结节',     minAge: 30, healthLimit: 35, cost: 5000,  damage: 10 },
-    { id: 'D_HYPERTENSION', name: '高血压',   minAge: 40, healthLimit: 40, cost: 8000,  damage: 12 },
-    { id: 'D_DIABETES',     name: '糖尿病',   minAge: 40, healthLimit: 35, cost: 10000, damage: 15 },
-    { id: 'D_HEART',        name: '心脏病',   minAge: 45, healthLimit: 30, cost: 30000, damage: 20 }
   ];
 
   /* ================= [引擎层] 教育系统（v2.8） ================= */
