@@ -931,6 +931,21 @@
     return lost;
   }
 
+  // v3.17：恋爱分手 —— 自由恋爱线（E_LOVE_*）的唯一出口。
+  // 只清理恋爱相关字段：不碰 married / moodMax / 财产（恋爱阶段没有共同财产可分割）。
+  // 结婚仍只走 marryTo()，离婚仍只走 divorceNow()。
+  function breakUp() {
+    var ex = state.partnerName || '对方';
+    state.loveState = 'single';
+    state.inLove = false;
+    state.partnerName = '';
+    state.datingStart = 0;
+    state.datingLove = 0;
+    addLog('danger', '【分手】你和「' + ex + '」分开了。');
+    return true;
+  }
+
+
   function addKid() {
     state.kids = Math.min(3, (state.kids || 0) + 1);
     if (state.married) state.moodMax = Math.min(MOOD_MAX_CAP, MOOD_MAX_MARRIED + state.kids * MOOD_BONUS_PER_KID);

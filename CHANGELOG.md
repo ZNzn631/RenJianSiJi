@@ -2,11 +2,11 @@
 
 单文件网页人生模拟游戏（纯 HTML + CSS + JS，双击即玩）。
 
-- 版本：**v3.16.2（恋爱线 +15 / 协议离婚死链修复 / 平衡模拟提速）**
+- 版本：**v3.17（自由恋爱主线 20 条 / 婚后线去重 / breakUp 收口）**
 - 日期：2026-10-31
 - 结构：`data.js`（纯数据）+ `engine.js`（核心引擎）+ `人间开发.html`（HTML/CSS/UI + 底部引入）
 - 主文件：`人间开发.html`（入口，需与 data.js / engine.js 同目录）
-- 上一版：**v3.16.1**（平衡模拟分批重构：500 局 31s）
+- 上一版：**v3.16.2**（协议离婚死链修复 / 平衡闸门终稿）
 - 变更性质：**纯数据层追加**（eventsData +20 事件），引擎零改动（回归 120/120 ×5 全绿；早逝 38.7% / 平凡 34.7% 双 PASS）
 - 历史冻结版：`历史版本/v1.0_核心引擎版.html`（137,842 字节 / `0d9137a117982b12274c97c20a6265a2`，保留不动）
 - 引擎备份：`v1.0.1_瑕疵修补版.html`（引擎 JS 与本版逐字节一致，可随时对比）
@@ -1639,6 +1639,86 @@ n=500 标准误约 2.2pp，三轮 37.0–40.0% 属正常波动。`check_balance.
 - 顺手把 `run_balance_batch.js` 的 KPI 判定改成与官方脚本一致的闭区间（原来写成了 `>` / `<`，40.0% 会被误判 FAIL）。
 
 ---
+
+## v3.17 · 自由恋爱主线 20 条 + 婚后线去重（2026-10-31）
+
+按「相遇 → 约会 → 热恋 → 婚前危机 → 结婚/分手」重做恋爱线，并与 v3.16 的 `LV_*` 婚后线做减重。
+
+### 1. 数据层：+20 条 / −3 条
+
+| 阶段 | 事件 | 门槛 |
+|---|---|---|
+| 起手（5） | `E_LOVE_MEET_WORK` 职场邂逅 / `E_LOVE_MEET_PARTY` 朋友组局 / `E_LOVE_MEET_COFFEE` 咖啡店偶遇 / `E_LOVE_MEET_APP` 右滑 / `E_LOVE_MEET_EX` 久别重逢 | 全部 `onceEver: true` + `loveState: 'single'` + `single: true` + `minAge: 22` |
+| 主线（2） | `E_LOVE_DATE_1` 第一次约会 → `E_LOVE_DATE_2` 深夜散步 | `chainOnly`，牵手需 `cha ≥ 35`、`eq ≥ 35`；成功调 `startDating()` 并**断链** |
+| 热恋（5） | `E_LOVE_GIFT` 情人节（`monthIn: [2]`）/ `E_LOVE_COLD` 冷场 / `E_LOVE_MONEY` 谁请客 / `E_LOVE_SICK_OTHER` TA 生病了 / `E_LOVE_QUARREL` 手机里的秘密 | 全部 `loveState: 'dating'` |
+| 婚前（3） | `E_LOVE_HOUSE` 买房分歧（含**父母垫付 8 万**分支）/ `E_LOVE_BETROTHAL` 彩礼嫁妆 / `E_LOVE_PARENT_AGAINST` 门当户对 | `loveState: 'dating'` + `datingMonths` |
+| 结局（2） | `E_LOVE_MARRY` 修成正果（婚礼 40k / 旅行 15k / 先领证 0 成本兜底）/ `E_LOVE_BREAKUP` 和平分手 | `loveState: 'dating'` |
+| 补充（3） | `E_LOVE_INVEST_A` 查到的第一条线索 / `E_LOVE_INVEST_B` 真相 / `E_LOVE_REUNION` 久违的消息 | 前两条 `chainOnly`，复合走 `startDating()` |
+
+**删除（与新线重复）**：`LV_HOUSE_ARGUE`、`LV_HOUSE_ARGUE_B`（买房分歧）、`LV_WED_DAY`（婚礼那天）。
+**改指向**：`LV_MEET_PARENT_B` / `LV_COHABIT_B` 的下一跳由 `LV_HOUSE_ARGUE` 改为 `E_LOVE_HOUSE`（共 5 处引用）。
+**收口**：`LV_PROPOSE` 的两个「领证」选项不再自己调 `marryTo()`，改为链到 `E_LOVE_MARRY` —— 全库结婚只剩两个入口：自由恋爱走 `E_LOVE_MARRY`，相亲走 `E_MARRY_WED`。
+
+现状：**192 事件 / 434 选项 / 67 处链跳 / 36 条链节点**（`LV_*` 12 条，`E_LOVE_*` 新线 20 条）。
+
+### 2. 引擎：只加 `breakUp()`（engine.js:937）
+
+```js
+function breakUp() {
+  var ex = state.partnerName || '对方';
+  state.loveState = 'single';
+  state.inLove = false;
+  state.partnerName = '';
+  state.datingStart = 0;
+  state.datingLove = 0;
+  addLog('danger', '【分手】你和「' + ex + '」分开了。');
+  return true;
+}
+```
+
+- 只清恋爱字段，不碰 `married` / `moodMax` / 财产（恋爱阶段没有共同财产）。
+- **没有**复用 `divorceNow()`：那个会按比例分财产、`divorceCount+1`、写 `lastMarryMonth`（再婚冷却 30 个月），用在恋爱分手上语义与数值都错。
+- 也**没有**写 `lastMarryMonth`：`marryCooldown` 是 30 个月口径（相亲用），复用它会把分手后的相亲锁死两年半。
+
+### 3. 新增 D7 验收（24 条 × 2 视口）
+
+| # | 断言 | 实测 |
+|---|---|---|
+| D7a | 20 条事件全部落地 | 20/20 |
+| D7b | 起手 5 条 onceEver + single + minAge≥22 | uniform |
+| D7c | 热恋 5 条门槛统一 `loveState:'dating'` | uniform |
+| D7d | 情人节绑 2 月 | `[2]` |
+| D7e | **20 条都留了无门槛出口**（防弹窗死锁） | all has escape |
+| D7f/g | 重复事件已删、无残留指向 | removed / refs=0 |
+| D7h–D7m | 邂逅 → 约会 → 散步 → 牵手 → `dating/inLove/datingStart` 并断链 | 全过 |
+| D7n–D7r | 买房（父母垫付）→ 彩礼 → 旅行结婚 → `married / moodMax 110` | 全过 |
+| D7s | 全属性 +5 落地（Δint/Δsta/Δcha/Δwill/Δeq 各 5） | 全 +5 |
+| D7t–D7v | 分手 → `breakUp()` 收口，不碰婚姻字段与 `moodMax` | 全过 |
+| D7w/x | **身无分文时婚礼仍可完婚**（先领证兜底） | 过 |
+
+### 4. 回归与平衡
+
+| 套件 | 结果 |
+|---|---|
+| `tests/run_extra.js`（D1~D7，两视口） | **228/228**，JS 错误 0 |
+| `tests/run.js`（既有稳定性） | **120/120**，JS 错误 0，属性越界 0 |
+| `tests/run_balance_batch.js 500 100` | 500/500 局，84–116s |
+
+| 轮次 | 英年早逝（20–40%） | 平凡一生（30–50%） |
+|---|---|---|
+| 1 | 36.4% | 38.8% |
+| 2 | 36.0% | 33.0% |
+
+两只 KPI 都落在区间中部，恋爱线没有把生存曲线推出闸门。
+
+### 5. 设计说明（两处刻意的取舍）
+
+- **`E_LOVE_REUNION` 没有严格锁「必须是前任」**：要精确判定需要新增 `everBrokeUp` 字段并进 `sanitize` 白名单（多改一处引擎），按你「只加 breakUp 那 3 行」的要求，文案写成「很久没联系的人」，语义对旧识也成立。
+- **`E_LOVE_BETROTHAL` 的「让父母去谈」**用 `rnd(100)` 掷骰决定谈成/谈崩（只影响属性与日志），链路统一走向婚礼；要拆成两条不同后续事件，需要一个状态标志位，同样会碰 `sanitize`。
+
+---
+
+
 
 
 
