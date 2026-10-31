@@ -2,7 +2,7 @@
 
 单文件网页人生模拟游戏（纯 HTML + CSS + JS，双击即玩）。
 
-- 版本：**v3.17（自由恋爱主线 20 条 / 婚后线去重 / breakUp 收口）**
+- 版本：**v3.18（暮年阶段事件库 +12）**
 - 日期：2026-10-31
 - 结构：`data.js`（纯数据）+ `engine.js`（核心引擎）+ `人间开发.html`（HTML/CSS/UI + 底部引入）
 - 主文件：`人间开发.html`（入口，需与 data.js / engine.js 同目录）
@@ -1717,6 +1717,106 @@ function breakUp() {
 - **`E_LOVE_BETROTHAL` 的「让父母去谈」**用 `rnd(100)` 掷骰决定谈成/谈崩（只影响属性与日志），链路统一走向婚礼；要拆成两条不同后续事件，需要一个状态标志位，同样会碰 `sanitize`。
 
 ---
+
+## v3.17.1 · 工程目录归位：tests/ 回到 4 个文件（2026-10-31）
+
+v3.16 期间为验收新增了独立探针与独立报告，破坏了「tests/ 4 个脚本 + 结论只进 CHANGELOG」的既有约定。本版把全部测试能力合并回原骨架，并清掉非代码产物。
+
+### 合并
+
+| 原 | 去向 |
+|---|---|
+| `tests/恋爱与兼容测试.js`（D1~D7 探针，807 行） | 并入 `tests/稳定性测试.js`（927 → 1687 行），共用 `ok/S/$/restore/PRISTINE`，新增 `dReset/dClone/note/freeOption/optionByText/eventOpen/openCount/curEventTitle/clickRest/absDay/logCount` |
+| `tests/run_extra.js`（双视口运行器） | 并入 `tests/run.js`：默认跑 `1366,768` 与 `390,700` 两档并合并结果，也可 `node tests/run.js 1280,900` 指定单档 |
+| `tests/run_balance_batch.js`（分批闸门） | 并入 `tests/check_balance.js`：保留分批重启、独立 `user-data-dir`、`--js-flags=--max-old-space-size=4096`、单批失败重试→对半拆批；产物改写系统临时目录（不再落仓库） |
+| `文档/测试报告_v3.17_恋爱线.md`、`README.md`、`tests/README.md` | 删除，结论统一进本文件 |
+
+### 删除
+
+`文档/`、`运行产物/`、`归档/`、根 `README.md`、`tests/README.md`、`tests/恋爱与兼容测试.js`、`tests/run_extra.js`、`tests/run_balance_batch.js`。
+
+### 验证
+
+```
+node tests/run.js             → 468/468（两视口 × 234）· JS 错误 0 · 属性越界 0
+node tests/check_balance.js   → 500 局 / 5 批 / 121s · 早逝 36.8% PASS · 平凡 37.6% PASS
+node tests/check_balance.js --quick → 150 局 / 51s · 35.3% / 36.0% 双 PASS
+```
+
+### 当前 tests/
+
+| 文件 | 作用 |
+|---|---|
+| `run.js` | 运行器（双视口） |
+| `稳定性测试.js` | 探针：既有 120 条 + D1~D7 114 条 |
+| `check_balance.js` | 平衡闸门（分批，默认 500 局） |
+| `sim_500.js` | 单局模拟器（`window.IS_SIMULATION = true`，UI 全空转） |
+
+---
+
+## v3.18 · 暮年阶段事件库 +12（2026-10-31）
+
+纯数据层追加，`data.js` 尾部 append；引擎零改动。全部事件 `requires` 带 `minAge: 60`。
+
+### 1. 新增事件
+
+| # | id | 标题 | 额外门槛 | 链 |
+|---|---|---|---|---|
+| 1 | `E_OLD_DANCE` | 广场舞 | — | — |
+| 2 | `E_OLD_DUSK_LOVE` | 黄昏恋 | `onceEver` | — |
+| 3 | `E_OLD_LECTURE` | 保健讲座 | — | → `E_OLD_FAKE_MED` |
+| 4 | `E_OLD_FAKE_MED` | 天价假药 | `chainOnly` | 链尾 |
+| 5 | `E_OLD_GRANDKID` | 带孙子 | `hasChild` | — |
+| 6 | `E_OLD_GRANDKID_TIRED` | 腰不行了 | `stamina.max: 45` | — |
+| 7 | `E_OLD_CHECKUP` | 体检报告·大关 | — | — |
+| 8 | `E_OLD_REVIEW` | 回顾一生 | `onceEver` | — |
+| 9 | `E_OLD_FRIEND_GONE` | 老友走了 | — | — |
+| 10 | `E_OLD_PENSION` | 养老金的窗口 | — | — |
+| 11 | `E_OLD_HOUSE_LEAK` | 老房子漏雨 | — | — |
+| 12 | `E_OLD_WILL` | 立遗嘱 | `money.min: 100000` + `onceEver` | — |
+
+现状：**204 事件 / 470 选项**。
+
+### 2. 设计要点
+
+- **链式只有一段**（`E_OLD_LECTURE` → `E_OLD_FAKE_MED`）：讲座现场不掏钱就结束，掏钱才进「再加两万还是停手」的抉择。
+- **回顾一生按身家给心情**：`onChoose` 里按 `state.money` 分四档 → 心情 +20 / +14 / +8 / +3，并把档位文案写进日志（≥100 万 / ≥30 万 / ≥5 万 / 其余）。
+- **体检是大关卡**：全套检查 62% 虚惊（心情 +10）、38% 查出问题（体质 −6、心情 −14），用 `rnd(100)` 掷骰并把结果写日志；拖着不查则吃体质与运气的长期惩罚。
+- **带孙辈用 `hasChild` 近似**：引擎没有「孙辈」字段（`E_FOUR_GEN` 结局才读 `children[i].hasChild`），这里以「有存活子女」作为可带娃门槛。
+
+### 3. 平衡调参（重要）
+
+首版上线后跑 500 局，早逝率一度冲到 **40.2% / 40.6%**（越界）。定位：**这 12 条里有 5 条在扣体质**，而体质正是 60 岁后最紧的资源 —— 扣体质 → 低体质跨月被 `healthCheck` 强制住院 → `hospitalCount` 累积 → 更容易命中 `E_DEATH_EARLY`（优先 1），于是早逝上升、平凡同步下降（两者此消彼长）。
+
+两轮微调（只改这 12 条事件自己的 `effects`，不碰任何全局常量）：
+
+| 事件 | 首版 | 终版 |
+|---|---|---|
+| 带孙子（接一整个暑假） | stamina −6 | **−1** |
+| 腰不行了（贴膏药） | −4 | **−2** |
+| 体检（塞进抽屉） | −4 | **−1** |
+| 老房子漏雨（拿盆接） | −3 | **−1** |
+| 假药（加强疗程） | −4 | **−2** |
+| 广场舞（跟着跳） | +2 | **+3** |
+| 回顾一生（出门走走） | +2 | **+3** |
+
+### 4. 验证
+
+```
+node tests/run.js                  → 468/468 · JS 错误 0 · 属性越界 0
+node tests/check_balance.js 1000 100 → 两轮：
+  早逝 37.7% / 38.3%（区间 20–40%）PASS
+  平凡 34.3% / 35.8%（区间 30–50%）PASS
+```
+
+- 可达性：65 岁、已婚有孙、存款 35 万的真实态下，`eligibleEvents()` 里 11 条池事件全部命中（`E_OLD_FAKE_MED` 是链式节点，按设计不进池）。
+- **500 局单次的抽样误差约 2.2pp**，本项目早逝基线就在 37–38%，所以单批 500 局偶尔会摸到 40.0+。要卡 20–40% 的闸门，建议判定用 **1000 局**（`node tests/check_balance.js 1000 100`），500 局只作快速看趋势。
+
+---
+
+
+
+
 
 
 

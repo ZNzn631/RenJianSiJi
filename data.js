@@ -4486,6 +4486,356 @@
         }
       ]
     }
+,
+
+    /* ================================================================
+       v3.18 · 暮年阶段事件库（12 条）
+       ---------------------------------------------------------------
+       全部 requires 带 minAge: 60；题材：广场舞 / 黄昏恋 / 保健讲座诈骗（2 段链式）
+       / 带孙辈 / 体检大关 / 回顾一生（按身家给心情）/ 老友 / 养老金 / 老房子 / 遗嘱。
+       只读写既有字段与既有规则（money / stamina / mood / onceEver / hasChild…），
+       不新增判定键、不改引擎。
+       ================================================================ */
+    {
+      id: 'E_OLD_DANCE',
+      title: '广场舞',
+      description: '傍晚的小广场，音响里放着一段很旧的曲子。前排的大姐回头看了你一眼，把扇子往旁边挪了挪，腾出半个位置。',
+      weight: 7,
+      requires: { minAge: 60 },
+      options: [
+        {
+          label: '站到最后一排，跟着跳',
+          effects: { mood: 12, stamina: 3, cha: 2 },
+          result: '你踩错了三次，没人笑你。散场时有人问「明天还来吗」。',
+        },
+        {
+          label: '在旁边看一会儿就走',
+          effects: { mood: 3 },
+          result: '你在长椅上坐了二十分钟，看了三支舞，然后回家热了碗剩饭。'
+        },
+        {
+          label: '嫌吵，绕路回家',
+          effects: { mood: -4, will: 1 },
+          result: '你绕过整条街，路灯把你的影子拉得比平时长。'
+        }
+      ]
+    },
+    {
+      id: 'E_OLD_DUSK_LOVE',
+      title: '黄昏恋',
+      description: '舞队里那个人，老伴走了三年。这天散场，TA 站在路灯下等你，说「顺路，一起走一段吧」。',
+      weight: 6,
+      requires: { minAge: 60, onceEver: true },
+      options: [
+        {
+          label: '并肩走完那条街',
+          effects: { mood: 20, cha: 2, luck: 3 },
+          result: '你们聊了一路的天气和菜价，谁也没有提「以后」，但都走得很慢。',
+          onChoose: function () {
+            state.mood = Math.min(moodMaxOf(), state.mood + 4);
+            clampStats();
+            addLog('event', '【黄昏】这一段路，你走了四十分钟，比平时多一倍。');
+          }
+        },
+        {
+          label: '说「家里还有人等我」',
+          effects: { mood: 4, will: 2 },
+          result: 'TA 点点头，说「那快回去吧」，然后自己往另一边走了。'
+        },
+        {
+          label: '从此再也不去跳舞',
+          effects: { mood: -10 },
+          result: '音响还在响，你换了一条路，一走就是两年。'
+        }
+      ]
+    },
+    {
+      id: 'E_OLD_LECTURE',
+      title: '保健讲座',
+      description: '活动室里坐满了人，门口发鸡蛋和面条。台上那位「专家」穿着白大褂，说这个东西能调理三高、睡得香、腿脚有力。',
+      weight: 7,
+      requires: { minAge: 60 },
+      options: [
+        {
+          label: '听完就订一疗程',
+          effects: { money: -8000, mood: -3 },
+          result: '你把现金数了三遍。出门时有人替你拎着那两盒东西，一直送到公交站。',
+          nextEventId: 'E_OLD_FAKE_MED'
+        },
+        {
+          label: '只领鸡蛋，一分不掏',
+          effects: { mood: 5, will: 3 },
+          result: '你把鸡蛋放进布袋，任台上怎么喊「今天最后一天」，都没有回头。'
+        },
+        {
+          label: '举手问一句：批号是多少',
+          effects: { cha: 2, eq: 2, mood: -2 },
+          result: '「专家」愣了一下，说「这个不重要」。散场时有人悄悄跟你道谢。'
+        }
+      ]
+    },
+    {
+      id: 'E_OLD_FAKE_MED',
+      title: '天价假药',
+      description: '一个月过去，那盒「进口软胶囊」还剩大半。你说的腿疼没见好，倒是每次吃完都觉得胃里发胀。',
+      weight: 1,
+      chainOnly: true,
+      requires: { minAge: 60 },
+      options: [
+        {
+          label: '再加两万的「加强疗程」',
+          effects: { money: -20000, mood: -12, stamina: -2 },
+          result: '电话那头叫你「叔叔」，叫得比你亲儿子还勤。第二个月，那个号码停机了。'
+        },
+        {
+          label: '停手，去正规医院看',
+          effects: { money: -2000, stamina: 4, mood: 2, intelligence: 2 },
+          result: '医生看了盒子背面，说「这个成分表，说白了就是淀粉」。你笑了一下，笑得很不是滋味。'
+        },
+        {
+          label: '拿着盒子去社区投诉',
+          effects: { money: 4000, mood: 6, will: 3 },
+          result: '退了四千，剩下的钱没人认。你在登记表上签了名，字写得比平时用力。'
+        }
+      ]
+    },
+    {
+      id: 'E_OLD_GRANDKID',
+      title: '带孙子',
+      description: '儿女把孩子的书包往沙发上一放，说「就一个暑假」。孩子已经在翻你的抽屉了。',
+      weight: 6,
+      requires: { minAge: 60, hasChild: true },
+      options: [
+        {
+          label: '接过来，带一整个暑假',
+          effects: { stamina: -1, mood: 14, eq: 3 },
+          result: '两个月里你学会了三种动画片的主题曲，也被老师叫去谈过一次话。',
+          onChoose: function () {
+            addLog('event', '【孙辈】家里多了一双小拖鞋，门口多了一辆自行车。');
+          }
+        },
+        {
+          label: '只周末带两天',
+          effects: { stamina: -2, mood: 8 },
+          result: '每个周日晚上送孩子回去，你都要在楼下站一会儿才上楼。'
+        },
+        {
+          label: '出钱请个保姆，自己歇着',
+          effects: { money: -12000, mood: -4 },
+          result: '钱转过去，事办得妥妥帖帖。孩子下次来时，先喊的是阿姨。'
+        }
+      ]
+    },
+    {
+      id: 'E_OLD_GRANDKID_TIRED',
+      title: '腰不行了',
+      description: '抱着孩子上了一次三楼，你在楼道里扶着栏杆歇了两次。晚上躺下，腰上像是塞了块石头。',
+      weight: 5,
+      requires: { minAge: 60, stamina: { max: 45 } },
+      options: [
+        {
+          label: '去医院拍个片子',
+          effects: { money: -1500, stamina: 3, mood: 2 },
+          result: '医生说退行性改变，这个年纪都这样。你听着，反而松了口气。'
+        },
+        {
+          label: '贴膏药，忍着',
+          effects: { stamina: -2, mood: -5 },
+          result: '膏药的味道在家里散了两天。孩子说「爷爷身上有味道」，你说那明天不抱了。'
+        },
+        {
+          label: '跟儿女说：我带不动了',
+          effects: { eq: 3, mood: -6, will: 2 },
+          result: '话说出口比想象中难。儿女沉默了一会儿，说「那我们再想办法」。'
+        }
+      ]
+    },
+    {
+      id: 'E_OLD_CHECKUP',
+      title: '体检报告·大关',
+      description: '一页纸，几个指标后面跟着小小的向上箭头。医生没有多说，只写了一句「建议进一步检查」。',
+      weight: 8,
+      requires: { minAge: 60 },
+      options: [
+        {
+          label: '全套检查一次做完',
+          effects: { money: -4000, mood: 4, intelligence: 1 },
+          result: '抽了五管血，等结果的那三天，你把家里的药盒都整理了一遍。',
+          onChoose: function () {
+            if (rnd(100) < 62) {
+              state.mood = Math.min(moodMaxOf(), state.mood + 10);
+              addLog('event', '【体检】结果出来：虚惊一场，只是年纪到了（心情 +10）。');
+            } else {
+              state.stamina = Math.max(0, state.stamina - 6);
+              state.mood = Math.max(0, state.mood - 14);
+              addLog('danger', '【体检】查出点东西，需要长期吃药复查（体质 −6，心情 −14）。');
+            }
+            clampStats();
+          }
+        },
+        {
+          label: '只查最要紧的两项',
+          effects: { money: -1200, mood: 2 },
+          result: '你挑了最便宜的两项，剩下的打算「以后再说」。',
+          onChoose: function () {
+            if (rnd(100) < 55) {
+              state.mood = Math.min(moodMaxOf(), state.mood + 4);
+              addLog('event', '【体检】两项都还好，你把报告折起来放进抽屉。');
+            } else {
+              state.stamina = Math.max(0, state.stamina - 3);
+              state.mood = Math.max(0, state.mood - 8);
+              addLog('danger', '【体检】其中一项不太好，医生让你三个月后再来。');
+            }
+            clampStats();
+          }
+        },
+        {
+          label: '塞进抽屉，明年再说',
+          effects: { mood: -6, stamina: -1, luck: -2 },
+          result: '抽屉里已经有前年的、大前年的。它们叠在一起，比今年这本厚一点。'
+        }
+      ]
+    },
+    {
+      id: 'E_OLD_REVIEW',
+      title: '回顾一生',
+      description: '整理柜子翻出一本旧相册。第一页是你十六岁那年，站在学校门口，手里拎着一个很旧的包。',
+      weight: 6,
+      requires: { minAge: 60, onceEver: true },
+      options: [
+        {
+          label: '一页一页翻完',
+          effects: { mood: 0 },
+          result: '翻到最后一页时，天已经黑了，你没有开灯。',
+          onChoose: function () {
+            var m = state.money || 0, add, txt;
+            if (m >= 1000000) { add = 20; txt = '这一生，账面上是赢的。'; }
+            else if (m >= 300000) { add = 14; txt = '不算大富，但也没缺过什么。'; }
+            else if (m >= 50000) { add = 8; txt = '攒下的钱不多，够用。'; }
+            else { add = 3; txt = '钱一直很紧，可照片里的人都在笑。'; }
+            state.mood = Math.min(moodMaxOf(), state.mood + add);
+            clampStats();
+            addLog('event', '【回顾】' + txt + '（心情 +' + add + '）');
+          }
+        },
+        {
+          label: '算一算这辈子攒下多少',
+          effects: { mood: 0, intelligence: 2 },
+          result: '你拿笔在报纸边上列了一串数字，最后把纸揉了。',
+          onChoose: function () {
+            var m = state.money || 0, add;
+            if (m >= 1000000) { add = 16; }
+            else if (m >= 300000) { add = 11; }
+            else if (m >= 50000) { add = 6; }
+            else { add = 0; }
+            state.mood = Math.min(moodMaxOf(), state.mood + add);
+            clampStats();
+            addLog('event', '【回顾】存款 ' + Math.round(m) + ' 元（心情 +' + add + '）');
+          }
+        },
+        {
+          label: '合上，出门走走',
+          effects: { mood: 6, stamina: 3 },
+          result: '楼下的桂花开了，你站了一会儿，才想起来自己已经很久没有闻过这个味道。'
+        }
+      ]
+    },
+    {
+      id: 'E_OLD_FRIEND_GONE',
+      title: '老友走了',
+      description: '电话是早上七点打来的。老同事的儿子在那边说得很客气，说「我爸最后还念着你」。',
+      weight: 5,
+      requires: { minAge: 60 },
+      options: [
+        {
+          label: '去送最后一程',
+          effects: { money: -500, mood: -8, eq: 3 },
+          result: '鞠躬的时候你看见遗像上他还在笑，是四十岁那年的照片。'
+        },
+        {
+          label: '在楼下坐一下午',
+          effects: { mood: -10, will: 2 },
+          result: '你没上去，就在花坛边坐着。有人来问路，你说不知道，声音有点哑。'
+        },
+        {
+          label: '给还活着的老朋友打个电话',
+          effects: { mood: 6, eq: 2 },
+          result: '电话那头第一句是「你怎么想起给我打电话了」，你说「没事，就是问问」。'
+        }
+      ]
+    },
+    {
+      id: 'E_OLD_PENSION',
+      title: '养老金的窗口',
+      description: '每月十五号，银行门口的队伍能排到街角。保安一遍遍喊「可以用手机银行的往这边走」。',
+      weight: 4,
+      requires: { minAge: 60 },
+      options: [
+        {
+          label: '排一小时，取出来存定期',
+          effects: { mood: 4, intelligence: 1 },
+          result: '存单拿到手，你把它和身份证一起放进贴身的口袋。'
+        },
+        {
+          label: '取出来给孙辈买辆自行车',
+          effects: { money: -800, mood: 8 },
+          result: '孩子骑着车在小区里绕圈，你在楼下站到天黑。'
+        },
+        {
+          label: '学会用手机银行，不再排队',
+          effects: { eq: 3, intelligence: 2, mood: 2 },
+          result: '你让柜员教了三遍，第四遍自己点成了，心里有点得意。'
+        }
+      ]
+    },
+    {
+      id: 'E_OLD_HOUSE_LEAK',
+      title: '老房子漏雨',
+      description: '连着下了三天雨，卧室天花板洇出一片黄，水一滴一滴落在搪瓷盆里，声音很规律。',
+      weight: 5,
+      requires: { minAge: 60 },
+      options: [
+        {
+          label: '找人把屋顶重铺一遍',
+          effects: { money: -6000, mood: 5, will: 2 },
+          result: '师傅说这房子再撑二十年没问题。你算了算，二十年后自己八十几。'
+        },
+        {
+          label: '拿盆接着，等雨停',
+          effects: { stamina: -1, mood: -6 },
+          result: '雨停了，盆还在原地。后来它就一直放在那儿，谁也没挪。'
+        },
+        {
+          label: '搬到儿女家去住',
+          effects: { mood: -3, eq: 2, money: 2000 },
+          result: '房子空着，钥匙你带了两个月才交出去。'
+        }
+      ]
+    },
+    {
+      id: 'E_OLD_WILL',
+      title: '立遗嘱',
+      description: '社区在宣传免费法律咨询。你坐在桌前，工作人员问：「房子、存款，打算怎么分？」',
+      weight: 4,
+      requires: { minAge: 60, money: { min: 100000 }, onceEver: true },
+      options: [
+        {
+          label: '找律师，一条条写清楚',
+          effects: { money: -3000, mood: 8, will: 3, eq: 2 },
+          result: '签完字，你把那份东西锁进柜子最里面，忽然觉得轻松了。'
+        },
+        {
+          label: '自己手写一份，压在抽屉底',
+          effects: { mood: 2, intelligence: 1 },
+          result: '写完改了三遍，最后一句是「你们别吵」。'
+        },
+        {
+          label: '不写了，到时候再说',
+          effects: { mood: -6, luck: -2 },
+          result: '你把宣传单折起来垫了桌脚，那张桌子从此不晃了。'
+        }
+      ]
+    }
   ];
 
   // 按 id 查行动：线性查找而不是静态索引，保证外部往 actionsData 里 push 新条目后立刻可用
