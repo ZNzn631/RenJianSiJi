@@ -579,6 +579,41 @@
         }
         state.stockValue = 0;
       }
+    },
+    /* v3.31：买房（原 E_DOWNPAY 事件改为点击行动触发，成功后 housing='own'） */
+    {
+      id: 'buyHouse',
+      name: '买房',
+      description: '中介发来一套房：三十平，首付按城市房价折算。「这是你自己的」。',
+      costDays: 1,
+      effects: { mood: -6, stamina: -3 },
+      displayEffects: { mood: -6, stamina: -3 },
+      hideWhenLocked: true,
+      requires: { houseMoney: 900000, minAge: 18 },
+      denyText: { houseMoney: '首付（按城市房价折算）不够，先攒钱或搬去房价低的城市。' },
+      onRun: function () {
+        var down = houseCost(900000);
+        state.money -= down;
+        state.housing = 'own';
+        state.rentType = 'home';
+        state.commute = 30;   // 已购房：通勤中等，不再付房租
+        addLog('event', '【买房】首付 ' + down + ' 元（' + cityName() + '）。你有了自己的家。');
+      }
+    },
+    /* v3.31：搬家去别的城市（消耗搬家费 5000，重新选择城市） */
+    {
+      id: 'moveCity',
+      name: '搬家去别的城市',
+      description: '收拾行李，换个城市重新开始。',
+      costDays: 3,
+      effects: { money: -5000 },
+      displayEffects: { money: -5000 },
+      hideWhenLocked: true,
+      requires: { money: { min: 5000 }, minAge: 18 },
+      onRun: function () {
+        var ev = findEvent('E_MOVE_DEST');
+        if (ev) openEvent(ev);   // 用事件选项当城市选择器（零新增 UI）
+      }
     }
   ];
 
@@ -687,12 +722,12 @@
      'normal' 是兜底城市（老档默认），三系数全 1.0。
      系数初版为占位值，最终以 1000 局平衡测试标定为准（见 CHANGELOG）。 */
   var citiesData = window.citiesData = [
-    { id: 'normal',   name: '普通城市', salaryFactor: 1.0,  livingFactor: 1.0,  houseFactor: 1.0 },
-    { id: 'beijing',  name: '北京',     salaryFactor: 1.4,  livingFactor: 1.5,  houseFactor: 2.0 },
-    { id: 'chengdu',  name: '成都',     salaryFactor: 1.0,  livingFactor: 0.85, houseFactor: 1.2 },
-    { id: 'changsha', name: '长沙',     salaryFactor: 0.95, livingFactor: 0.75, houseFactor: 0.9 },
-    { id: 'hegang',   name: '鹤岗',     salaryFactor: 0.7, livingFactor: 0.45, houseFactor: 0.15 },
-    { id: 'county',   name: '小县城',   salaryFactor: 0.75, livingFactor: 0.55, houseFactor: 0.25 }
+    { id: 'normal',   name: '普通城市', salaryFactor: 1.0,  livingFactor: 1.0,  houseFactor: 1.0,  moodBonus: 0 },
+    { id: 'beijing',  name: '北京',     salaryFactor: 1.4,  livingFactor: 1.5,  houseFactor: 2.0,  moodBonus: -2 },
+    { id: 'chengdu',  name: '成都',     salaryFactor: 1.0,  livingFactor: 0.85, houseFactor: 1.2,  moodBonus: 1 },
+    { id: 'changsha', name: '长沙',     salaryFactor: 0.95, livingFactor: 0.75, houseFactor: 0.9,  moodBonus: 2 },
+    { id: 'hegang',   name: '鹤岗',     salaryFactor: 0.7, livingFactor: 0.45, houseFactor: 0.15, moodBonus: 5 },
+    { id: 'county',   name: '小县城',   salaryFactor: 0.75, livingFactor: 0.55, houseFactor: 0.25, moodBonus: 5 }
   ];
 
   /* ================= [引擎层] 教育系统（v2.8） ================= */
@@ -1131,28 +1166,6 @@
           label: '放弃，先赚钱',
           effects: { money: 1500, mood: 3 },
           result: '你签了工作，把录取通知书夹进了抽屉最底层。'
-        }
-      ]
-    },
-    {
-      id: 'E_DOWNPAY',
-      title: '首付',
-      description: '中介发来一套房：三十平，首付五万，月供压得人喘不过气，但「这是你自己的」。',
-      weight: 2,
-      requires: { houseMoney: 900000, minAge: 18 },   // v3.24：首付按城市房价折算
-      options: [
-        {
-          label: '咬牙付首付',
-          meta: '首付（按城市折算）',
-          requires: { houseMoney: 900000 },
-          effects: { mood: -6, stamina: -3 },
-          result: '签字那天你拍了张照，晚上就着泡面看了很久。',
-          onChoose: function () { state.money -= houseCost(900000); addLog('event', '【买房】首付 ' + houseCost(900000) + ' 元（' + cityName() + '）。'); }
-        },
-        {
-          label: '再等等',
-          effects: { mood: -4 },
-          result: '中介第二天就说房子卖了，你不知道该庆幸还是后悔。'
         }
       ]
     },
@@ -6238,6 +6251,109 @@
           result: '电话打通了，那头愣了两秒，说「是你啊」。'
         }
       ]
+    },
+    /* v3.31：租房抉择（22 岁毕业后一次性必发） */
+    {
+      id: 'E_RENT_CHOICE',
+      title: '租房抉择',
+      description: '毕业了，你提着箱子站在城市的街头。住哪儿，是每个月都要重新回答的问题。',
+      weight: 4,
+      priority: true,
+      requires: { onceEver: true, isStudent: false, minAge: 22, maxAge: 28 },
+      options: [
+        {
+          label: '住在家里，省房租',
+          effects: { mood: 2 },
+          result: '你回了家。房租省了，但饭桌上开始出现「什么时候找对象」。',
+          onChoose: function () { state.housing = 'home'; state.rentType = 'home'; state.commute = 40; }
+        },
+        {
+          label: '市区合租，离公司近',
+          effects: { mood: -3, eq: 1 },
+          result: '你和两个陌生人合租。隔壁半夜煮泡面，你闻着香味饿着肚子。',
+          onChoose: function () { state.housing = 'rent'; state.rentType = 'share'; state.commute = 20; }
+        },
+        {
+          label: '市区整租，一个人住',
+          effects: { mood: 4 },
+          result: '一居室，租金贵，但关上门就是自己的世界。',
+          onChoose: function () { state.housing = 'rent'; state.rentType = 'whole'; state.commute = 25; }
+        },
+        {
+          label: '郊区整租，图个便宜安静',
+          effects: { mood: 1, stamina: -1 },
+          result: '房子大了三倍，通勤长了四倍。每天在公交上补觉。',
+          onChoose: function () { state.housing = 'rent'; state.rentType = 'suburb'; state.commute = 90; }
+        },
+        {
+          label: '先换个城市生活',
+          requires: { money: { min: 5000 } },
+          effects: { money: -5000 },
+          result: '你把行李箱调了个方向。',
+          nextEventId: 'E_MOVE_DEST'
+        }
+      ]
+    },
+    /* v3.31：搬家目的地选择（chainOnly：被 E_RENT_CHOICE 指向 / 被 moveCity 行动打开，不进常规池） */
+    {
+      id: 'E_MOVE_DEST',
+      title: '搬去哪里？',
+      description: '六个城市，各有各的活法。房价、工资、生活成本，全都不一样。',
+      weight: 1,
+      chainOnly: true,
+      options: [
+        { label: '北京 · 机会多，房价也高', effects: {}, result: '你拖着箱子，站在了北京的夜色里。', onChoose: function () { state.city = 'beijing'; } },
+        { label: '成都 · 慢生活，物价适中', effects: {}, result: '你在成都的巷子里，闻到了花椒的香气。', onChoose: function () { state.city = 'chengdu'; } },
+        { label: '长沙 · 房价友好，烟火气足', effects: {}, result: '长沙的夜宵摊，让你的胃先安了家。', onChoose: function () { state.city = 'changsha'; } },
+        { label: '鹤岗 · 白菜房价，躺平圣地', effects: {}, result: '你在鹤岗，第一次觉得买房不是梦。', onChoose: function () { state.city = 'hegang'; } },
+        { label: '小县城 · 安稳，机会少', effects: {}, result: '县城的日子很慢，慢到你能听见自己的呼吸。', onChoose: function () { state.city = 'county'; } },
+        { label: '普通城市 · 不折腾了', effects: {}, result: '你留在了一座说不出名字的普通城市。', onChoose: function () { state.city = 'normal'; } }
+      ]
+    },
+    /* ================= v3.31.1 城市专属事件（数值机制引导城市流动） ================= */
+    {
+      id: 'E_HG_FISHING',
+      title: '去江边钓鱼',
+      description: '鹤岗的江边很安静，连风都慢半拍。你支起鱼竿，等一条鱼，也等自己缓过来。',
+      weight: 6,
+      requires: { city: 'hegang', minAge: 18 },
+      options: [
+        { label: '钓一下午', effects: { mood: 8 }, result: '鱼没钓着几条，心却静了。' },
+        { label: '钓到天黑', effects: { mood: 12, stamina: -1 }, result: '你在江边坐到了天黑，星光落在水面上。' }
+      ]
+    },
+    {
+      id: 'E_HG_MARKET',
+      title: '早市买菜',
+      description: '清晨的早市，两块五一斤的青菜，三块一碗的豆腐脑。日子在这里，是称得出来的。',
+      weight: 5,
+      requires: { city: ['hegang', 'county'], minAge: 18 },
+      options: [
+        { label: '逛一逛，买点菜', effects: { money: -30, mood: 6 }, result: '你拎着一兜青菜回家，觉得活着也没那么贵。' },
+        { label: '只看不买，图个热闹', effects: { mood: 3 }, result: '你在人群里走了两圈，心里暖烘烘的。' }
+      ]
+    },
+    {
+      id: 'E_BJ_SUBWAY',
+      title: '地铁早高峰',
+      description: '北京的早高峰，你被挤成了一张照片，贴在车门上。',
+      weight: 6,
+      requires: { city: 'beijing', minAge: 18, maxAge: 60 },
+      options: [
+        { label: '硬着头皮挤上去', effects: { mood: -10, stamina: -5 }, result: '你到站的时候，衬衫已经皱了，人也像被拧过。' },
+        { label: '早出门一小时避峰', effects: { mood: -3, stamina: -2 }, result: '你五点起床，赶在人群之前到了公司，趴在桌上补觉。' }
+      ]
+    },
+    {
+      id: 'E_BJ_RENT',
+      title: '租不起市区的房',
+      description: '房东又涨租了。中介说，同地段已经涨到一万二，你看着工资条，沉默了。',
+      weight: 5,
+      requires: { city: 'beijing', housing: 'rent', minAge: 22 },
+      options: [
+        { label: '搬到郊区，通勤认了', effects: { mood: -5 }, result: '你搬去了燕郊，每天通勤两小时。', onChoose: function () { state.rentType = 'suburb'; state.commute = 90; } },
+        { label: '咬牙续租，吃土也要住市区', effects: { money: -1500, mood: -8 }, result: '你续了租，卡里又少了一截。' }
+      ]
     }
   ];
 
@@ -6318,6 +6434,74 @@
   function livingCostText() {
     return '每月自动结算生活费：在职按月薪 ' + Math.round(LIVING_RATE * 100)
       + '%，无业保底 ' + LIVING_BASE + ' 元。';
+  }
+
+  /* ================= [数据层] v3.31 租房 / 通勤 / 城市流动 ================= */
+  // 租房类型：rentFactor 是相对「市区合租」的房租倍率；commute 决定通勤惩罚
+  var RENT_TYPES = {
+    home:   { name: '住在家里',  commute: 40, rentFactor: 0,   desc: '省房租，但通勤靠公交，偶尔被念叨' },
+    share:  { name: '市区合租',  commute: 20, rentFactor: 1.0, desc: '离公司近，与人合租' },
+    whole:  { name: '市区整租',  commute: 25, rentFactor: 2.0, desc: '一个人住，离公司近，贵' },
+    suburb: { name: '郊区整租',  commute: 90, rentFactor: 0.8, desc: '便宜安静，但通勤漫长' }
+  };
+  var RENT_BASE = 1400;          // 基准月租（市区合租、普通城市）；最终 = RENT_BASE × cityFactors().living × rentFactor
+  var COMMUTE_THRESHOLD = 60;    // 通勤 > 60 分钟触发惩罚（按月）
+  var COMMUTE_MOOD = -4;         // 通勤折磨：心情（每月）
+  var COMMUTE_STA = -1;          // 通勤折磨：体力（每月）
+  var RENT_ARREAR_MOOD = -6;     // 付不起房租：暂缓的心情惩罚（不扣成负数，留翻盘余地）
+
+  function rentOf() {
+    if (state.housing !== 'rent') return 0;
+    var t = RENT_TYPES[state.rentType] || RENT_TYPES.home;
+    if (!t || !t.rentFactor) return 0;
+    var f = (typeof cityFactors === 'function') ? cityFactors().living : 1;   // 城市生活系数（北京贵/鹤岗便宜）
+    return Math.round(RENT_BASE * f * t.rentFactor);
+  }
+
+  function settleHousing() {
+    // ① 房租（租房才扣）
+    var rent = rentOf();
+    if (rent > 0) {
+      if (state.money >= rent) {
+        state.money -= rent;
+        addLog('month', '【房租】本月房租 -' + rent + ' 元（' + (RENT_TYPES[state.rentType] ? RENT_TYPES[state.rentType].name : '租房') + ' · ' + (typeof cityName === 'function' ? cityName() : '') + '）。');
+      } else {
+        state.mood += RENT_ARREAR_MOOD;   // 暂缓：不扣成负数，只伤心情
+        clampStats();
+        addLog('danger', '【房租】这个月房租 ' + rent + ' 元交不上了，只能先欠着（心情 ' + RENT_ARREAR_MOOD + '）。得快点赚钱。');
+      }
+    }
+    // ② 通勤折磨（> 60 分钟，每月扣心情/体力）
+    var c = state.commute || 0;
+    if (c > COMMUTE_THRESHOLD) {
+      state.mood += COMMUTE_MOOD;
+      state.sta += COMMUTE_STA;
+      clampStats();
+      addLog('sys', '【通勤】每天 ' + c + ' 分钟的路程，挤得人身心俱疲（心情 ' + COMMUTE_MOOD + ' / 体力 ' + COMMUTE_STA + '）。');
+    }
+  }
+
+  // v3.31.1：城市躺平红利 / 北京亚健康（按城市 moodBonus 每月结算）
+  function cityMoodBonus() {
+    var id = state.city || 'normal';
+    for (var i = 0; i < (citiesData || []).length; i++) {
+      if (citiesData[i].id === id) return Number(citiesData[i].moodBonus) || 0;
+    }
+    return 0;
+  }
+  function settleCityWellbeing() {
+    var bonus = cityMoodBonus();
+    if (bonus !== 0) {
+      state.mood += bonus;
+      clampStats();
+      addLog(bonus > 0 ? 'sys' : 'danger', '【城市】' + (typeof cityName === 'function' ? cityName() : '') + '的生活节奏' + (bonus > 0 ? '让你很放松（心情 +' + bonus + '）' : '压得你喘不过气（心情 ' + bonus + '）') + '。');
+    }
+    // 北京：高薪带血，在职每月扣 1 体质（亚健康累积）
+    if ((state.city || 'normal') === 'beijing' && state.salary > 0) {
+      state.sta += -1;
+      clampStats();
+      addLog('danger', '【北京】高强度通勤与加班，身体在透支（体力 -1）。');
+    }
   }
 
   // 学历阶梯：minEdu 按这里的顺序比较高低

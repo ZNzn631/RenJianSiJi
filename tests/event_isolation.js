@@ -30,6 +30,7 @@
   var EDUS = ['初中', '高中', '专科', '本科', '硕士', '博士'];
   var LOVE = ['single', 'dating', 'married'];
   var HOUS = ['home', 'dorm', 'rent'];
+  var CITIES = ['normal', 'beijing', 'chengdu', 'changsha', 'hegang', 'county'];
   var MONEY = [0, 3000, 30000, 150000, 600000, 1000000];
   var STA = [0, 20, 60, 95];
   var MOOD = [10, 50, 90];
@@ -59,6 +60,7 @@
     s.loveState = cfg.love; s.married = cfg.love === 'married';
     s.love = (cfg.loveVal !== undefined) ? cfg.loveVal : (cfg.love === 'married' ? 60 : 0);
     s.housing = cfg.housing;
+    s.city = cfg.city || 'normal';
     s.schoolTier = cfg.tier;
     s.hasInsurance = cfg.insurance;
     s.stockValue = 10000;   // v3.22：覆盖股票事件的可满足性
@@ -85,7 +87,7 @@
     return {
       age: pick(AGES), edu: pick(EDUS), job: pick(JOBS), money: pick(MONEY),
       sta: pick(STA), mood: pick(MOOD), attr: pick(ATTR), love: pick(LOVE),
-      housing: pick(HOUS), month: pick(MONTHS), tier: pick(['重点', '普通']),
+      housing: pick(HOUS), city: pick(CITIES), month: pick(MONTHS), tier: pick(['重点', '普通']),
       insurance: Math.random() < 0.5, teenLove: Math.random() < 0.3,
       exam: Math.random() < 0.7, posYears: Math.floor(Math.random() * 8),
       jobCooldown: Math.floor(Math.random() * 36), childrenMode: Math.floor(Math.random() * 4),
@@ -154,6 +156,11 @@
     if (key === 'oncePerDay') { if (val !== true) return false; var dk = s.y + '-' + s.m + '-' + s.d; s.usage[ev.id] = { day: dk }; return true; }
     if (key === 'oncePerWeek') { if (val !== true) return false; s.usage[ev.id] = { week: 'X' }; return true; }
     if (key === 'houseMoney') { s.money = houseCost(Number(val)) - 1; return true; }   // v3.24：房价门槛反证
+    if (key === 'city') {
+      var clist = Array.isArray(val) ? val : [val];
+      for (var ci = 0; ci < CITIES.length; ci++) if (clist.indexOf(CITIES[ci]) === -1) { s.city = CITIES[ci]; return true; }
+      return false;
+    }
     // 属性区间
     var MAP = { money: 'money', stamina: 'sta', mood: 'mood', intelligence: 'int', cha: 'cha', will: 'will', eq: 'eq', luck: 'luck' };
     if (MAP[key] && val && typeof val === 'object') {

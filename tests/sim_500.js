@@ -26,6 +26,12 @@
   var ACTS = RJS.actions.map(function (a) { return a.id; });
   var OUT = { random: [], smart: [], parent: [], parentLow: [] };
 
+  var MOVE_CITY_ORDER = ['beijing', 'chengdu', 'changsha', 'hegang', 'county', 'normal'];   // 与 E_MOVE_DEST 选项顺序一致
+  function cityMeta(id) {
+    var arr = window.citiesData || [];
+    for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i];
+    return { id: id, salaryFactor: 1, livingFactor: 1, houseFactor: 1, moodBonus: 0 };
+  }
   function chooseRandom() {
     var ev = RJS.simPendingEvent();
     if (!ev) return;
@@ -33,6 +39,26 @@
     for (var i = 0; i < ev.options.length; i++) if (RJS.checkRequires(ev.options[i]).length === 0) free.push(i);
     if (!free.length) { RJS.simChoose(0); return; }
     var s = S();
+    // v3.31.1：搬家选城市 —— 按人设与状态理性选择，避免「永远选第一个=北京」的虹吸
+    if (ev.id === 'E_MOVE_DEST') {
+      var cBest = free[0], cBestScore = -Infinity;
+      for (var ci = 0; ci < free.length; ci++) {
+        var cityId = MOVE_CITY_ORDER[free[ci]] || 'normal';
+        var meta = cityMeta(cityId);
+        var lf = meta.livingFactor || 1, sf = meta.salaryFactor || 1, mb = meta.moodBonus || 0;
+        var score = 0;
+        if (PERSONA === 'layabout') {
+          score = (1 - lf) * 100 + mb * 4 + Math.random() * 30;   // 躺平：去最低成本（鹤岗/县城），随机分散
+        } else if (PERSONA === 'worker' && (s.sta < 40 || s.mood < 30)) {
+          score = sf * 40 - lf * 15 + mb + Math.random() * 10;   // 打工人撑不住：逃离到工资不暴跌+成本降的城市（长沙/成都）
+        } else {
+          score = sf * 12 + mb;   // striver 与状态好的 worker 追工资
+        }
+        if (score > cBestScore) { cBestScore = score; cBest = free[ci]; }
+      }
+      RJS.simChoose(cBest);
+      return;
+    }
     // 10% 作死：偏要挑最「伤」的（硬扛疾病、冲动花大钱）
     if (Math.random() < 0.10) {
       var worst = free[0], worstScore = Infinity;
@@ -59,7 +85,7 @@
     RJS.simChoose(best);
   }
   function randomAction(sabotage) {
-    var EXCLUDE = sabotage ? {} : { resign: 1, buyStock: 1 };
+    var EXCLUDE = sabotage ? { moveCity: 1 } : { resign: 1, buyStock: 1, moveCity: 1 };
     for (var k = 0; k < 40; k++) {
       var id = ACTS[Math.floor(Math.random() * ACTS.length)];
       if (EXCLUDE[id]) continue;
@@ -87,9 +113,20 @@
     if (r < 0.70) return 'worker';
     return 'layabout';
   }
+  function shouldMove(s) {
+    if (s.age < 22 || s.money < 6000) return false;
+    if (PERSONA === 'striver') return s.city !== 'beijing';                          // 做题家：追北京
+    if (PERSONA === 'worker') {
+      if (s.city === 'beijing') return (s.sta < 30 || s.mood < 20);   // 北京极端撑不住才逃（先休息恢复，别轻易逃离）
+      return s.age < 30 && s.sta >= 60 && s.mood >= 50;   // 年轻时状态好 → 进京打工追工资
+    }
+    if (PERSONA === 'layabout') return (s.city === 'beijing' || s.city === 'normal') && (s.sta < 40 || s.mood < 30);   // 躺平者：大城市撑不住才逃
+    return false;
+  }
   function smartAction() {
     var s = S();
     if (Math.random() < 0.10) return randomAction(true);   // 随机作死：跳过理性决策
+    if (shouldMove(s)) return 'moveCity';                   // v3.31.1：状态驱动的搬家决策（逃离北上广）
 
     if (s.mood < 12) return 'rest';
 

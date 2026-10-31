@@ -359,6 +359,23 @@
         detail: '需要 ' + need + ' 元（当前 ' + state.money + ' 元，已按城市房价折算）',
         suffix: true
       };
+    },
+    // 城市条件（v3.31.1）：'beijing' 或 ['hegang','county'] 命中其一
+    city: function (v) {
+      var cur = state.city || 'normal';
+      var list = Array.isArray(v) ? v : [v];
+      if (list.indexOf(cur) > -1) return null;
+      var names = [];
+      for (var i = 0; i < list.length; i++) {
+        for (var j = 0; j < (citiesData || []).length; j++) {
+          if (citiesData[j].id === list[i]) { names.push(citiesData[j].name); break; }
+        }
+      }
+      return {
+        key: 'city', title: '城市不符',
+        detail: '需要在「' + (names.length ? names.join(' / ') : list.join(' / ')) + '」（当前「' + cityName() + '」）',
+        suffix: true
+      };
     }
   };
 
@@ -520,7 +537,9 @@
       mood: 80,
       stockValue: 0,        // v3.22：股票市值（买入即 +1 万成本，settleStocks 每月按运气/随机涨跌）
       city: 'normal',       // v3.24：出生城市（默认普通城市，三系数全 1.0）
-      housing: 'home',    // v3.5.4：居住状态 home/dorm/rent（开局住家，上大学→dorm，工作→rent）
+      housing: 'home',    // v3.5.4：居住状态 home/dorm/rent/own（开局住家，上大学→dorm，工作→rent，买房→own）
+      commute: 0,         // v3.31：通勤时长（分钟），由租房类型/买房决定；>60 每月扣心情/体力
+      rentType: 'home',   // v3.31：租房类型 home/share/whole/suburb（决定房租系数与通勤）
       isStudent: false,   // v3.7：在校生（本科/专科且 <22 岁），由规则动态判定
       /* --- 婚姻系统（v3.0）：全部为新增字段，旧档由 sanitize 补默认值 --- */
       married: false,        // 是否已婚
@@ -908,6 +927,8 @@
     }
     if (state.married || (state.children && state.children.length)) settleFamily();   // v3.1：已婚或有孩子都要家庭月结
     settleStocks();                              // v3.22：股票每月涨跌（只动 stockValue，不碰生活费/工资）
+    settleHousing();                             // v3.31：租房/通勤每月结算（房租+通勤惩罚；函数体在 data.js，与 settleStocks 同款追加）
+    settleCityWellbeing();                       // v3.31.1：城市心情红利/北京亚健康（函数体在 data.js）
     checkDisease();                              // v3.13：跨月疾病判定（只排队，弹窗交给 triggerMonthlyEvent）
   }
 
@@ -2024,7 +2045,9 @@
       mood: asInt(s.mood, 80, 0, moodMaxVal),
       stockValue: asInt(s.stockValue, 0, 0, 999999999),   // v3.22：旧档缺失 → 0
       city: (typeof s.city === 'string' && s.city) ? s.city : 'normal',   // v3.24：旧档缺失/非法 → 普通城市（系数 1.0）
-      housing: (s.housing === 'dorm' || s.housing === 'rent') ? s.housing : 'home',   // v3.5.4：居住状态，旧档缺省 home
+      housing: (s.housing === 'dorm' || s.housing === 'rent' || s.housing === 'own') ? s.housing : 'home',   // v3.5.4：居住状态，旧档缺省 home；v3.31：+own 已买房
+      commute: asInt(s.commute, 0, 0, 300),    // v3.31：通勤时长（分钟），旧档缺失 → 0
+      rentType: (s.rentType === 'share' || s.rentType === 'whole' || s.rentType === 'suburb') ? s.rentType : 'home',   // v3.31：租房类型，旧档缺失 → home
       isStudent: (s.edu === '本科' || s.edu === '专科') && (Number(s.age) || 0) < 22,   // v3.7：在校生（读档时按学历+年龄回推）
       /* --- 婚姻系统字段（v3.0）--- */
       married: s.married === true,
