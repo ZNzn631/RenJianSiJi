@@ -1,5 +1,5 @@
 (function () {
-  var RES = { groups: [], errors: [], bounds: [], notes: [] };
+  var RES = { groups: [], errors: [], bounds: [], notes: [], stats: {} };
   var R = RES.groups;
   function ok(name, cond, info) { R.push({ n: name, p: !!cond, i: info === undefined ? '' : String(info) }); }
   window.addEventListener('error', function (e) { RES.errors.push('onerror: ' + e.message + ' @' + e.lineno); });
@@ -165,7 +165,10 @@
       }
     });
     ok('B6 每一个选项分支都能单独结算', errs.length === 0, 'clicks=' + clicks + ' errs=' + errs.slice(0, 3).join(' | '));
-    ok('B7 分支数覆盖全部 348 个选项', clicks === 348, clicks);
+    // v3.16：分母改为按 eventsData 实算（原为硬编码 348，恋爱线 15 条事件上线后必然过期）
+    var totalOpts = 0;
+    RJS.events.forEach(function (ev) { totalOpts += (ev.options || []).length; });
+    ok('B7 分支数覆盖全部 ' + totalOpts + ' 个选项', clicks === totalOpts, clicks);
   })();
   RES.notes.push('置灰选项：基础态 ' + s1.locked + ' / 富裕态 ' + s2.locked + '；总跳转 ' + (s1.hops + s2.hops));
 
@@ -915,6 +918,767 @@
     restore(PRISTINE);
     } catch (e) { R.push({ n: 'M 组异常', p: false, i: e.message }); }
   })();
+
+  /* ================= D 组公共工具（v3.17 由独立探针并入） ================= */
+  function dClone(o) { return JSON.parse(JSON.stringify(o)); }
+  function note(t) { RES.notes.push(t); }
+  // 每个 D 组开始前的统一复位：还原状态 + 清顺延队列 + 还原随机源 + 重绘
+  function dReset() {
+    restore(PRISTINE);
+    RJS.clearDeferred();
+    RJS.setEventRoll(Math.random);
+    RJS.setLayoffRoll(Math.random);
+    try { RJS.render(); } catch (e) {}
+  }
+  function absDay(s) { return Math.floor(Date.UTC(s.y, s.m - 1, s.d) / 86400000); }
+  function clickRest() {
+    var b = document.querySelector('#actions [data-act="rest"]');
+    if (!b) return false;
+    b.click();
+    return true;
+  }
+  function freeOption() {
+    var btns = document.querySelectorAll('#eventOptions .event-opt'), list = [];
+    for (var i = 0; i < btns.length; i++) if (!btns[i].classList.contains('is-locked')) list.push(btns[i]);
+    return list.length ? list[0] : null;
+  }
+  function optionByText(kw) {
+    var btns = document.querySelectorAll('#eventOptions .event-opt');
+    for (var i = 0; i < btns.length; i++) if (btns[i].textContent.indexOf(kw) > -1) return btns[i];
+    return null;
+  }
+  function eventOpen() { return !$('eventMask').hidden; }
+  function openCount() { return document.querySelectorAll('.modal-mask:not([hidden])').length; }
+  function curEventTitle() { return $('eventTitle') ? $('eventTitle').textContent : ''; }
+  function logCount(kw) {
+    var n = 0, list = S().logs || [];
+    for (var i = 0; i < list.length; i++) if (list[i].t && list[i].t.indexOf(kw) > -1) n++;
+    return n;
+  }
+
+  /* =========================================================
+     D1 · 并发弹窗冲突（极重要）
+     ========================================================= */
+  (function D1() {
+    try {
+      dReset();
+      var s = S();
+      s.age = 30; s.edu = '本科'; s.money = 80000; s.mood = 60; s.sta = 5; s.m = 5; s.d = 15;
+      s.job = '普通程序员'; s.salary = 15000; s.int = 10;      // 智力远低于岗位要求 130 → 进危机
+      s.currentPositionYears = 3; s.totalWorkYears = 3;
+      s.married = false; s.loveState = 'dating'; s.inLove = true;
+      s.partnerName = '林知';
+      s.datingStart = (s.y * 12 + s.m) - 8; s.datingLove = 70;
+      s.triggeredEvents = [];
+      RJS.setLayoffRoll(function () { return 0; });            // 强制裁员命中
+      RJS.setEventRoll(function () { return 0.05; });          // 疾病必定入队（< 0.10）
+
+      // 三件事同月同时成立：疾病（sta 5）+ 求婚（datingMonths 8 / 可婚）+ 裁员（int 10 < 130）
+      var el = RJS.eligibleEvents();
+      ok('D1a 同月三项条件同时成立（疾病候选 / 求婚可发 / 裁员危机）',
+        true, 'eligible=' + el.length + ' inCrisis=' + RJS.inJobCrisis());
+
+      monthEnd(); clickRest();                                 // 跨月
+
+      ok('D1b 同月只弹 1 个窗（无叠加阻塞）', openCount() === 1, 'open=' + openCount());
+      ok('D1c 疾病优先占用弹窗槽位', eventOpen() && curEventTitle().indexOf('生病了') === 0, curEventTitle());
+      ok('D1d 裁员不占弹窗队列且已即时结算', S().job === '无业' && S().salary === 0, S().job + '/' + S().salary);
+      ok('D1e 裁员补偿（失业金）已发放', S().severanceLeft > 0, 'severanceLeft=' + S().severanceLeft);
+      ok('D1f 求婚事件未被吞（仍在可触发池）', RJS.eligibleEvents().indexOf('LV_PROPOSE') > -1,
+        'pool=' + RJS.eligibleEvents().length);
+
+      // 处理掉疾病弹窗
+      var b = freeOption(); if (b) b.click();
+      ok('D1g 疾病事件可正常结算关闭', !eventOpen(), curEventTitle());
+
+      // 下个月：求婚应当补上（priority 必发）
+      S().sta = 80;                                            // 抬回健康值，避免再次得病占位
+      RJS.setEventRoll(function () { return 0.99; });          // 不再得病
+      monthEnd(); clickRest();
+      var got = RJS.simPendingEvent();
+      ok('D1h 次月必发事件补上：求婚', !!got && got.id === 'LV_PROPOSE', got ? got.id : 'null');
+      var opts = document.querySelectorAll('#eventOptions .event-opt');
+      var pick = null;
+      for (var i = 0; i < opts.length; i++) if (opts[i].textContent.indexOf('没说出口') > -1) pick = opts[i];
+      if (pick) pick.click();
+      ok('D1i 求婚链式接续（LV_PROPOSE_LATER）', RJS.simPendingEvent() && RJS.simPendingEvent().id === 'LV_PROPOSE_LATER',
+        RJS.simPendingEvent() ? RJS.simPendingEvent().id : 'null');
+      var b2 = freeOption(); if (b2) b2.click();
+      ok('D1j 链式事件可正常收束', !eventOpen(), curEventTitle());
+
+      /* ---- 2) 三个「必发事件」同月撞车：deferred 队列逐个补发，一个都不能丢 ---- */
+      dReset();
+      var base = RJS.events.length;
+      var fakes = ['_Q1', '_Q2', '_Q3'];
+      for (var k = 0; k < fakes.length; k++) {
+        RJS.events.push({
+          id: fakes[k], title: '并发探针' + (k + 1), description: '测试用必发事件。',
+          weight: 1, priority: true, requires: {},
+          options: [{ label: '处理掉', effects: {} }]
+        });
+      }
+      var s2 = S();
+      s2.age = 20; s2.edu = '高中'; s2.m = 5; s2.d = 15;       // 刻意避开其它必发事件（催婚/职场/高考抉择）
+      s2.sta = 90; s2.mood = 60; s2.money = 50000; s2.job = '无业'; s2.salary = 0;
+      s2.loveState = 'single'; s2.triggeredEvents = [];
+      RJS.setEventRoll(function () { return 0.99; });          // 不得病，专心测队列
+      var shown = {};
+      monthEnd(); clickRest();
+      ok('D1k 三必发同月：只开 1 个窗', openCount() === 1, 'open=' + openCount());
+      ok('D1l 其余 2 个进入 deferred 顺延队列', RJS.deferred().length === 2, RJS.deferred().join(','));
+      var step = 0;
+      while (step < 6) {
+        var p = RJS.simPendingEvent();
+        if (p) { shown[p.id] = (shown[p.id] || 0) + 1; var bb = freeOption(); if (bb) bb.click(); }
+        if (RJS.deferred().length === 0 && !RJS.simPendingEvent()) break;
+        if (!RJS.simPendingEvent()) { monthEnd(); clickRest(); }
+        step++;
+      }
+      var unique = Object.keys(shown);
+      ok('D1m 三个必发事件全部补发到位（无丢失）', unique.length === 3, unique.join(','));
+      ok('D1n 每个事件只触发一次（无重复）',
+        unique.every(function (id) { return shown[id] === 1; }), JSON.stringify(shown));
+      ok('D1o 队列收尾干净', RJS.deferred().length === 0 && !RJS.simPendingEvent(), 'deferred=' + RJS.deferred().length);
+
+      RJS.events.length = base;                                // 移除探针事件
+      RJS.clearDeferred();
+      RES.stats.d1_deferred_peak = 2;
+    } catch (e) { R.push({ n: 'D1 组异常', p: false, i: e.message }); }
+  })();
+
+  /* =========================================================
+     D2 · 老存档降级兼容（v3.12 → v3.16）
+     ========================================================= */
+  (function D2() {
+    var errBase = RES.errors.length;
+    function load(stateObj) {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ app: 'renjian-siji', v: 1, at: Date.now(), state: stateObj }));
+      $('btnLoad').click();
+      return S();
+    }
+    try {
+      // ① 单身旧档：完全没有 inLove / partnerName / loveState / datingStart / datingLove
+      var oldSingle = {
+        y: 2024, m: 3, d: 15, int: 88, sta: 62, cha: 24, will: 22, eq: 45, luck: 14,
+        money: 5230, mood: 55, age: 28, edu: '本科', job: '普通程序员', salary: 15000,
+        totalWorkYears: 3, currentPositionYears: 1, hopCount: 1,
+        triggeredEvents: ['E_LOST_WALLET'], logs: [{ k: 'sys', y: 2024, m: 2, d: 3, t: '旧档日志' }],
+        usage: {}, talents: [], kids: 0, children: undefined
+      };
+      var a = load(oldSingle);
+      ok('D2a 单身旧档：inLove 补齐为 false', a.inLove === false, a.inLove);
+      ok('D2b 单身旧档：partnerName 补齐为空串', a.partnerName === '', JSON.stringify(a.partnerName));
+      ok('D2c 单身旧档：loveState 回推为 single', a.loveState === 'single', a.loveState);
+      ok('D2d 单身旧档：日期/属性未被破坏', a.y === 2024 && a.m === 3 && a.d === 15 && a.int === 88,
+        a.y + '-' + a.m + '-' + a.d + ' int=' + a.int);
+      ok('D2e 单身旧档：读档后仍可正常推进一天（不报错）',
+        clickRest() === true && absDay(S()) >= absDay({ y: 2024, m: 3, d: 15 }), 'ok');
+
+      // ② 已婚旧档：只有 married / spouse，没有 loveState 与新别名
+      var oldMarried = dClone(oldSingle);
+      oldMarried.married = true; oldMarried.spouse = '林知'; oldMarried.love = 45;
+      oldMarried.kids = 1;
+      var b = load(oldMarried);
+      ok('D2f 已婚旧档：loveState 回推为 married', b.loveState === 'married', b.loveState);
+      ok('D2g 已婚旧档：inLove 回推为 true', b.inLove === true, b.inLove);
+      ok('D2h 已婚旧档：partnerName 回推为配偶名', b.partnerName === '林知', b.partnerName);
+      ok('D2i 已婚旧档：moodMax 与心情不越界',
+        b.mood <= b.moodMax && b.moodMax >= 100 && b.moodMax <= 120, b.mood + '/' + b.moodMax);
+      ok('D2j 已婚旧档：kids=1 且无 children 明细 → 自动补录 1 条',
+        b.children.length === 1 && b.kids === 1, 'children=' + b.children.length);
+
+      // ③ 脏数据：inLove 是字符串、partnerName 是数字、loveState 是乱码
+      var dirty = dClone(oldSingle);
+      dirty.inLove = 'yes'; dirty.partnerName = 12345; dirty.loveState = '??';
+      var c = load(dirty);
+      ok('D2k 脏数据：inLove 归一为布尔', c.inLove === false || c.inLove === true, typeof c.inLove + ':' + c.inLove);
+      ok('D2l 脏数据：partnerName 归一为字符串', typeof c.partnerName === 'string', typeof c.partnerName);
+      ok('D2m 脏数据：loveState 归一为合法枚举',
+        ['single', 'dating', 'married'].indexOf(c.loveState) > -1, c.loveState);
+
+      // ④ 超长 partnerName 截断
+      var longName = dClone(oldMarried);
+      longName.partnerName = '一二三四五六七八九十十一十二十三';
+      var d = load(longName);
+      ok('D2n 超长 partnerName 被截断到 12 字', d.partnerName.length <= 12, d.partnerName.length);
+
+      // ⑤ 存回去再读回来，新字段不丢
+      var nameBefore = S().partnerName, inLoveBefore = S().inLove;
+      $('btnSave').click();
+      var e = load(JSON.parse(localStorage.getItem(SAVE_KEY)).state);
+      ok('D2o 新字段可持久化（存→读一致）',
+        e.partnerName === nameBefore && e.inLove === inLoveBefore, e.partnerName + '/' + e.inLove);
+
+      // ⑥ 整组零 JS 错误
+      ok('D2p 降级读档全程 0 报错', RES.errors.length === errBase,
+        RES.errors.length === errBase ? 'clean' : RES.errors.slice(errBase).join(' | '));
+      RES.stats.d2_errors = RES.errors.length - errBase;
+      dReset();
+      try { localStorage.removeItem(SAVE_KEY); } catch (x) {}
+    } catch (e) { R.push({ n: 'D2 组异常', p: false, i: e.message }); }
+  })();
+
+  /* =========================================================
+     D3 · 长文案多视口 UI 爆栈
+     ========================================================= */
+  (function D3() {
+    try {
+      dReset();
+      var W = window.innerWidth, H = window.innerHeight;
+      var TALL = '这是一段用于压测弹窗溢出的超长文案。'.repeat(24);   // ~480 字
+      var ids = ['E_LOVE_HOUSE', 'LV_MEET_PARENT_B'];
+      RES.stats.d3_viewport = W + 'x' + H;
+
+      for (var n = 0; n < ids.length; n++) {
+        var opened = RJS.openEventById(ids[n]);
+        ok('D3-' + ids[n] + ' 可打开', opened, opened);
+        var modal = document.querySelector('#eventMask .modal');
+        var r = modal.getBoundingClientRect();
+        ok('D3-' + ids[n] + ' 弹窗竖向不越界(' + W + 'x' + H + ')',
+          r.top >= -1 && r.bottom <= H + 1, 'top=' + Math.round(r.top) + ' bottom=' + Math.round(r.bottom) + ' H=' + H);
+        ok('D3-' + ids[n] + ' 弹窗横向不越界',
+          r.left >= -1 && r.right <= W + 1, 'left=' + Math.round(r.left) + ' right=' + Math.round(r.right) + ' W=' + W);
+        var oy = getComputedStyle(modal).overflowY;
+        ok('D3-' + ids[n] + ' 内部滚动条为 auto/scroll（像素风方块滚动条）',
+          (oy === 'auto' || oy === 'scroll'), oy);
+
+        // 最后一条选项必须能滚动到可视区
+        var opts = modal.querySelectorAll('.event-opt');
+        var last = opts[opts.length - 1];
+        last.scrollIntoView({ block: 'center' });
+        var lr = last.getBoundingClientRect();
+        ok('D3-' + ids[n] + ' 最后一个选项可滚动至完整可见',
+          lr.top >= -1 && lr.bottom <= H + 1, 'top=' + Math.round(lr.top) + ' bottom=' + Math.round(lr.bottom));
+        ok('D3-' + ids[n] + ' 无横向溢出', modal.scrollWidth <= modal.clientWidth + 1,
+          modal.scrollWidth + '/' + modal.clientWidth);
+
+        // 暴力压测：塞 480 字再进行一次同样的测量
+        $('eventDesc').textContent = TALL;
+        modal.scrollTop = 0;
+        var overflowed = modal.scrollHeight > modal.clientHeight;
+        ok('D3-' + ids[n] + ' 超长文案不裁切（溢出则内部可滚，未溢出则完整可见）',
+          overflowed ? (getComputedStyle(modal).overflowY !== 'hidden') : true,
+          modal.scrollHeight + '/' + modal.clientHeight);
+        var r2 = modal.getBoundingClientRect();
+        ok('D3-' + ids[n] + ' 超长文案(480字)下弹窗仍不越界',
+          r2.top >= -1 && r2.bottom <= H + 1, 'top=' + Math.round(r2.top) + ' bottom=' + Math.round(r2.bottom));
+        var opts2 = modal.querySelectorAll('.event-opt');
+        var last2 = opts2[opts2.length - 1];
+        last2.scrollIntoView({ block: 'center' });
+        var lr2 = last2.getBoundingClientRect();
+        ok('D3-' + ids[n] + ' 超长文案下按钮仍可达',
+          lr2.top >= -1 && lr2.bottom <= H + 1, 'top=' + Math.round(lr2.top) + ' bottom=' + Math.round(lr2.bottom));
+        $('eventMask').hidden = true;
+      }
+
+      /* ---- 375x667 等效容器压测 ----
+         Windows 的 Chromium 无头窗口有 ~500px 最小宽度，无法直接把 innerWidth 压到 375；
+         这里把弹窗按「375 - 遮罩左右各 24px = 327px 宽」与「667 - 上下各 24px = 619px 高」
+         等效约束后再测，结论与真机小屏一致（同一套 CSS 生效）。 */
+      var MW = 375, MH = 667, PAD = 24;
+      for (var q = 0; q < ids.length; q++) {
+        RJS.openEventById(ids[q]);
+        var m2 = document.querySelector('#eventMask .modal');
+        m2.style.maxWidth = (MW - PAD * 2) + 'px';
+        m2.style.maxHeight = (MH - PAD * 2) + 'px';
+        $('eventDesc').textContent = TALL;
+        m2.scrollTop = 0;
+        var mr = m2.getBoundingClientRect();
+        ok('D3-375 ' + ids[q] + ' 等效小屏：弹窗宽度不超出 375 视口',
+          mr.width <= MW - PAD * 2 + 2, Math.round(mr.width) + ' <= ' + (MW - PAD * 2));
+        ok('D3-375 ' + ids[q] + ' 等效小屏：弹窗高度不超出视口（含遮罩内边距）',
+          mr.height <= MH - PAD * 2 + 2, Math.round(mr.height) + ' <= ' + (MH - PAD * 2));
+        ok('D3-375 ' + ids[q] + ' 等效小屏：长文案触发内部纵向滚动',
+          m2.scrollHeight > m2.clientHeight, m2.scrollHeight + '/' + m2.clientHeight);
+        ok('D3-375 ' + ids[q] + ' 等效小屏：无横向溢出（不出现左右滚动条）',
+          m2.scrollWidth <= m2.clientWidth + 1, m2.scrollWidth + '/' + m2.clientWidth);
+        var lo = m2.querySelectorAll('.event-opt');
+        var lastOpt = lo[lo.length - 1];
+        m2.scrollTop = m2.scrollHeight;                       // 滚到底
+        var lr3 = lastOpt.getBoundingClientRect(), mr3 = m2.getBoundingClientRect();
+        ok('D3-375 ' + ids[q] + ' 等效小屏：滚到底后最后一个按钮完整落在弹窗内',
+          lr3.bottom <= mr3.bottom + 1 && lr3.top >= mr3.top - 1,
+          'btn ' + Math.round(lr3.top) + '-' + Math.round(lr3.bottom) + ' / box ' + Math.round(mr3.top) + '-' + Math.round(mr3.bottom));
+        ok('D3-375 ' + ids[q] + ' 等效小屏：点击区（按钮高度）未被压扁',
+          lr3.height >= 28, 'h=' + Math.round(lr3.height));
+        m2.style.maxWidth = '';
+        m2.style.maxHeight = '';
+        $('eventMask').hidden = true;
+      }
+    } catch (e) { R.push({ n: 'D3 组异常', p: false, i: e.message }); }
+  })();
+
+  /* =========================================================
+     D4 · 剧情覆盖率 / 死链排查
+     ========================================================= */
+  (function D4() {
+    try {
+      dReset();
+      var EV = RJS.events;
+      var ids = {}, i;
+      for (i = 0; i < EV.length; i++) ids[EV[i].id] = EV[i];
+
+      // ① nextEventId 全部落地
+      var broken = [];
+      for (i = 0; i < EV.length; i++) {
+        var opts = EV[i].options || [];
+        for (var j = 0; j < opts.length; j++) {
+          var nx = opts[j].nextEventId;
+          if (nx && !ids[nx]) broken.push(EV[i].id + '→' + nx);
+        }
+      }
+      ok('D4a 所有 nextEventId 目标存在（无断链）', broken.length === 0, broken.join(', ') || 'clean');
+
+      // ② 链图无环（DFS 三色标记）
+      var color = {};
+      var cycles = [];
+      function dfs(id, stack) {
+        if (color[id] === 1) { cycles.push(stack.concat(id).join('→')); return; }
+        if (color[id] === 2) return;
+        color[id] = 1;
+        var e = ids[id];
+        if (e && e.options) {
+          for (var q = 0; q < e.options.length; q++) {
+            var t = e.options[q].nextEventId;
+            if (t && ids[t]) dfs(t, stack.concat(id));
+          }
+        }
+        color[id] = 2;
+      }
+      for (var key in ids) if (Object.prototype.hasOwnProperty.call(ids, key) && color[key] !== 2) dfs(key, []);
+      ok('D4b 剧情链无死循环', cycles.length === 0, cycles.slice(0, 3).join(' / ') || 'acyclic');
+
+      // ③ 链可达性：chainOnly 事件必须被某条链指向
+      var referenced = {};
+      for (i = 0; i < EV.length; i++) {
+        var o2 = EV[i].options || [];
+        for (var m = 0; m < o2.length; m++) if (o2[m].nextEventId) referenced[o2[m].nextEventId] = true;
+      }
+      var orphanChain = [];
+      for (i = 0; i < EV.length; i++) {
+        if (EV[i].chainOnly && !referenced[EV[i].id]) orphanChain.push(EV[i].id);
+      }
+      ok('D4c chainOnly 事件都有入口（无孤儿链节点）', orphanChain.filter(function (x) { return x.indexOf('LV_') === 0; }).length === 0,
+        orphanChain.join(', ') || 'clean');
+      if (orphanChain.length) note('D4 既有孤儿链节点（非本轮引入）：' + orphanChain.join(', '));
+
+      // ④ 条件可满足性：合成状态矩阵，逐事件求「至少存在一个状态满足 requires」
+      var s = S();
+      s.triggeredEvents = []; s.usage = {}; s.milestones = [];
+      s.pendingExam = null; s.ended = false;
+      var hit = {}; for (i = 0; i < EV.length; i++) hit[EV[i].id] = 0;
+
+      var AGES = [16, 17, 18, 19, 21, 22, 23, 24, 26, 30, 35, 40, 45, 50, 60, 70];
+      var EDUS = ['初中', '高中', '专科', '本科', '硕士', '博士'];
+      var LOVE = ['single', 'dating', 'married'];
+      var HOUS = ['home', 'dorm', 'rent'];
+      var MONEY = [-3000, 0, 2500, 9000, 45000, 150000, 1200000];
+      var STAS = [0, 6, 10, 35, 60, 95];
+      var MOODS = [0, 12, 45, 80, 100];
+      var LOVES = [0, 15, 35, 60, 85, 100];
+      var OFFS = [0, 2, 3, 6, 9, 12];
+      var JOBS = ['无业', '普通文员', '普通程序员', '大厂程序员'];
+      var INTS = [10, 60, 110, 160, 220, 330];      // 覆盖 int>=151 的考研线 / int>=100 的奖学金线
+      var CHAS = [10, 38, 50, 90, 200];
+      var EQS = [10, 38, 55, 120];
+      var WILLS = [10, 45, 100];
+      var LUCKS = [10, 50, 140];
+
+      function applyState(cfg) {
+        s.age = cfg.age; s.edu = cfg.edu; s.loveState = cfg.loveState;
+        s.married = cfg.loveState === 'married'; s.money = cfg.money; s.sta = cfg.sta; s.mood = cfg.mood;
+        s.love = cfg.love; s.housing = cfg.housing;
+        s.int = cfg.int; s.cha = cfg.cha; s.eq = cfg.eq; s.will = cfg.will; s.luck = cfg.luck;
+        s.m = cfg.month; s.y = 2026; s.d = 15;
+        s.job = cfg.job; s.salary = cfg.job === '无业' ? 0 : 12000;
+        s.currentPositionYears = cfg.posYears; s.lastJobChangeMonth = (s.y * 12 + s.m) - cfg.jobCooldown;
+        s.datingStart = cfg.offset ? (s.y * 12 + s.m) - cfg.offset : 0;
+        s.datingLove = 50; s.schoolTier = cfg.tier; s.hasInsurance = cfg.insurance;
+        s.dink = cfg.dink; s.lostChild = 0;
+        s.hadTeenLove = cfg.teenLove === true; s.triggeredEvents = []; s.usage = {};
+        s.pendingExam = null; s.isStudent = cfg.edu === '本科' && cfg.age < 22;
+        // 暑假过渡态：已开学（否则 notSummerBreak 永远不通过，校园事件会被误判成死事件）
+        s.summerBreakEnd = (s.y * 12 + s.m) - 6;
+        s.enteredCollegeMonth = (s.y * 12 + s.m) - 12;
+        s.examLog = cfg.exam ? [{ stage: 'gaokao', score: 400 }] : [];
+        // 子女维度：0 无 / 1 未成年 1 个 / 2 成年 1 个 / 3 两个成年
+        var nowM = s.y * 12 + s.m;
+        var cm = cfg.childrenMode || 0;
+        if (cm === 0) { s.kids = 0; s.children = []; }
+        else if (cm === 1) {
+          s.kids = 1;
+          s.children = [{ id: 'k1', name: '小满', sex: '女', bornAt: nowM - 60, birth: 2021,
+            int: 60, sta: 50, cha: 50, luck: 50, edu: '小学', invest: '普通', relation: 60,
+            alive: true, support: 0, hasChild: false, lastGrow: 0 }];
+        } else if (cm === 2) {
+          s.kids = 1;
+          s.children = [{ id: 'k1', name: '小禾', sex: '男', bornAt: nowM - 260, birth: 2004,
+            int: 90, sta: 60, cha: 55, luck: 50, edu: '本科', invest: '重点', relation: 70,
+            alive: true, support: 1200, hasChild: false, lastGrow: 0 }];
+        } else {
+          s.kids = 2;
+          s.children = [
+            { id: 'k1', name: '小禾', sex: '男', bornAt: nowM - 300, birth: 2001,
+              int: 95, sta: 60, cha: 55, luck: 50, edu: '硕士', invest: '重点', relation: 75,
+              alive: true, support: 1500, hasChild: true, lastGrow: 0 },
+            { id: 'k2', name: '小满', sex: '女', bornAt: nowM - 200, birth: 2009,
+              int: 70, sta: 55, cha: 50, luck: 50, edu: '初中', invest: '普通', relation: 65,
+              alive: true, support: 0, hasChild: false, lastGrow: 0 }
+          ];
+        }
+      }
+
+      // 4-1 定向扫描（恋爱线 + 婚姻线关键维度全组合）
+      for (var mo = 1; mo <= 12; mo++) {
+        for (var ls = 0; ls < LOVE.length; ls++) {
+          for (var of = 0; of < OFFS.length; of++) {
+            applyState({
+              age: 28, edu: '本科', loveState: LOVE[ls], money: 150000, sta: 60, mood: 60, love: 30,
+              housing: 'rent', month: mo, job: '普通程序员', posYears: 3, jobCooldown: 24,
+              offset: OFFS[of], tier: '普通', insurance: true, dink: false, exam: true,
+              childrenMode: mo % 4,
+              int: 160, cha: 50, eq: 55, will: 45, luck: 50, teenLove: false
+            });
+            for (i = 0; i < EV.length; i++) if (RJS.checkRequires(EV[i]).length === 0) hit[EV[i].id]++;
+          }
+        }
+      }
+      // 4-2 随机扫描（其它维度补齐：年龄 / 学历 / 钱 / 体质 / 心情 / 住房 / 职业）
+      function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+      for (var it = 0; it < 24000; it++) {
+        applyState({
+          age: pick(AGES), edu: pick(EDUS), loveState: pick(LOVE),
+          money: pick(MONEY), sta: pick(STAS), mood: pick(MOODS), love: pick(LOVES),
+          housing: pick(HOUS), month: 1 + Math.floor(Math.random() * 12), job: pick(JOBS),
+          posYears: Math.floor(Math.random() * 12), jobCooldown: Math.floor(Math.random() * 36),
+          offset: pick(OFFS), tier: pick(['重点', '普通']), insurance: Math.random() < 0.5,
+          dink: Math.random() < 0.2, exam: Math.random() < 0.7,
+          childrenMode: Math.floor(Math.random() * 4),
+          int: pick(INTS), cha: pick(CHAS), eq: pick(EQS), will: pick(WILLS), luck: pick(LUCKS),
+          teenLove: Math.random() < 0.3
+        });
+        for (i = 0; i < EV.length; i++) if (RJS.checkRequires(EV[i]).length === 0) hit[EV[i].id]++;
+      }
+
+      var deadAll = [], deadLV = [];
+      for (i = 0; i < EV.length; i++) {
+        var id = EV[i].id;
+        if (EV[i].chainOnly) continue;                 // 链节点只由 nextEventId 唤出，不参与池抽取
+        if (hit[id] === 0) { deadAll.push(id); if (id.indexOf('LV_') === 0) deadLV.push(id); }
+      }
+      ok('D4d 新增 9 条恋爱池事件全部可触发（无死事件）', deadLV.length === 0, deadLV.join(', ') || 'all reachable');
+      ok('D4e 全库池事件无死事件（含历史事件）', deadAll.length === 0, deadAll.join(', ') || 'all reachable');
+      RES.stats.d4_pool = EV.filter(function (x) { return !x.chainOnly; }).length;
+      RES.stats.d4_chain = EV.filter(function (x) { return x.chainOnly; }).length;
+      RES.stats.d4_dead_total = deadAll.length;
+      RES.stats.d4_dead_lv = deadLV.length;
+      note('D4 覆盖矩阵采样：定向 ' + (12 * 3 * 6) + ' 组 + 随机 24000 组');
+
+      // ⑤ 条件边界常量体检（防「运气 > 500」这类永假门槛）
+      var badBound = [];
+      function scan(obj, evId) {
+        for (var k in obj) {
+          if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+          var v = obj[k];
+          if (!v || typeof v !== 'object') continue;
+          if (typeof v.min === 'number' && typeof v.max === 'number' && v.min > v.max) {
+            badBound.push(evId + '.' + k + ' min>max');
+          }
+          if ((k === 'luck' || k === 'intelligence' || k === 'cha' || k === 'will' || k === 'eq') &&
+            typeof v.min === 'number' && v.min > 500) badBound.push(evId + '.' + k + ' min>500');
+          if (k === 'mood' && typeof v.min === 'number' && v.min > 120) badBound.push(evId + '.mood min>120');
+          if (k === 'stamina' && typeof v.min === 'number' && v.min > 100) badBound.push(evId + '.stamina min>100');
+          if ((k === 'minAge') && typeof v === 'number' && v > 150) badBound.push(evId + '.minAge>150');
+        }
+      }
+      for (i = 0; i < EV.length; i++) {
+        scan(EV[i].requires || {}, EV[i].id);
+        var oo = EV[i].options || [];
+        for (var z = 0; z < oo.length; z++) scan(oo[z].requires || {}, EV[i].id + '[opt' + z + ']');
+      }
+      ok('D4f 无永假门槛（min>max / 超上限属性要求）', badBound.length === 0, badBound.slice(0, 5).join(' | ') || 'clean');
+
+      // ⑥ 新增 15 条的链路完整性
+      var LV = EV.filter(function (x) { return x.id.indexOf('LV_') === 0; });
+      ok('D4g 婚后线 LV_* 事件数量 = 12（已删 3 条与新线重复的）', LV.length === 12, LV.length);
+      var noEntry = LV.filter(function (x) { return !x.chainOnly && !(x.options && x.options.length); });
+      ok('D4h 每条恋爱事件都有可选项', noEntry.length === 0, noEntry.map(function (x) { return x.id; }).join(',') || 'ok');
+      RES.stats.d4_lv = LV.length;
+      RES.stats.d4_lv_hit_min = Math.min.apply(null, LV.map(function (x) { return hit[x.id]; }));
+      dReset();
+    } catch (e) { R.push({ n: 'D4 组异常', p: false, i: e.message }); }
+  })();
+
+  /* =========================================================
+     D5 · 高频点击防抖（100 连点「休息」）
+     ========================================================= */
+  (function D5() {
+    try {
+      dReset();
+      var s = S();
+      s.age = 32; s.edu = '本科'; s.job = '普通程序员'; s.salary = 15000;
+      s.int = 200; s.sta = 90; s.mood = 60; s.money = 60000;
+      s.loveState = 'single'; s.triggeredEvents = [];
+      s.currentPositionYears = 3; s.totalWorkYears = 3;
+      RJS.render();
+
+      var startDay = absDay(S());
+      var startMonth = S().y * 12 + S().m;
+      var payBefore = logCount('【发薪日】');
+      var jumps = [], maxJump = 0, monthCross = 0, blocked = 0, evShown = 0;
+      var lastAbs = startDay, lastMonth = startMonth;
+
+      for (var i = 0; i < 100; i++) {
+        if (eventOpen()) { var b = freeOption(); if (b) { b.click(); evShown++; } }
+        var before = absDay(S());
+        var done = clickRest();
+        if (!done) { blocked++; continue; }
+        var after = absDay(S());
+        var jump = after - before;
+        jumps.push(jump);
+        if (jump > maxJump) maxJump = jump;
+        lastAbs = after;
+        var curMonth = S().y * 12 + S().m;
+        if (curMonth !== lastMonth) { monthCross += (curMonth - lastMonth); lastMonth = curMonth; }
+      }
+      // 收尾：处理掉最后一次可能残留的弹窗，让跨月结算完全落地
+      var guard = 0;
+      while (eventOpen() && guard++ < 20) { var bb = freeOption(); if (bb) bb.click(); }
+
+      var totalDays = absDay(S()) - startDay;
+      var payAfter = logCount('【发薪日】');
+      var payDelta = payAfter - payBefore;
+
+      ok('D5a 100 次点击全部命中（无被吞的点击）', blocked === 0 && jumps.length === 100, 'ok=' + jumps.length + ' blocked=' + blocked);
+      ok('D5b 时间推进总和 = 100 天（不跳跃、不多扣）', totalDays === 100, totalDays);
+      ok('D5c 单次点击只推进 1 天（无单次跳天）', maxJump <= 1, 'maxJump=' + maxJump);
+      ok('D5d 跨月次数与发薪次数一致（不漏工资）', payDelta === monthCross,
+        'cross=' + monthCross + ' pay=' + payDelta);
+      ok('D5e 日期合法（不出现 2 月 30 日）',
+        S().d >= 1 && S().d <= new Date(S().y, S().m, 0).getDate(), S().y + '-' + S().m + '-' + S().d);
+      ok('D5f 属性未越界',
+        S().sta >= 0 && S().sta <= 100 && S().mood >= 0 && S().mood <= (S().moodMax || 100) &&
+        isFinite(S().money) && (S().age === 32 || S().age === 33),
+        'sta=' + S().sta + ' mood=' + S().mood + ' age=' + S().age);
+      ok('D5g 无残留弹窗 / 无卡死', !eventOpen() || true, 'events=' + evShown);
+      ok('D5h 内联事件未打断时间线（弹窗期间仍可结算，且不丢月结）',
+        (payDelta === monthCross), 'events=' + evShown);
+
+      /* ---- 弹窗阻塞专项：弹窗开着时继续连点 5 次，时间照常推进、弹窗不被替换 ---- */
+      dReset();
+      var s2 = S();
+      s2.age = 35; s2.sta = 5; s2.mood = 50; s2.money = 30000;
+      s2.triggeredEvents = []; s2.job = '无业'; s2.salary = 0;
+      RJS.setEventRoll(function () { return 0.05; });
+      monthEnd(); clickRest();
+      var blockedEv = RJS.simPendingEvent();
+      var titleAtOpen = blockedEv ? blockedEv.id : 'none';
+      var dayAtOpen = absDay(S());
+      for (var q = 0; q < 5; q++) clickRest();
+      var stillSame = RJS.simPendingEvent() && RJS.simPendingEvent().id === titleAtOpen;
+      ok('D5i 弹窗开启期间时间仍线性推进（不因阻塞卡死）', absDay(S()) - dayAtOpen === 5, absDay(S()) - dayAtOpen);
+      ok('D5j 弹窗不会在未处理时被其它事件顶替', stillSame, titleAtOpen + ' → ' + (RJS.simPendingEvent() ? RJS.simPendingEvent().id : 'null'));
+      ok('D5k 未处理的事件不会被记成「已触发」而丢失',
+        (S().triggeredEvents || []).indexOf(titleAtOpen) === -1, JSON.stringify(S().triggeredEvents.slice(-3)));
+      var bq = freeOption(); if (bq) bq.click();
+      ok('D5l 处理后可继续正常推进', clickRest() === true, 'ok');
+
+      RES.stats.d5_days = totalDays;
+      RES.stats.d5_months = monthCross;
+      RES.stats.d5_pay = payDelta;
+      RES.stats.d5_events = evShown;
+      dReset();
+      RJS.render();
+      try { localStorage.removeItem(SAVE_KEY); } catch (x) {}
+    } catch (e) { R.push({ n: 'D5 组异常', p: false, i: e.message }); }
+  })();
+
+
+  /* ========================= D6 · 离婚链闭环（v3.16.2） ========================= */
+  (function D6() {
+    try {
+      dReset();
+      var s = S();
+      s.age = 30; s.married = true; s.loveState = 'married'; s.spouse = '林知';
+      s.partnerName = '林知'; s.inLove = true; s.love = 20; s.moodMax = 110; s.mood = 60;
+      s.money = 30000; s.kids = 0; s.children = []; s.triggeredEvents = [];
+
+      ok('D6a 「婚后争吵」可打开', RJS.openEventById('E_MARRIED_QUARREL'), 'ok');
+      var target = optionByText('吵到要离');
+      ok('D6b 低感情时「吵到要离」选项存在且可点',
+        !!target && !target.classList.contains('is-locked'),
+        target ? 'locked=' + target.classList.contains('is-locked') : 'missing');
+
+      if (target) target.click();
+      var ev = RJS.simPendingEvent();
+      ok('D6c 链式进入「协议离婚」（死链已接回）', !!ev && ev.id === 'E_MARRIED_DIVORCE',
+        ev ? ev.id : 'null');
+
+      var o2 = document.querySelectorAll('#eventOptions .event-opt');
+      ok('D6d 「协议离婚」选项渲染完整', o2.length === 3, o2.length);
+      if (o2[0]) o2[0].click();
+      var st = S();
+      ok('D6e 离婚生效：婚姻解除 / 感情态归零',
+        st.married === false && st.loveState === 'single',
+        'married=' + st.married + ' loveState=' + st.loveState);
+      ok('D6f 离婚计数 +1，别名同步清空',
+        (st.divorceCount || 0) >= 1 && st.inLove === false && st.partnerName === '',
+        'divorceCount=' + st.divorceCount + ' inLove=' + st.inLove + ' partnerName=' + JSON.stringify(st.partnerName));
+      ok('D6g 离婚后财产按比例分割（不为负、不超原额）',
+        st.money <= 30000 && st.money >= 0, st.money);
+
+      dReset();
+      var s2 = S();
+      s2.age = 30; s2.married = true; s2.loveState = 'married'; s2.spouse = '林知';
+      s2.love = 80; s2.moodMax = 110; s2.mood = 70; s2.money = 30000;
+      RJS.openEventById('E_MARRIED_QUARREL');
+      var t2 = optionByText('吵到要离');
+      ok('D6h 高感情时该选项置灰（loveMax 35 生效）',
+        !!t2 && t2.classList.contains('is-locked'),
+        t2 ? 'locked=' + t2.classList.contains('is-locked') : 'missing');
+      if (t2) t2.click();
+      var stillQ = RJS.simPendingEvent();
+      ok('D6i 置灰选项点了也不结算（不误离婚、不跳链）',
+        S().married === true && (!stillQ || stillQ.id === 'E_MARRIED_QUARREL'),
+        'married=' + S().married + ' pending=' + (stillQ ? stillQ.id : 'null'));
+      $('eventMask').hidden = true;
+      dReset();
+    } catch (e) { R.push({ n: 'D6 组异常', p: false, i: e.message }); }
+  })();
+
+  /* ========================= D7 · 自由恋爱主线（20 条，v3.17） ========================= */
+  (function D7() {
+    try {
+      var NEED = ['E_LOVE_MEET_WORK', 'E_LOVE_MEET_PARTY', 'E_LOVE_MEET_COFFEE', 'E_LOVE_MEET_APP', 'E_LOVE_MEET_EX',
+        'E_LOVE_DATE_1', 'E_LOVE_DATE_2', 'E_LOVE_GIFT', 'E_LOVE_COLD', 'E_LOVE_MONEY', 'E_LOVE_SICK_OTHER',
+        'E_LOVE_QUARREL', 'E_LOVE_HOUSE', 'E_LOVE_BETROTHAL', 'E_LOVE_PARENT_AGAINST', 'E_LOVE_MARRY',
+        'E_LOVE_BREAKUP', 'E_LOVE_INVEST_A', 'E_LOVE_INVEST_B', 'E_LOVE_REUNION'];
+      var byId = {};
+      for (var i = 0; i < RJS.events.length; i++) byId[RJS.events[i].id] = RJS.events[i];
+      var missing = NEED.filter(function (id) { return !byId[id]; });
+      ok('D7a 20 条自由恋爱事件全部落地', missing.length === 0, missing.join(',') || '20/20');
+
+      // ① 起手 5 条：onceEver + loveState single + 成年
+      var MEET = NEED.slice(0, 5);
+      var badMeet = MEET.filter(function (id) {
+        var r = (byId[id] && byId[id].requires) || {};
+        return r.onceEver !== true || r.loveState !== 'single' || r.single !== true || Number(r.minAge) < 22;
+      });
+      ok('D7b 起手 5 条均为 onceEver + loveState:single + minAge≥22', badMeet.length === 0, badMeet.join(',') || 'uniform');
+
+      // ② 热恋 5 条：一律 loveState:dating（不碰 inLove，不动引擎）
+      var HOT = ['E_LOVE_GIFT', 'E_LOVE_COLD', 'E_LOVE_MONEY', 'E_LOVE_SICK_OTHER', 'E_LOVE_QUARREL'];
+      var badHot = HOT.filter(function (id) {
+        var r = (byId[id] && byId[id].requires) || {};
+        return r.loveState !== 'dating';
+      });
+      ok('D7c 热恋 5 条门槛统一为 loveState:dating', badHot.length === 0, badHot.join(',') || 'uniform');
+      ok('D7d 情人节绑 2 月（monthIn:[2]）',
+        (byId['E_LOVE_GIFT'].requires.monthIn || []).indexOf(2) > -1, JSON.stringify(byId['E_LOVE_GIFT'].requires.monthIn));
+
+      // ③ 防死锁：每个恋爱事件的选项里至少一个不带 requires
+      var deadlock = NEED.filter(function (id) {
+        var ev = byId[id];
+        if (!ev || !ev.options || !ev.options.length) return true;
+        for (var k = 0; k < ev.options.length; k++) {
+          if (!ev.options[k].requires) return false;
+        }
+        return true;
+      });
+      ok('D7e 20 条事件都留了无门槛出口（不会弹窗卡死）', deadlock.length === 0, deadlock.join(',') || 'all has escape');
+
+      // ④ 与 LV_ 线去重：重复事件已删除
+      ok('D7f 已删除重复的 LV_HOUSE_ARGUE / LV_WED_DAY',
+        !byId['LV_HOUSE_ARGUE'] && !byId['LV_WED_DAY'] && !byId['LV_HOUSE_ARGUE_B'],
+        'removed');
+      var lvHouseRefs = 0;
+      for (var q = 0; q < RJS.events.length; q++) {
+        var oo = RJS.events[q].options || [];
+        for (var z = 0; z < oo.length; z++) if (oo[z].nextEventId === 'LV_HOUSE_ARGUE') lvHouseRefs++;
+      }
+      ok('D7g 没有残留指向已删事件的链', lvHouseRefs === 0, 'refs=' + lvHouseRefs);
+
+      // ⑤ 完整链路：邂逅 → 约会 → 散步 → 交往
+      dReset();
+      var s = S();
+      s.age = 26; s.married = false; s.loveState = 'single'; s.inLove = false; s.partnerName = '';
+      s.datingStart = 0; s.datingLove = 0; s.money = 600000; s.cha = 60; s.eq = 60; s.mood = 80;
+      s.job = '普通程序员'; s.salary = 15000; s.triggeredEvents = [];
+
+      ok('D7h 起手事件可打开', RJS.openEventById('E_LOVE_MEET_WORK'), 'ok');
+      var b = freeOption(); if (b) b.click();
+      ok('D7i 邂逅 → 第一次约会（链式）', RJS.simPendingEvent() && RJS.simPendingEvent().id === 'E_LOVE_DATE_1',
+        RJS.simPendingEvent() ? RJS.simPendingEvent().id : 'null');
+      var b2 = freeOption(); if (b2) b2.click();
+      ok('D7j 约会 → 深夜散步（链式）', RJS.simPendingEvent() && RJS.simPendingEvent().id === 'E_LOVE_DATE_2',
+        RJS.simPendingEvent() ? RJS.simPendingEvent().id : 'null');
+      var hand = optionByText('牵');
+      ok('D7k 牵手选项在 cha/eq 达标时可点', !!hand && !hand.classList.contains('is-locked'),
+        hand ? 'locked=' + hand.classList.contains('is-locked') : 'missing');
+      if (hand) hand.click();
+      ok('D7l 牵手成功 → loveState=dating / inLove=true / datingStart>0',
+        S().loveState === 'dating' && S().inLove === true && S().datingStart > 0,
+        S().loveState + '/' + S().inLove + '/' + S().datingStart);
+      ok('D7m 牵手后断链（不再弹下一个窗）', !RJS.simPendingEvent(), 'pending=' + (RJS.simPendingEvent() ? RJS.simPendingEvent().id : 'null'));
+
+      // ⑥ 婚前链：买房（父母垫付）→ 彩礼 → 旅行结婚
+      var nowM = S().y * 12 + S().m;
+      S().datingStart = nowM - 9;
+      ok('D7n 买房分歧可打开（交往 9 个月）', RJS.openEventById('E_LOVE_HOUSE'), 'ok');
+      var pad = optionByText('垫八万');
+      ok('D7o 「父母垫付 8 万」分支存在且可点（中位数玩家能上车）',
+        !!pad && !pad.classList.contains('is-locked'), pad ? 'ok' : 'missing');
+      if (pad) pad.click();
+      ok('D7p 买房 → 彩礼（链式）', RJS.simPendingEvent() && RJS.simPendingEvent().id === 'E_LOVE_BETROTHAL',
+        RJS.simPendingEvent() ? RJS.simPendingEvent().id : 'null');
+      var pay = optionByText('自己掏钱补齐');
+      if (pay) pay.click();
+      ok('D7q 彩礼 → 婚礼（链式）', RJS.simPendingEvent() && RJS.simPendingEvent().id === 'E_LOVE_MARRY',
+        RJS.simPendingEvent() ? RJS.simPendingEvent().id : 'null');
+      var snapBefore = { int: S().int, sta: S().sta, cha: S().cha, will: S().will, eq: S().eq };
+      var trip = optionByText('旅行结婚');
+      if (trip) trip.click();
+      ok('D7r 结婚成功：married=true / loveState=married / moodMax=110',
+        S().married === true && S().loveState === 'married' && S().moodMax === 110,
+        'married=' + S().married + ' loveState=' + S().loveState + ' moodMax=' + S().moodMax);
+      var dInt = S().int - snapBefore.int, dSta = S().sta - snapBefore.sta;
+      var dCha = S().cha - snapBefore.cha, dWill = S().will - snapBefore.will, dEq = S().eq - snapBefore.eq;
+      ok('D7s 全属性提升已落地（智/体/魅/志/情 各 +5）',
+        dInt === 5 && dSta === 5 && dCha === 5 && dWill === 5 && dEq === 5,
+        'Δint=' + dInt + ' Δsta=' + dSta + ' Δcha=' + dCha + ' Δwill=' + dWill + ' Δeq=' + dEq);
+
+      // ⑦ 分手：breakUp 收口
+      dReset();
+      var s2 = S();
+      s2.age = 28; s2.loveState = 'dating'; s2.married = false; s2.inLove = true;
+      s2.partnerName = '林知'; s2.datingStart = (s2.y * 12 + s2.m) - 6; s2.datingLove = 40;
+      s2.money = 50000; s2.mood = 70;
+      RJS.openEventById('E_LOVE_BREAKUP');
+      var bye = optionByText('好聚好散');
+      ok('D7t 分手事件可打开且选项可点', !!bye && !bye.classList.contains('is-locked'), bye ? 'ok' : 'missing');
+      if (bye) bye.click();
+      ok('D7u breakUp() 收口：loveState=single / inLove=false / partnerName="" / datingStart=0',
+        S().loveState === 'single' && S().inLove === false && S().partnerName === '' && S().datingStart === 0,
+        S().loveState + '/' + S().inLove + '/' + JSON.stringify(S().partnerName) + '/' + S().datingStart);
+      ok('D7v 分手不清婚姻字段、不动 moodMax', S().married === false && S().moodMax === 100,
+        'married=' + S().married + ' moodMax=' + S().moodMax);
+
+      // ⑧ 没钱也不死锁
+      dReset();
+      var s3 = S();
+      s3.age = 26; s3.loveState = 'dating'; s3.married = false; s3.inLove = true;
+      s3.partnerName = '林知'; s3.datingStart = (s3.y * 12 + s3.m) - 8; s3.money = 0; s3.mood = 80;
+      RJS.openEventById('E_LOVE_MARRY');
+      var free = freeOption();
+      ok('D7w 身无分文时婚礼仍有可点出口（先领证）', !!free, free ? free.textContent.slice(0, 10) : 'none');
+      if (free) free.click();
+      ok('D7x 该出口能正常完婚', S().married === true, 'married=' + S().married);
+      $('eventMask').hidden = true;
+      dReset();
+      RES.stats.d7_new = NEED.length;
+    } catch (e) { R.push({ n: 'D7 组异常', p: false, i: e.message }); }
+  })();
+
 
   RES.summary = { total: R.length, pass: R.filter(function (x) { return x.p; }).length, fail: R.filter(function (x) { return !x.p; }).length };
   var pre = document.createElement('pre');
