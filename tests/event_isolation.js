@@ -50,6 +50,16 @@
     ] };
   }
 
+  function friendsOf(mode, nowM) {
+    if (mode === 0) return [];
+    if (mode === 1) return [{ id: 'f1', name: '林晓宇', favor: 80, tag: '同事', lastInteract: nowM }];
+    if (mode === 2) return [
+      { id: 'f1', name: '林晓宇', favor: 80, tag: '同事', lastInteract: nowM },
+      { id: 'f2', name: '沈子墨', favor: 40, tag: '同学', lastInteract: nowM }
+    ];
+    if (mode === 3) return [{ id: 'f1', name: '林晓宇', favor: 80, tag: '同事', lastInteract: nowM, debt: { amount: 5000, outcome: 'repay' } }];
+    return [{ id: 'f1', name: '林晓宇', favor: 80, tag: '同事', lastInteract: nowM, debt: { amount: 5000, outcome: 'vanish' } }];
+  }
   function makeState(cfg) {
     var s = S();
     s.y = 2026; s.m = cfg.month; s.d = 15;
@@ -80,6 +90,8 @@
     s.ended = false; s.hospitalCount = 0; s.deathStrikes = 0;
     var k = kid(cfg.childrenMode, s.y * 12 + s.m);
     s.kids = k.kids; s.children = k.children;
+    s.friends = friendsOf(cfg.friendsMode, s.y * 12 + s.m);   // v3.32：朋友采样
+    s.recentSetback = cfg.setback ? (s.y * 12 + s.m) : 0;     // v3.32：挫折采样
     return s;
   }
 
@@ -92,7 +104,8 @@
       exam: Math.random() < 0.7, posYears: Math.floor(Math.random() * 8),
       jobCooldown: Math.floor(Math.random() * 36), childrenMode: Math.floor(Math.random() * 4),
       offset: pick([0, 2, 3, 6, 9, 12]), lastMarry: 0,
-      loveVal: pick([0, 15, 35, 60, 85, 100])
+      loveVal: pick([0, 15, 35, 60, 85, 100]),
+      friendsMode: Math.floor(Math.random() * 5), setback: Math.random() < 0.5
     };
   }
 
@@ -161,6 +174,26 @@
       for (var ci = 0; ci < CITIES.length; ci++) if (clist.indexOf(CITIES[ci]) === -1) { s.city = CITIES[ci]; return true; }
       return false;
     }
+    // v3.32：朋友条件反证
+    if (key === 'friendFavor') {
+      var needF = Number(val);
+      var fl = s.friends || [];
+      for (var fi = 0; fi < fl.length; fi++) fl[fi].favor = Math.max(0, needF - 1);
+      return fl.length > 0;
+    }
+    if (key === 'friendTag') {
+      if (val === true) { s.friends = []; return true; }
+      var needT = Array.isArray(val) ? val : [val];
+      var fl2 = s.friends || [];
+      for (var ti = 0; ti < fl2.length; ti++) if (needT.indexOf(fl2[ti].tag) > -1) { fl2[ti].tag = '__none__'; return true; }
+      return false;
+    }
+    if (key === 'friendDebt') {
+      var fl3 = s.friends || [];
+      for (var di = 0; di < fl3.length; di++) if (fl3[di].debt) { delete fl3[di].debt; return true; }
+      return false;
+    }
+    if (key === 'setbackRecent') { s.recentSetback = 0; return true; }
     // 属性区间
     var MAP = { money: 'money', stamina: 'sta', mood: 'mood', intelligence: 'int', cha: 'cha', will: 'will', eq: 'eq', luck: 'luck' };
     if (MAP[key] && val && typeof val === 'object') {

@@ -2,12 +2,12 @@
 
 单文件网页人生模拟游戏（纯 HTML + CSS + JS，双击即玩）。
 
-- 版本：**v3.31.1（城市躺平红利 · 逃离北上广）**
+- 版本：**v3.32（朋友与社交网络）**
 - 日期：2026-10-31
 - 结构：`data.js`（纯数据）+ `engine.js`（核心引擎）+ `人间开发.html`（HTML/CSS/UI + 底部引入）
 - 主文件：`人间开发.html`（入口，需与 data.js / engine.js 同目录）
-- 上一版：**v3.31**（租房 · 通勤 · 城市流动）
-- 变更性质：**数值机制引导城市流动**（城市 moodBonus 躺平红利 + 北京亚健康 + 4 城市专属事件 + 引擎 city 条件规则 + 分层 Agent 状态驱动搬家）；回归 527/527；早逝 11.7% / 平凡 25.1% 双 PASS
+- 上一版：**v3.31.1**（城市躺平红利 · 逃离北上广）
+- 变更性质：**朋友与社交网络子系统**（friends 数组 + 组局聚会行动 + 10 朋友事件 + 4 朋友条件规则 + 好感度衰减/买醉查岗/搬家人走茶凉）；回归 527/527；早逝 9.7% / 平凡 24.1% 双 PASS
 - 历史冻结版：`历史版本/v1.0_核心引擎版.html`（137,842 字节 / `0d9137a117982b12274c97c20a6265a2`，保留不动）
 - 引擎备份：`v1.0.1_瑕疵修补版.html`（引擎 JS 与本版逐字节一致，可随时对比）
 - 各版本快照 `_bak_v*.html`：见桌面 `人间四季_Project/`（工作区只保留主文件与测试）
@@ -2562,6 +2562,53 @@ node tests/check_balance.js 1000 100
 ```
 
 北京从 98.2%（v3.31）→ 48.4%，鹤岗+县城从 0 → 25.2%，县城从 0 → 11.2%。「逃离北上广」剧本真正成立。
+
+---
+
+## v3.32 · 朋友与社交网络（2026-10-31）
+
+### 1. 状态扩展（引擎最小追加）
+
+- 新增 `friends: []`、`recentSetback: 0`，均进 sanitize 白名单。
+- `friends` 元素：`{ id, name, favor(0–100), tag, lastInteract, debt? }`。
+
+### 2. 社交获取
+
+- 新行动 `hangout` 组局聚会：花 500、心情 +15、30% 结识新朋友（16–18 岁交同学/发小，22+ 交同事/酒肉朋友）。
+
+### 3. 10 个朋友事件（三类）
+
+- 情绪价值：`E_FRIEND_DRINK` 深夜买醉（裁员/失恋/离婚后 + 好感≥60 → 心情+30；已婚 50% 查岗）、`E_FRIEND_PHONE` 深夜电话、`E_FRIEND_BIRTHDAY` 生日。
+- 利益冲突：`E_FRIEND_BORROW` 借钱 → 50% `E_FRIEND_REPAY` 还钱（+20）／50% `E_FRIEND_VANISH` 人间蒸发（损失 5000、好感归零、移除）；`E_FRIEND_GUARANTEE` 求担保。
+- 职场/利益：`E_FRIEND_REFER` 内推大厂、`E_FRIEND_BACKSTAB` 背刺、`E_FRIEND_PARTNER` 创业邀约。
+
+### 4. 引擎改动
+
+- `newState` +`friends`/`recentSetback`；`sanitize` +白名单；`monthlySettle` +`settleFriends()`。
+- `REQUIRE_RULES` 新增 4 条朋友规则：`friendFavor`/`friendTag`/`friendDebt`/`setbackRecent`（用户授权）。
+- `doLayoff`/`divorceNow`/`breakUp` 各 +1 行 `state.recentSetback = nowMonth()`（用户授权）。
+
+### 5. 状态联动
+
+- 好感度衰减：连续 3 个月没互动，每月 −2；favor 归 0 且非「发小」自动移除（发小永不移除）。
+- 买醉查岗：已婚 50% 概率配偶感情 −10、朋友好感 +5。
+- 搬家联动：`moveCityDecay()` 在搬家时把 `tag:'同事'` 的好友好感减半，30% 概率直接移除（人走茶凉）。
+
+### 6. 探针适配
+
+- `event_isolation`：`friendsOf`（含 repay/vanish 债变体）/`makeState`/`randomCfg`/`violate` 补朋友反证。
+- `稳定性测试` D4：`FRIENDS_VARIANTS` + `applyState`/随机扫描补 friends 采样。
+
+### 7. 测试
+
+```
+node tests/run.js → 527/527 · JS 错误 0 · 属性越界 0
+  事件穿透：270 事件（235 带条件，反证 727 处）穿透 0 · 断链 0 · 孤儿 0 · 死锁 0 · 环 0 · 漂移 0
+
+node tests/check_balance.js 1000 100
+  英年早逝 9.7%（3–15%）PASS · 平凡一生 24.1%（15–38%）PASS · 贫病 16.3%（信息项）
+  城市分布：北京 47.1% · 鹤岗 14.1% + 县城 9.3% = 23.4% · 长沙 14.2% · 成都 14.1%
+```
 
 ---
 

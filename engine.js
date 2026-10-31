@@ -376,6 +376,65 @@
         detail: '需要在「' + (names.length ? names.join(' / ') : list.join(' / ')) + '」（当前「' + cityName() + '」）',
         suffix: true
       };
+    },
+    // 朋友系统（v3.32）：四个朋友条件规则，全部纯追加
+    // ① 至少一个朋友好感度 ≥ N
+    friendFavor: function (v) {
+      var need = Number(v);
+      if (!isFinite(need)) return null;
+      var list = state.friends || [];
+      for (var i = 0; i < list.length; i++) {
+        if ((list[i].favor || 0) >= need) return null;
+      }
+      return {
+        key: 'friendFavor', title: '没有交心朋友',
+        detail: '需要至少一个好感度 ≥ ' + need + ' 的朋友',
+        suffix: true
+      };
+    },
+    // ② 有指定标签的朋友（true = 任意朋友）
+    friendTag: function (v) {
+      var list = state.friends || [];
+      if (v === true) {
+        if (list.length > 0) return null;
+        return { key: 'friendTag', title: '没有朋友', detail: '你现在一个朋友都没有', suffix: true };
+      }
+      var need = Array.isArray(v) ? v : [v];
+      for (var i = 0; i < list.length; i++) {
+        if (need.indexOf(list[i].tag) > -1) return null;
+      }
+      var label = { 发小: '发小', 同学: '同学', 室友: '室友', 同事: '同事', 酒肉朋友: '酒肉朋友' };
+      return {
+        key: 'friendTag', title: '缺少这种朋友',
+        detail: '需要「' + need.map(function (t) { return label[t] || t; }).join(' / ') + '」朋友',
+        suffix: true
+      };
+    },
+    // ③ 有一个借了钱（可选 outcome）的朋友
+    friendDebt: function (v) {
+      var list = state.friends || [];
+      for (var i = 0; i < list.length; i++) {
+        var d = list[i].debt;
+        if (!d) continue;
+        if (v === true) return null;
+        if (typeof v === 'string' && d.outcome === v) return null;
+      }
+      return {
+        key: 'friendDebt', title: '没有欠债的朋友',
+        detail: '需要有一个向你借过钱还没了结的朋友',
+        suffix: true
+      };
+    },
+    // ④ 最近 12 个月经历过裁员/失恋/离婚
+    setbackRecent: function (v) {
+      if (v !== true) return null;
+      var last = Number(state.recentSetback) || 0;
+      if (last && (nowMonth() - last) <= 12) return null;
+      return {
+        key: 'setbackRecent', title: '近期无挫折',
+        detail: '最近没有经历裁员、失恋或离婚',
+        suffix: true
+      };
     }
   };
 
@@ -540,6 +599,8 @@
       housing: 'home',    // v3.5.4：居住状态 home/dorm/rent/own（开局住家，上大学→dorm，工作→rent，买房→own）
       commute: 0,         // v3.31：通勤时长（分钟），由租房类型/买房决定；>60 每月扣心情/体力
       rentType: 'home',   // v3.31：租房类型 home/share/whole/suburb（决定房租系数与通勤）
+      friends: [],        // v3.32：朋友列表 [{ id, name, favor, tag, lastInteract, debt? }]
+      recentSetback: 0,   // v3.32：最近一次裁员/失恋/离婚的绝对月数（深夜买醉触发用），0=无
       isStudent: false,   // v3.7：在校生（本科/专科且 <22 岁），由规则动态判定
       /* --- 婚姻系统（v3.0）：全部为新增字段，旧档由 sanitize 补默认值 --- */
       married: false,        // 是否已婚
@@ -816,6 +877,7 @@
     markJobChange();
     addLog('danger', '【失业】你被公司无情优化了！当前失去收入来源。'
       + (reason ? '（' + reason + '）' : ''));
+    state.recentSetback = nowMonth();          // v3.32：记录挫折（深夜买醉触发）
     return true;
   }
 
@@ -929,6 +991,7 @@
     settleStocks();                              // v3.22：股票每月涨跌（只动 stockValue，不碰生活费/工资）
     settleHousing();                             // v3.31：租房/通勤每月结算（房租+通勤惩罚；函数体在 data.js，与 settleStocks 同款追加）
     settleCityWellbeing();                       // v3.31.1：城市心情红利/北京亚健康（函数体在 data.js）
+    settleFriends();                             // v3.32：朋友好感度衰减（函数体在 data.js）
     checkDisease();                              // v3.13：跨月疾病判定（只排队，弹窗交给 triggerMonthlyEvent）
   }
 
@@ -1022,6 +1085,7 @@
     addLog('danger', '【离婚】你和「' + ex + '」分开了（' + (kind || '协议') + '），分走 ' + lost
       + ' 元。心情上限回到 100。');
     clampStats();
+    state.recentSetback = nowMonth();          // v3.32：记录挫折（深夜买醉触发）
     return lost;
   }
 
@@ -1036,6 +1100,7 @@
     state.datingStart = 0;
     state.datingLove = 0;
     addLog('danger', '【分手】你和「' + ex + '」分开了。');
+    state.recentSetback = nowMonth();          // v3.32：记录挫折（深夜买醉触发）
     return true;
   }
 
@@ -2048,6 +2113,8 @@
       housing: (s.housing === 'dorm' || s.housing === 'rent' || s.housing === 'own') ? s.housing : 'home',   // v3.5.4：居住状态，旧档缺省 home；v3.31：+own 已买房
       commute: asInt(s.commute, 0, 0, 300),    // v3.31：通勤时长（分钟），旧档缺失 → 0
       rentType: (s.rentType === 'share' || s.rentType === 'whole' || s.rentType === 'suburb') ? s.rentType : 'home',   // v3.31：租房类型，旧档缺失 → home
+      friends: (typeof normalizeFriends === 'function') ? normalizeFriends(s.friends) : [],   // v3.32：朋友列表，旧档缺失 → []
+      recentSetback: asInt(s.recentSetback, 0, 0, 999999),   // v3.32：最近挫折月份，旧档缺失 → 0
       isStudent: (s.edu === '本科' || s.edu === '专科') && (Number(s.age) || 0) < 22,   // v3.7：在校生（读档时按学历+年龄回推）
       /* --- 婚姻系统字段（v3.0）--- */
       married: s.married === true,

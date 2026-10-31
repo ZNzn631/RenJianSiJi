@@ -611,8 +611,31 @@
       hideWhenLocked: true,
       requires: { money: { min: 5000 }, minAge: 18 },
       onRun: function () {
+        moveCityDecay();   // v3.32：人走茶凉，同事好友好感减半
         var ev = findEvent('E_MOVE_DEST');
         if (ev) openEvent(ev);   // 用事件选项当城市选择器（零新增 UI）
+      }
+    },
+    /* v3.32：组局聚会（花 500 心情+15，30% 结识新朋友） */
+    {
+      id: 'hangout',
+      name: '组局聚会',
+      description: '约上朋友吃顿饭、喝顿酒，热闹热闹。',
+      costDays: 1,
+      effects: { money: -500, mood: 15 },
+      displayEffects: { money: -500, mood: 15 },
+      hideWhenLocked: false,
+      requires: { money: { min: 500 }, minAge: 16 },
+      onRun: function () {
+        touchAllFriends();
+        if (Math.random() < 0.30) {
+          var age = getAge();
+          var tag = age <= 18 ? (Math.random() < 0.5 ? '发小' : '同学') : (Math.random() < 0.5 ? '同事' : '酒肉朋友');
+          var f = makeFriend(tag);
+          state.friends = state.friends || [];
+          state.friends.push(f);
+          addLog('event', '【朋友】聚会上你认识了新朋友「' + f.name + '」（' + tag + '）。');
+        }
       }
     }
   ];
@@ -6354,6 +6377,202 @@
         { label: '搬到郊区，通勤认了', effects: { mood: -5 }, result: '你搬去了燕郊，每天通勤两小时。', onChoose: function () { state.rentType = 'suburb'; state.commute = 90; } },
         { label: '咬牙续租，吃土也要住市区', effects: { money: -1500, mood: -8 }, result: '你续了租，卡里又少了一截。' }
       ]
+    },
+    /* ================= v3.32 朋友与社交网络（10 事件 · 三类） ================= */
+    {
+      id: 'E_FRIEND_DRINK',
+      title: '深夜买醉',
+      description: '你心里堵得慌。朋友看出你的不对劲，拉着你说：「走，喝酒去，天大的事明天再说。」',
+      weight: 5,
+      priority: true,
+      requires: { friendFavor: 60, setbackRecent: true, minAge: 18 },
+      options: [
+        {
+          label: '去，一醉方休',
+          effects: { mood: 30, stamina: -3 },
+          result: '你喝到后半夜，把委屈都吐了出来。朋友一直在旁边，没劝你，就陪着。',
+          onChoose: function () {
+            touchBestFriend();
+            if (state.married && Math.random() < 0.5) {
+              state.love = Math.max(0, (state.love || 0) - 10);
+              addLog('danger', '【查岗】' + (state.spouse || '另一半') + '打来电话查岗，你满身酒气，对方很不高兴（感情 -10）。');
+              var bf = bestFriend();
+              if (bf) { bf.favor = Math.min(100, (bf.favor || 0) + 5); addLog('event', '【朋友】朋友帮你圆了场（好感 +5）。'); }
+            }
+          }
+        },
+        {
+          label: '不去了，想一个人待着',
+          effects: { mood: 3, will: 2 },
+          result: '朋友没再坚持，只拍了拍你的肩。'
+        }
+      ]
+    },
+    {
+      id: 'E_FRIEND_PHONE',
+      title: '深夜电话',
+      description: '凌晨一点，手机震了。是朋友打来的，问你最近怎么样，说「就想听听你的声音」。',
+      weight: 4,
+      requires: { friendFavor: 50, mood: { max: 40 }, minAge: 16 },
+      options: [
+        { label: '接起来，聊到天亮', effects: { mood: 15, stamina: -2 }, result: '你们从过去聊到现在，天快亮时才挂电话。', onChoose: function () { touchBestFriend(); } },
+        { label: '挂断，明天再说', effects: { mood: -5 }, result: '你挂断了。第二天想回拨，又不知道从何说起。' }
+      ]
+    },
+    {
+      id: 'E_FRIEND_BIRTHDAY',
+      title: '朋友的生日',
+      description: '日历提醒你，今天是那位朋友的生日。',
+      weight: 4,
+      requires: { friendFavor: 40, minAge: 12 },
+      options: [
+        { label: '买个礼物送过去', effects: { money: -200, mood: 5 }, result: '朋友很惊喜，说你还记得。', onChoose: function () { var bf = bestFriend(); if (bf) { bf.favor = Math.min(100, (bf.favor || 0) + 10); touchFriend(bf); } } },
+        { label: '发条消息祝福', effects: { mood: 2 }, result: '你发了个红包过去，对方秒回「够意思」。', onChoose: function () { var bf = bestFriend(); if (bf) { bf.favor = Math.min(100, (bf.favor || 0) + 3); touchFriend(bf); } } }
+      ]
+    },
+    {
+      id: 'E_FRIEND_BORROW',
+      title: '朋友借钱',
+      description: '朋友吞吞吐吐地开口：「最近手头紧，能不能借我 5000 块，下个月就还。」',
+      weight: 5,
+      requires: { friendTag: true, money: { min: 5000 }, minAge: 18 },
+      options: [
+        {
+          label: '借给他',
+          effects: { money: -5000 },
+          result: '你把钱转了过去。他连声道谢。',
+          onChoose: function () {
+            var bf = bestFriend();
+            if (bf) { bf.debt = { amount: 5000, outcome: (Math.random() < 0.5 ? 'repay' : 'vanish') }; touchFriend(bf); }
+          }
+        },
+        {
+          label: '婉拒，最近也紧',
+          effects: { mood: -3 },
+          result: '朋友没再说什么，但你们之间似乎隔了点什么。',
+          onChoose: function () { var bf = bestFriend(); if (bf) { bf.favor = Math.max(0, (bf.favor || 0) - 10); touchFriend(bf); } }
+        }
+      ]
+    },
+    {
+      id: 'E_FRIEND_REPAY',
+      title: '朋友还钱',
+      description: '朋友如约把钱转给了你，还多转了个红包：「谢谢你当初拉了我一把。」',
+      weight: 3,
+      priority: true,
+      requires: { friendDebt: 'repay', minAge: 18 },
+      options: [
+        {
+          label: '收下，说声谢谢',
+          effects: { money: 5000, mood: 8 },
+          result: '你收下了。这份情，算是互相欠着了。',
+          onChoose: function () { var f = clearDebt('repay'); if (f) { f.favor = Math.min(100, (f.favor || 0) + 20); touchFriend(f); } }
+        }
+      ]
+    },
+    {
+      id: 'E_FRIEND_VANISH',
+      title: '人间蒸发',
+      description: '你打过去的电话，关机。发出去的消息，石沉大海。借出去的 5000 块，没了下文。',
+      weight: 3,
+      priority: true,
+      requires: { friendDebt: 'vanish', minAge: 18 },
+      options: [
+        {
+          label: '算了，认了',
+          effects: { mood: -10 },
+          result: '你把他从通讯录里删了。5000 块，买了个教训。',
+          onChoose: function () {
+            var f = clearDebt('vanish');
+            if (f) {
+              f.favor = 0;
+              var list = state.friends || [];
+              var idx = list.indexOf(f);
+              if (idx > -1) list.splice(idx, 1);
+              addLog('danger', '【朋友】「' + f.name + '」人间蒸发了，借出的 5000 打了水漂。');
+            }
+          }
+        }
+      ]
+    },
+    {
+      id: 'E_FRIEND_GUARANTEE',
+      title: '朋友求担保',
+      description: '朋友想做笔生意，找你帮忙做担保：「你就签个字，出不了事。」',
+      weight: 4,
+      requires: { friendFavor: 70, minAge: 22 },
+      options: [
+        {
+          label: '签字担保',
+          effects: { mood: -4 },
+          result: '你签了字。',
+          onChoose: function () {
+            var bf = bestFriend();
+            if (bf) { touchFriend(bf); if (Math.random() < 0.3) { state.money = Math.max(0, (state.money || 0) - 8000); bf.favor = Math.max(0, (bf.favor || 0) - 30); addLog('danger', '【担保】朋友生意黄了，你被连累赔了 8000 元（好感 -30）。'); } }
+          }
+        },
+        { label: '婉拒，这个忙帮不了', effects: { mood: -2 }, result: '朋友脸色有点难看，但没说什么。', onChoose: function () { var bf = bestFriend(); if (bf) { bf.favor = Math.max(0, (bf.favor || 0) - 8); touchFriend(bf); } } }
+      ]
+    },
+    {
+      id: 'E_FRIEND_REFER',
+      title: '朋友内推',
+      description: '同事朋友跳槽去了大厂，拍着胸脯说：「我把你内推过去，比现在翻一倍。」',
+      weight: 4,
+      priority: true,
+      requires: { friendTag: '同事', friendFavor: 70, job: '普通程序员', minAge: 22 },
+      options: [
+        {
+          label: '接受内推',
+          effects: { mood: 6 },
+          result: '你更新了简历，紧张又期待。',
+          onChoose: function () {
+            var bf = bestFriend(); if (bf) touchFriend(bf);
+            if (state.job === '普通程序员') {
+              state.job = '大厂程序员';
+              state.salary = JOBS['大厂程序员'] ? JOBS['大厂程序员'].salary : 20000;
+              state.totalWorkYears = 0;
+              state.currentPositionYears = 0;
+              markJobChange();
+              addLog('event', '【内推】你成功入职大厂，月薪 ' + state.salary + '。');
+            }
+          }
+        },
+        { label: '婉拒，现在挺好', effects: { mood: -2 }, result: '朋友说「机会难得啊」，你没再说话。', onChoose: function () { var bf = bestFriend(); if (bf) { bf.favor = Math.max(0, (bf.favor || 0) - 5); touchFriend(bf); } } }
+      ]
+    },
+    {
+      id: 'E_FRIEND_BACKSTAB',
+      title: '同事背刺',
+      description: '你熬了三个通宵的方案，会上被那个「朋友」抢了功。老板夸的是他。',
+      weight: 4,
+      requires: { friendTag: '同事', minAge: 22, employed: true },
+      options: [
+        { label: '当面对质', effects: { mood: -15 }, result: '他支支吾吾，说「下次带你」。你冷笑，心凉透了。', onChoose: function () { var bf = bestFriend(); if (bf) { bf.favor = 0; touchFriend(bf); } } },
+        { label: '忍了，山水有相逢', effects: { mood: -8, will: 3 }, result: '你记下了这笔账，也看清了一个人。', onChoose: function () { var bf = bestFriend(); if (bf) { bf.favor = Math.max(0, (bf.favor || 0) - 20); touchFriend(bf); } } }
+      ]
+    },
+    {
+      id: 'E_FRIEND_PARTNER',
+      title: '创业邀约',
+      description: '朋友兴冲冲地找你：「咱俩合伙干一票！就缺你这 2 万块启动资金。」',
+      weight: 4,
+      requires: { friendFavor: 75, money: { min: 20000 }, minAge: 24 },
+      options: [
+        {
+          label: '合伙，拼一把',
+          effects: { money: -20000, mood: 5 },
+          result: '你把积蓄打了过去，心里又兴奋又发虚。',
+          onChoose: function () {
+            var bf = bestFriend();
+            if (!bf) return;
+            touchFriend(bf);
+            if (Math.random() < 0.5) { state.money += 40000; bf.favor = Math.min(100, (bf.favor || 0) + 15); addLog('event', '【创业】半年后项目成了，你分到 4 万，和朋友关系更铁了。'); }
+            else { bf.favor = Math.max(0, (bf.favor || 0) - 25); addLog('danger', '【创业】项目黄了，2 万块打了水漂，朋友也躲着你了（好感 -25）。'); }
+          }
+        },
+        { label: '婉拒，风险太大', effects: { mood: -3 }, result: '朋友说你「没胆」，悻悻走了。', onChoose: function () { var bf = bestFriend(); if (bf) { bf.favor = Math.max(0, (bf.favor || 0) - 10); touchFriend(bf); } } }
+      ]
     }
   ];
 
@@ -6502,6 +6721,95 @@
       clampStats();
       addLog('danger', '【北京】高强度通勤与加班，身体在透支（体力 -1）。');
     }
+  }
+
+  /* ================= [数据层] v3.32 朋友与社交网络 ================= */
+  var FRIEND_SURNAME = ['林', '沈', '周', '许', '苏', '程', '叶', '陈', '温', '江', '顾', '陆'];
+  var FRIEND_GIVEN = ['晓宇', '子墨', '一凡', '嘉树', '安然', '沐晴', '北辰', '思远', '若曦', '亦辰', '清越', '南乔'];
+  var FRIEND_TAG_INIT = { 发小: 70, 同学: 50, 室友: 50, 同事: 40, 酒肉朋友: 40 };
+  var FRIEND_DECAY_MONTHS = 3;   // 连续 N 个月没互动开始衰减
+  var FRIEND_DECAY_AMOUNT = 2;   // 每月衰减量
+
+  function makeFriend(tag) {
+    var list = state.friends || [];
+    var name = FRIEND_SURNAME[Math.floor(Math.random() * FRIEND_SURNAME.length)]
+      + FRIEND_GIVEN[Math.floor(Math.random() * FRIEND_GIVEN.length)];
+    return {
+      id: 'f' + (list.length + 1), name: name,
+      favor: FRIEND_TAG_INIT[tag] || 40, tag: tag,
+      lastInteract: nowMonth()
+    };
+  }
+  function touchFriend(f) { if (f) f.lastInteract = nowMonth(); }
+  function touchAllFriends() {
+    var list = state.friends || [];
+    for (var i = 0; i < list.length; i++) list[i].lastInteract = nowMonth();
+  }
+  function bestFriend() {
+    var list = state.friends || [];
+    var best = null, max = -1;
+    for (var i = 0; i < list.length; i++) {
+      if ((list[i].favor || 0) > max) { max = list[i].favor || 0; best = list[i]; }
+    }
+    return best;
+  }
+  function touchBestFriend() { touchFriend(bestFriend()); }
+  function clearDebt(outcome) {
+    var list = state.friends || [];
+    for (var i = 0; i < list.length; i++) {
+      var d = list[i].debt;
+      if (d && d.outcome === outcome) { delete list[i].debt; return list[i]; }
+    }
+    return null;
+  }
+  function settleFriends() {
+    var list = state.friends || [];
+    var now = nowMonth();
+    for (var i = list.length - 1; i >= 0; i--) {
+      var f = list[i];
+      if (!f) { list.splice(i, 1); continue; }
+      if (now - (f.lastInteract || now) >= FRIEND_DECAY_MONTHS) {
+        f.favor = Math.max(0, (f.favor || 0) - FRIEND_DECAY_AMOUNT);
+        if (f.favor <= 0 && f.tag !== '发小') {
+          addLog('sys', '【朋友】你和「' + f.name + '」慢慢断了联系。');
+          list.splice(i, 1);
+        }
+      }
+    }
+  }
+  function moveCityDecay() {
+    var list = state.friends || [];
+    for (var i = list.length - 1; i >= 0; i--) {
+      var f = list[i];
+      if (f.tag !== '同事') continue;
+      f.favor = Math.floor((f.favor || 0) / 2);
+      if (f.favor <= 0 || Math.random() < 0.3) {
+        addLog('sys', '【朋友】你搬走了，和「' + f.name + '」渐渐断了联系（人走茶凉）。');
+        list.splice(i, 1);
+      } else {
+        addLog('sys', '【朋友】你搬走了，和「' + f.name + '」的联系淡了（好感减半）。');
+      }
+    }
+  }
+  function normalizeFriends(raw) {
+    if (!Array.isArray(raw)) return [];
+    var out = [];
+    for (var i = 0; i < raw.length; i++) {
+      var f = raw[i];
+      if (!f || typeof f !== 'object') continue;
+      var rec = {
+        id: (typeof f.id === 'string' && f.id) ? f.id : 'f' + (out.length + 1),
+        name: (typeof f.name === 'string' && f.name) ? f.name : '朋友',
+        favor: Math.max(0, Math.min(100, Math.round(Number(f.favor) || 0))),
+        tag: (typeof f.tag === 'string' && f.tag) ? f.tag : '朋友',
+        lastInteract: Math.max(0, Math.round(Number(f.lastInteract) || 0))
+      };
+      if (f.debt && typeof f.debt === 'object') {
+        rec.debt = { amount: Math.max(0, Math.round(Number(f.debt.amount) || 0)), outcome: f.debt.outcome === 'vanish' ? 'vanish' : 'repay' };
+      }
+      out.push(rec);
+    }
+    return out;
   }
 
   // 学历阶梯：minEdu 按这里的顺序比较高低
