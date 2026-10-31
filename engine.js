@@ -341,6 +341,12 @@
         return { key: 'notSummerBreak', title: '暑假过渡期', detail: '刚高考完还没开学，校园生活尚未开始', suffix: true };
       }
       return null;
+    },
+    // 未购买医保（v3.13）：购买医保行动用，已买则锁定
+    noInsurance: function (v) {
+      if (v !== true) return null;
+      if (!state.hasInsurance) return null;
+      return { key: 'noInsurance', title: '已购买', detail: '你已经买过医疗保险了', suffix: true };
     }
   };
 
@@ -510,6 +516,7 @@
       enteredCollegeMonth: 0,// v3.7：考入大学的绝对月数（懒初始化）
       summerBreakEnd: 0,     // v3.7：暑假结束的绝对月数
       firstSalary: false,    // v3.7：是否已触发「第一笔工资」
+      hasInsurance: false,   // v3.13：是否已购买医疗保险
       spouse: '',            // 配偶名字
       marriedAt: 0,          // 结婚绝对月数（y*12+m）
       love: 50,              // 感情值 0-100
@@ -823,6 +830,7 @@
       addLog('sys', '【养老金】这个月到账 ' + PENSION + ' 元。');
     }
     if (state.married || (state.children && state.children.length)) settleFamily();   // v3.1：已婚或有孩子都要家庭月结
+    checkDisease();                              // v3.13：跨月疾病判定（只排队，弹窗交给 triggerMonthlyEvent）
   }
 
   // 年终奖：月薪 × (1 + 总工龄×0.2)，最多 3 个月
@@ -1366,6 +1374,58 @@
     if ((state.hospitalCount || 0) >= HOSPITAL_DEATH) endLife('health');   // 累计负债住院达到阈值才猝死
   }
 
+  /* ================= [引擎层] 疾病与医疗系统（v3.13） ================= */
+  var DISEASE_CHANCE = 0.10;          // 每次跨月、符合条件的得病概率
+  var pendingDisease = null;          // 待弹出的疾病事件（与 pendingEvent 互斥）
+
+  // 符合条件的疾病：年龄达标 + 体质低于阈值
+  function eligibleDiseases() {
+    var age = getAge();
+    var out = [];
+    for (var i = 0; i < diseasesData.length; i++) {
+      var d = diseasesData[i];
+      if (age >= d.minAge && state.sta < d.healthLimit) out.push(d);
+    }
+    return out;
+  }
+
+  // 构造疾病事件（复用事件弹窗机制）
+  function buildDiseaseEvent(d) {
+    var pay = state.hasInsurance ? Math.round(d.cost * 0.2) : d.cost;
+    return {
+      id: 'DISEASE_' + d.id,
+      title: '生病了：' + d.name,
+      description: '你最近总觉得不舒服，去医院检查后确诊「' + d.name + '」。'
+        + (state.hasInsurance ? '（有医保，治疗费打 2 折）' : ''),
+      options: [
+        {
+          label: '去医院治病（¥' + pay + '）',
+          meta: '治疗费',
+          effects: { money: -pay, stamina: 2 },
+          result: '你住院治疗了几天，身体慢慢好转。'
+        },
+        {
+          label: '硬扛过去',
+          meta: '体质 -' + d.damage,
+          effects: { stamina: -d.damage },
+          result: '你没去医院，硬扛着，身体更差了。',
+          onChoose: function () { if (state.sta <= 0) hospitalize(); }
+        }
+      ]
+    };
+  }
+
+  // 跨月疾病判定：只在无待处理事件时进行，得病则排队
+  function checkDisease() {
+    if (state.ended) return;
+    if (pendingEvent || pendingDisease) return;   // 已有事件不叠加
+    var list = eligibleDiseases();
+    if (!list.length) return;
+    if (eventRoll() >= DISEASE_CHANCE) return;    // 90% 不得病
+    var d = list[Math.floor(eventRoll() * list.length)];
+    pendingDisease = buildDiseaseEvent(d);
+  }
+
   /* ================= [引擎层] 事件系统 ================= */
   /* ---- 教育系统运行时（v2.8） ---- */
   var examOpen = false;                          // 弹窗期间冻结时间（保险 3）
@@ -1664,6 +1724,12 @@
   function triggerMonthlyEvent() {
     if (state.ended) return;                   // 人生已结束：不再抽事件
     if (pendingEvent) return;                  // 已有未处理的事件就不叠加
+    if (pendingDisease) {                      // v3.13：疾病优先于常规随机事件
+      var dis = pendingDisease;
+      pendingDisease = null;
+      openEvent(dis);
+      return;
+    }
     var ev = pickEvent();
     if (!ev) return;                           // 没有符合条件的事件就这月无事
 
@@ -1867,6 +1933,7 @@
       enteredCollegeMonth: asInt(s.enteredCollegeMonth, 0, 0, 999999),
       summerBreakEnd: asInt(s.summerBreakEnd, 0, 0, 999999),
       firstSalary: s.firstSalary === true,               // v3.7
+      hasInsurance: s.hasInsurance === true,             // v3.13
       spouse: typeof s.spouse === 'string' ? s.spouse.slice(0, 12) : '',
       marriedAt: asInt(s.marriedAt, 0, 0, 999999),
       love: asInt(s.love, 50, 0, 100),

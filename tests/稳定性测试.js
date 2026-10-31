@@ -13,6 +13,7 @@
   function $(id) { return document.getElementById(id); }
   function S() { return RJS.state; }
   var PRISTINE = JSON.parse(JSON.stringify(RJS.state));
+  PRISTINE.talents = [];   // 隔离随机天赋（含负面），避免属性断言受随机抽卡影响
 
   function restore(src) {
     // 引擎没暴露清理接口：有残留事件/未结算考核时，用「重新开始」把 pendingEvent/examOpen 清干净
@@ -171,7 +172,7 @@
   /* ================= B8. 新增【社交】行动 ================= */
   (function social() {
     var act = RJS.actions.filter(function (a) { return a.id === 'social'; })[0];
-    ok('B8 社交行动已注册（共 ' + RJS.actions.length + ' 个行动）', !!act && RJS.actions.length === 19,
+    ok('B8 社交行动已注册（共 ' + RJS.actions.length + ' 个行动）', !!act && RJS.actions.length === 20,
       act ? 'costDays=' + act.costDays : '缺 social');
     if (!act) return;
     restore(PRISTINE);
@@ -513,7 +514,7 @@
 
     // 陪伴行动
     var comp = RJS.actions.filter(function (a) { return a.id === 'companion'; })[0];
-    ok('L4 陪伴已注册（共 ' + RJS.actions.length + ' 个行动）', !!comp && RJS.actions.length === 19, RJS.actions.length);
+    ok('L4 陪伴已注册（共 ' + RJS.actions.length + ' 个行动）', !!comp && RJS.actions.length === 20, RJS.actions.length);
     restore(PRISTINE); S().age = 30;
     ok('L5 单身也能陪伴（不再锁已婚）', RJS.checkRequires(comp).length === 0, '');
     restore(PRISTINE); S().age = 30; S().married = true; S().spouse = '林晓'; S().love = 50; S().money = 5000;
@@ -825,7 +826,7 @@
       alive: true, support: 0, supportDone: false, hasChild: false, lastGrow: kc.y * 12 + kc.m }];
     kc.kids = 1;
     var kact = RJS.actions.filter(function (a) { return a.id === 'kidcare'; })[0];
-    ok('M17 陪孩子已注册（共 ' + RJS.actions.length + ' 个行动）', !!kact && RJS.actions.length === 19, RJS.actions.length);
+    ok('M17 陪孩子已注册（共 ' + RJS.actions.length + ' 个行动）', !!kact && RJS.actions.length === 20, RJS.actions.length);
     S().d = 10;                                     // 固定非月末，避免跨月结算干扰
     var kb = { money: S().money, mood: S().mood, rel: S().children[0].relation };
     RJS.doAction('kidcare');

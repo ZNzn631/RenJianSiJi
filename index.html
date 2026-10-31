@@ -2331,12 +2331,16 @@
       for (var i = 0; i < kids.length && i < 3; i++) parts.push(kids[i].name + ' ' + childAge(kids[i]) + ' 岁');
       kidText = ' · 子女 ' + parts.join('、');
     }
+    var insText = state.hasInsurance ? ' · 🏥 医保已生效' : '';
     if (state.married) {
       box.hidden = false;
-      $('familyText').textContent = state.spouse + ' · 感情 ' + state.love + ' / 100' + kidText;
+      $('familyText').textContent = state.spouse + ' · 感情 ' + state.love + ' / 100' + kidText + insText;
     } else if (kids.length) {
       box.hidden = false;
-      $('familyText').textContent = (state.divorceCount > 0 ? '离异 ' : '单身 ') + kidText.replace(' · 子女 ', '子女 ');
+      $('familyText').textContent = (state.divorceCount > 0 ? '离异 ' : '单身 ') + kidText.replace(' · 子女 ', '子女 ') + insText;
+    } else if (state.hasInsurance) {
+      box.hidden = false;
+      $('familyText').textContent = '🏥 医保已生效' + (state.divorceCount > 0 ? ' · 离异' : '');
     } else if (state.divorceCount > 0) {
       box.hidden = false;
       $('familyText').textContent = '离异 ' + state.divorceCount + ' 次 · 心情上限 ' + moodMaxOf();
