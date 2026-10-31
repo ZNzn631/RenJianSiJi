@@ -1767,8 +1767,8 @@
       RJS.openEventById('E_STOCK_TIP');
       var opt2 = optionByText('全仓梭哈');
       if (opt2) opt2.click();
-      ok('S11 运气 200（≥150）梭哈 → 现金只扣 5 万，不蒸发',
-        S().money === 50000 && S().stockValue === 50000,
+      ok('S11 运气 200（≥150）梭哈 → 现金只扣 5 万，持仓翻倍',
+        S().money === 50000 && S().stockValue === 100000,
         'money=' + S().money + ' stock=' + S().stockValue);
       $('eventMask').hidden = true;
 

@@ -5502,7 +5502,9 @@
               addLog('danger', '【股灾】内幕消息是假的！现金蒸发 80%（剩 ' + state.money + ' 元），'
                 + (state.money < 0 ? '你负债了。' : '心情跌到 ' + state.mood + '。'));
             } else {
-              addLog('event', '【股票】内幕应验，加仓 50000 元，市值 ' + state.stockValue + ' 元。');
+              var tipBefore = state.stockValue || 0;
+              state.stockValue = Math.round((state.stockValue || 0) * 2);   // 极小概率：内幕应验，梭哈押中 → 持仓翻倍
+              addLog('event', '【股票】内幕是真的！梭哈押中，持仓翻倍：' + tipBefore + ' → ' + state.stockValue + ' 元。');
             }
           }
         },
