@@ -503,7 +503,56 @@
     { talent_id: 'T_BODY',    name: '体魄强健', category: '体质', type: '先天', max_level: 3,
       level_effect: { stat_gain: { sta: 1 } } },
     { talent_id: 'T_IRON',    name: '心志如铁', category: '心志', type: '先天', max_level: 3,
-      level_effect: { stat_gain: { will: 1 } } }
+      level_effect: { stat_gain: { will: 1 } } },
+
+    /* ===== v3.11 扩充：20 个新天赋（5 极品 / 5 负面 / 10 普通）=====
+       红线：只使用现有 level_effect 字段（learning_speed / work_money / event_luck / mood_recover / stat_gain）。
+       注意：引擎 applyTalentGain 对负数「只加不减」，目前真正生效的负数是 work_money（工资倍率）。 */
+    // ── 极品（5）──
+    { talent_id: 'T_PRODIGY',    name: '天生神童', category: '智力', type: '先天', max_level: 3,
+      level_effect: { learning_speed: 1.0 } },
+    { talent_id: 'T_LUCK_GOD',   name: '天选之子', category: '运气', type: '先天', max_level: 3,
+      level_effect: { event_luck: 1.0 } },
+    { talent_id: 'T_MONEY_KING', name: '财神爷',   category: '商业', type: '先天', max_level: 3,
+      level_effect: { work_money: 1.0 } },
+    { talent_id: 'T_IRON_BODY',  name: '天生神力', category: '体质', type: '先天', max_level: 3,
+      level_effect: { stat_gain: { sta: 3 } } },
+    { talent_id: 'T_ALLROUND',   name: '全才',     category: '智力', type: '先天', max_level: 3,
+      level_effect: { learning_speed: 0.5, mood_recover: 0.5 } },
+
+    // ── 负面（5）：真属性减益（v3.12 引擎已支持负数生效）──
+    { talent_id: 'T_SICKLY',     name: '病秧子',   category: '体质', type: '先天', max_level: 3,
+      level_effect: { stat_gain: { sta: -20 } } },
+    { talent_id: 'T_LOST',       name: '路痴',     category: '心情', type: '先天', max_level: 3,
+      level_effect: { mood_recover: -0.5 } },
+    { talent_id: 'T_UNLUCKY',    name: '倒霉蛋',   category: '运气', type: '先天', max_level: 3,
+      level_effect: { stat_gain: { luck: -20 } } },
+    { talent_id: 'T_SHOPAHOLIC', name: '剁手党',   category: '商业', type: '先天', max_level: 3,
+      level_effect: { stat_gain: { eq: -10 } } },
+    { talent_id: 'T_LAZY',       name: '懒癌',     category: '心志', type: '先天', max_level: 3,
+      level_effect: { stat_gain: { will: -20 } } },
+
+    // ── 普通（10）──
+    { talent_id: 'T_READER',  name: '书虫',   category: '智力', type: '先天', max_level: 3,
+      level_effect: { learning_speed: 0.2 } },
+    { talent_id: 'T_NOTE',    name: '速记',   category: '智力', type: '先天', max_level: 3,
+      level_effect: { stat_gain: { int: 1 } } },
+    { talent_id: 'T_SALES',   name: '推销员', category: '商业', type: '先天', max_level: 3,
+      level_effect: { work_money: 0.2 } },
+    { talent_id: 'T_SAVER',   name: '会攒钱', category: '商业', type: '先天', max_level: 3,
+      level_effect: { work_money: 0.15 } },
+    { talent_id: 'T_BLESS',   name: '小福星', category: '运气', type: '先天', max_level: 3,
+      level_effect: { event_luck: 0.2 } },
+    { talent_id: 'T_CALM',    name: '淡定',   category: '心情', type: '先天', max_level: 3,
+      level_effect: { mood_recover: 0.2 } },
+    { talent_id: 'T_CHARM',   name: '亲和力', category: '魅力', type: '先天', max_level: 3,
+      level_effect: { mood_recover: 0.15 } },
+    { talent_id: 'T_STRONG',  name: '壮实',   category: '体质', type: '先天', max_level: 3,
+      level_effect: { stat_gain: { sta: 1 } } },
+    { talent_id: 'T_FOCUS',   name: '专注',   category: '心志', type: '先天', max_level: 3,
+      level_effect: { stat_gain: { will: 1 } } },
+    { talent_id: 'T_SMOOTH',  name: '会来事', category: '情商', type: '先天', max_level: 3,
+      level_effect: { stat_gain: { eq: 1 } } }
   ];
 
   /* ================= [引擎层] 教育系统（v2.8） ================= */

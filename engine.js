@@ -650,14 +650,14 @@
       var g = gains[k];
       if (g <= 0) continue;
       var extra = g * (talentMul(mulMap[k]) - 1);
-      if (extra > 0) state[k] += extra;
+      if (extra !== 0) state[k] += extra;   // v3.12：允许负数（负面天赋）生效
     }
     var keys = ['int', 'sta', 'cha', 'will', 'eq', 'luck'];
     for (var i = 0; i < keys.length; i++) {
       var key = keys[i];
       if (gains[key] <= 0) continue;
       var add = talentStatGain(key);
-      if (add > 0) state[key] += add;
+      if (add !== 0) state[key] += add;   // v3.12：允许负数（负面天赋）生效
     }
     clampStats();
   }
