@@ -98,7 +98,7 @@
       title: '网恋奔现',
       description: '聊了半年的那个人终于约你见面，地点是城西的一家咖啡馆。',
       weight: 4,
-      requires: { onceEver: true, single: true, notTeenLove: true, loveState: 'single', minAge: 18, maxAge: 25 },   // v3.7：未婚、单身、且没早恋过才网恋
+      requires: { onceEver: true, notTeenLove: true, loveState: 'single', minAge: 18, maxAge: 25 },   // v3.7：未婚、单身、且没早恋过才网恋
       options: [
         {
           label: '盛装赴约',
@@ -501,7 +501,7 @@
       description: '过年回家，三姑六婆围坐一圈：「都快三十了，还一个人？」你妈把手机推到你面前，上面是一张照片。',
       weight: 6,
       priority: true,
-      requires: { onceEver: true, single: true, loveState: 'single', minAge: MARRY_URGE_AGE, maxAge: 40, marryCooldown: MARRY_COOLDOWN },   // v3.7：单身态才催婚
+      requires: { onceEver: true, loveState: 'single', minAge: MARRY_URGE_AGE, maxAge: 40, marryCooldown: MARRY_COOLDOWN },   // v3.7：单身态才催婚
       options: [
         {
           label: '去见一面',
@@ -521,7 +521,7 @@
       title: '相亲',
       description: '咖啡馆靠窗的位置，对方比照片上瘦一点。你们从工作聊到房子，从房子聊到以后想要几个孩子。',
       weight: 6,
-      requires: { single: true, loveState: 'single', minAge: MARRY_MIN_AGE, maxAge: 45, marryCooldown: MARRY_COOLDOWN },   // v3.7：单身态才相亲
+      requires: { loveState: 'single', minAge: MARRY_MIN_AGE, maxAge: 45, marryCooldown: MARRY_COOLDOWN },   // v3.7：单身态才相亲
       options: [
         {
           label: '认真打扮，提前半小时到',
@@ -602,7 +602,7 @@
       title: '旧情复燃',
       description: '同学会上，你看见了当年那个人。散场时对方说：「顺路，送你一段。」',
       weight: 5,
-      requires: { onceEver: true, single: true, loveState: 'single', minAge: MARRY_MIN_AGE, maxAge: 34, cha: { min: 45 }, marryCooldown: MARRY_COOLDOWN },   // v3.7：单身态才旧情复燃
+      requires: { onceEver: true, loveState: 'single', minAge: MARRY_MIN_AGE, maxAge: 34, cha: { min: 45 }, marryCooldown: MARRY_COOLDOWN },   // v3.7：单身态才旧情复燃
       options: [
         {
           label: '把当年没说完的话说完',
@@ -1682,7 +1682,7 @@
       title: '职场邂逅',
       description: '公司来了新人，工位正好在你旁边。TA 转过头问你打印机怎么用，你忽然忘了自己刚才在做什么。',
       weight: 7,
-      requires: { onceEver: true, loveState: 'single', single: true, minAge: 22, maxAge: 45, job: 'not_null' },
+      requires: { onceEver: true, loveState: 'single', minAge: 22, maxAge: 45, job: 'not_null' },
       options: [
         {
           label: '主动带 TA 熟悉一圈',
@@ -1702,7 +1702,7 @@
       title: '朋友组局',
       description: '周末被拉去玩剧本杀。昏暗的灯下你和一个陌生人拼车，搜证的时候配合得像排练过。',
       weight: 7,
-      requires: { onceEver: true, loveState: 'single', single: true, minAge: 22, maxAge: 40 },
+      requires: { onceEver: true, loveState: 'single', minAge: 22, maxAge: 40 },
       options: [
         {
           label: '散场时加个微信',
@@ -1722,7 +1722,7 @@
       title: '咖啡店偶遇',
       description: '你在角落看书，一个人转身时把整杯美式泼在了你外套上。对方慌得连道歉都说不利索。',
       weight: 7,
-      requires: { onceEver: true, loveState: 'single', single: true, minAge: 22, maxAge: 45 },
+      requires: { onceEver: true, loveState: 'single', minAge: 22, maxAge: 45 },
       options: [
         {
           label: '笑着说没关系，请 TA 喝一杯',
@@ -1742,7 +1742,7 @@
       title: '右滑',
       description: '交友软件推来一个人，照片拍得一般，简介却写得认真：「周末通常在家做饭，会做得比较慢。」',
       weight: 6,
-      requires: { onceEver: true, loveState: 'single', single: true, minAge: 22, maxAge: 40, cha: { min: 20 } },
+      requires: { onceEver: true, loveState: 'single', minAge: 22, maxAge: 40, cha: { min: 20 } },
       options: [
         {
           label: '认真聊一周，再约见面',
@@ -1768,7 +1768,7 @@
       title: '久别重逢',
       description: '地铁口有人喊了你的名字。你回头，看见一个很久没联系、却一眼就认出来的人。',
       weight: 5,
-      requires: { onceEver: true, loveState: 'single', single: true, minAge: 24, maxAge: 45 },
+      requires: { onceEver: true, loveState: 'single', minAge: 24, maxAge: 45 },
       options: [
         {
           label: '一起吃个饭，聊聊这些年',
@@ -2197,7 +2197,7 @@
       title: '久违的消息',
       description: '一个很久没说话的头像忽然亮了一下：「最近还好吗。」你盯着那五个字，看了很久。',
       weight: 3,
-      requires: { onceEver: true, loveState: 'single', single: true, minAge: 24, maxAge: 45 },
+      requires: { onceEver: true, loveState: 'single', minAge: 24, maxAge: 45 },
       options: [
         {
           label: '去见一面',

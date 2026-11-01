@@ -42,6 +42,7 @@
       title: '第一笔工资',
       description: '工资到账了，短信弹出来的那一下，你在公司楼下的便利店站了很久。',
       weight: 3,
+      priority: true,
       requires: { employed: true, minAge: 18, maxAge: 28, onceEver: true },
       options: [
         {

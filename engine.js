@@ -989,12 +989,12 @@
 
     // 有工作：月底发薪，顺带消耗体质与心情
     if (state.salary > 0) {
-      var pay = Math.round(state.salary * talentMul('work_money') * cityFactors().salary);   // 天赋：工资倍率 × 城市工资系数
+      var pay = Math.round(state.salary * talentMul('work_money') * cityFactors().salary * 0.92);   // v3.34：天赋工资倍率 × 城市系数 ×（1−8% 社保）
       state.money += pay;
       if (state.sta >= 5) state.sta += PAY_STAMINA;
       state.mood += PAY_MOOD;
       clampStats();
-      addLog('month', '【发薪日】你获得了工资 ' + pay + ' 元，上班让你有些疲惫');
+      addLog('month', '【发薪日】你获得了工资 ' + pay + ' 元（已扣 8% 社保），上班让你有些疲惫');
       SoundFX.play('coin');                              // v3.5：发薪成功播金币音效
     }
 
@@ -1035,7 +1035,7 @@
 
   // 年终奖：月薪 × (1 + 总工龄×0.2)，最多 3 个月
   function yearEndBonus() {
-    var months = Math.min(3, 1 + state.totalWorkYears * 0.2);
+    var months = Math.max(1, Math.min(3, 1 + state.totalWorkYears * 0.2));   // v3.34：年终奖基数 ≥1 个月工资，封顶 3 个月
     return Math.round(state.salary * months * cityFactors().salary);
   }
 

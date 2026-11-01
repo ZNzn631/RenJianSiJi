@@ -3,6 +3,19 @@
   /* ================= school 事件数据 ================= */
   var schoolEvents = [
     {
+      id: 'E_GRAD_CEREMONY',
+      title: '毕业典礼',
+      description: '校长把毕业证递到你手里，学士帽往天上一抛。四年的时光，在这一刻盖了章。',
+      weight: 8,
+      priority: true,
+      requires: { onceEver: true, minEdu: '本科', minAge: 22, maxAge: 24, isStudent: false },   // v3.34：本科毕业（22-24 岁、非在校）才办毕业典礼
+      options: [
+        { label: '拍下这珍贵的一刻', effects: { mood: 12 }, result: '你举着毕业证，笑得像个孩子。' },
+        { label: '和老师同学一一告别', effects: { mood: 8, eq: 2 }, result: '你说「常联系」，转身红了眼眶。' },
+        { label: '站在校门口，看人来人往', effects: { mood: 6, will: 3 }, result: '你站了很久，然后转身，走向下一段人生。' }
+      ]
+    },
+    {
       id: 'E_GRAD_CHOICE',
       title: '毕业抉择',
       description: '毕业典礼那天，三份东西摆在你桌上：大厂的 offer、考研报名表、老家的公务员招考简章。',
@@ -72,7 +85,7 @@
       title: '考研上岸',
       description: '分数出来了，你比分数线高了三十多分。导师的邮件躺在收件箱里，标题是「欢迎」。',
       weight: 3,
-      requires: { onceEver: true, education: ['本科'], intelligence: { min: 151 }, minAge: 22, maxAge: 26 },   // v3.7：22 岁 + 本科学历才能考研（18 岁在校生不可）
+      requires: { onceEver: true, education: ['本科'], isStudent: true, intelligence: { min: 151 }, minAge: 20 },   // v3.34：在校本科（<22 岁）才能考研上岸，毕业后不可
       options: [
         {
           label: '报名冲刺',
@@ -159,7 +172,7 @@
       title: '初恋',
       description: '她在图书馆靠窗的位置看书，阳光落在书页上。你走过去的手心全是汗。',
       weight: 5,
-      requires: { onceEver: true, single: true, notTeenLove: true, loveState: 'single', minAge: 18, maxAge: 25 },   // v3.7：单身态且未早恋才触发初恋
+      requires: { onceEver: true, notTeenLove: true, loveState: 'single', minAge: 18, maxAge: 25 },   // v3.7：单身态且未早恋才触发初恋
       options: [
         {
           label: '走过去表白',
@@ -202,7 +215,7 @@
       title: '第一次约会',
       description: '约在周六下午三点，商场门口。你提前一小时到了，反复照橱窗里的自己。',
       weight: 3,
-      requires: { onceEver: true, single: true, loveState: 'single', minAge: 18, maxAge: 25 },   // v3.7：单身态才约会
+      requires: { onceEver: true, loveState: 'single', minAge: 18, maxAge: 25 },   // v3.7：单身态才约会
       options: [
         { label: '认真准备，花了心思', effects: { money: -350, mood: 14 }, result: '那天的照片你一直留着。' },
         { label: '穿平时的衣服就去了', effects: { mood: -6 }, result: '她没说什么，但全程都在看手机。' }
@@ -268,7 +281,7 @@
       title: '学费',
       description: '缴费通知贴在班群置顶。一次性交清可以打折，分期要多付两百。',
       weight: 3,
-      requires: { money: { min: 20000 }, minAge: 18, maxAge: 23 },
+      requires: { money: { min: 20000 }, isStudent: true, minAge: 18 },   // v3.34：在校生才交学费
       options: [
         { label: '一次性交清', effects: { money: -20000, mood: -5, intelligence: 1 }, result: '账户余额瞬间见底，你截图存了个念。' },
         { label: '分期付款', effects: { money: -9000, mood: -9 }, result: '接下来半年，每个月都要想起这笔钱。' }
@@ -679,7 +692,7 @@
       title: '操场告白',
       description: '有人在操场用蜡烛摆了个爱心，围观的人起哄。那个人，你认识。',
       weight: 3,
-      requires: { isStudent: true, notSummerBreak: true, single: true, notTeenLove: true, loveState: 'single', minAge: 18, maxAge: 25, cha: { min: 40 } },   // v3.7：暑假不出现、单身且未早恋才告白
+      requires: { isStudent: true, notSummerBreak: true, notTeenLove: true, loveState: 'single', minAge: 18, maxAge: 25, cha: { min: 40 } },   // v3.7：暑假不出现、单身且未早恋才告白
       options: [
         { label: '走上去，说愿意', effects: { mood: 15, cha: 3 }, result: '你穿过人群，心跳快得像要炸开。' },
         { label: '悄悄走开', effects: { mood: -6, will: 2 }, result: '那晚你在操场绕了三圈，没敢回头。' }
@@ -801,7 +814,7 @@
       title: '收到情书',
       description: '课桌抽屉里多了一张折成心形的信纸，字很娟秀：「如果你愿意，周五放学操场见。」',
       weight: 6,
-      requires: { onceEver: true, education: ['高中'], minAge: 16, maxAge: 18, single: true, notTeenLove: true, cha: { min: 30 } },
+      requires: { onceEver: true, education: ['高中'], minAge: 16, maxAge: 18, loveState: 'single', notTeenLove: true, cha: { min: 30 } },
       options: [
         {
           label: '周五去操场',
@@ -821,7 +834,7 @@
       title: '一起晚自习',
       description: '晚自习的教室只剩你们俩，她压低声音问你：「这道题……你会吗？」她的头发蹭到了你的手背。',
       weight: 5,
-      requires: { onceEver: true, education: ['高中'], minAge: 16, maxAge: 18, single: true },
+      requires: { onceEver: true, education: ['高中'], minAge: 16, maxAge: 18, loveState: 'single' },
       options: [
         {
           label: '认真地讲题',
@@ -1079,7 +1092,7 @@
       title: '异地恋',
       description: '高中在一起的那个人，考去了另一座城市。车票越攒越多，视频通话越来越短。',
       weight: 3,
-      requires: { onceEver: true, isStudent: true, single: true, minAge: 18, maxAge: 25 },
+      requires: { onceEver: true, isStudent: true, loveState: 'single', minAge: 18, maxAge: 25 },
       options: [
         {
           label: '每个月见一次',

@@ -160,16 +160,41 @@
     },
     {
       id: 'social',
-      name: '社交',
-      description: '去同学家蹭一顿饭，或者陪朋友在街上逛半天。',
-      costDays: 1,
-      effects: { money: -10, eq: 2, cha: 2, mood: 5 },
-      displayEffects: { money: -10, eq: 2, cha: 2, mood: 5 },
-      requires: {
-        minAge: 12,                             // 12 岁以上才谈得上社交
-        oncePerDay: false
+      name: function () {
+        return (getAge() < 18 || isStudentNow()) ? '和同学去操场' : '请客吃饭';
       },
-      denyText: { minAge: '还不到 12 岁，先好好上学。' }
+      description: '和身边人聚一聚，热闹热闹。',
+      costDays: 1,
+      effects: { money: -200 },
+      displayEffects: { money: -200 },
+      requires: { money: { min: 200 }, minAge: 12 },
+      denyText: { money: '钱不够，聚不起。', minAge: '还不到 12 岁，先好好上学。' },
+      onRun: function () {
+        var young = getAge() < 18 || isStudentNow();
+        if (young) {
+          state.eq += 2; state.cha += 2; state.mood += 5;
+          addLog('sys', '【社交】你和同学去操场逛了一圈，心情舒畅。');
+        } else {
+          touchAllFriends();
+          state.mood = Math.min(moodMaxOf(), state.mood + 8);   // v3.34：恢复原 treat/hangout 的心情加成，避免心情低→裁员→工龄清零
+          if (state.married) addLove(5);
+          else if (state.loveState === 'dating') {
+            state.datingLove = Math.min(100, (state.datingLove || 0) + 5);
+            addLog('sys', '【请客】和恋人共进晚餐，好感度 +5。');
+          } else {
+            state.eq += 1;
+            addLog('sys', '【请客】和朋友吃饭聊天，情商 +1。');
+          }
+          if (Math.random() < 0.30) {
+            var age = getAge();
+            var tag = age <= 18 ? '同学' : (Math.random() < 0.5 ? '同事' : '酒肉朋友');
+            var f = makeFriend(tag);
+            state.friends = state.friends || [];
+            state.friends.push(f);
+            addLog('event', '【朋友】聚会上你认识了新朋友「' + f.name + '」（' + tag + '）。');
+          }
+        }
+      }
     },
     {
       id: 'companion',
@@ -190,8 +215,14 @@
           state.datingLove = Math.min(100, (state.datingLove || 0) + 6);
           addLog('sys', '【陪伴】你陪恋人度过了一天，好感度 +6。');
         } else {
-          state.mood = Math.min(moodMaxOf(), state.mood + 3);
-          addLog('sys', '【陪伴】你回家陪父母吃了顿饭，心情 +3。');
+          // v3.34：跨城限制——春节（1月）/国庆（10月）才回家，平时电话问候
+          if (state.m === 1 || state.m === 10) {
+            state.mood = Math.min(moodMaxOf(), state.mood + 3);
+            addLog('sys', '【陪伴】你回家陪父母吃了顿饭，心情 +3。');
+          } else {
+            state.mood = Math.min(moodMaxOf(), state.mood + 1);
+            addLog('sys', '【陪伴】离家太远，你给父母打了个电话，心情 +1（春节/国庆再回家）。');
+          }
         }
       }
     },
@@ -204,27 +235,6 @@
       displayEffects: { money: -500, mood: 8 },
       requires: { money: { min: 500 }, oncePerDay: false },
       denyText: { money: '钱不够，逛不起商场。' }
-    },
-    {
-      id: 'treat',
-      name: '请客吃饭',
-      description: '约上朋友或恋人，好好吃一顿。',
-      costDays: 1,
-      effects: { money: -300, mood: 6 },
-      displayEffects: { money: -300, mood: 6 },
-      requires: { money: { min: 300 }, oncePerDay: false },
-      onRun: function () {
-        // v3.9：按关系对象加「关系」——配偶加感情，恋人加好感，单身加情商
-        if (state.married) addLove(5);
-        else if (state.loveState === 'dating') {
-          state.datingLove = Math.min(100, (state.datingLove || 0) + 5);
-          addLog('sys', '【请客】和恋人共进晚餐，好感度 +5。');
-        } else {
-          state.eq += 1;
-          addLog('sys', '【请客】和朋友吃饭聊天，情商 +1。');
-        }
-      },
-      denyText: { money: '钱不够，请不起这顿。' }
     },
     {
       id: 'kidcare',
@@ -584,26 +594,41 @@
         if (ev) openEvent(ev);   // 用事件选项当城市选择器（零新增 UI）
       }
     },
-    /* v3.32：组局聚会（花 500 心情+15，30% 结识新朋友） */
+    /* v3.34：主动求婚（好感度 >85 成功结婚，否则分手） */
     {
-      id: 'hangout',
-      name: '组局聚会',
-      description: '约上朋友吃顿饭、喝顿酒，热闹热闹。',
+      id: 'propose',
+      name: '求婚',
+      description: '买一枚戒指，单膝跪地，赌上这辈子的勇气。',
       costDays: 1,
-      effects: { money: -500, mood: 15 },
-      displayEffects: { money: -500, mood: 15 },
-      hideWhenLocked: false,
-      requires: { money: { min: 500 }, minAge: 16 },
+      effects: { money: -10000 },
+      displayEffects: { money: -10000 },
+      hideWhenLocked: true,
+      requires: { loveState: 'dating', money: { min: 10000 }, minAge: 22 },
+      denyText: { loveState: '先交往，有了恋人才能求婚。' },
       onRun: function () {
-        touchAllFriends();
-        if (Math.random() < 0.30) {
-          var age = getAge();
-          var tag = age <= 18 ? (Math.random() < 0.5 ? '发小' : '同学') : (Math.random() < 0.5 ? '同事' : '酒肉朋友');
-          var f = makeFriend(tag);
-          state.friends = state.friends || [];
-          state.friends.push(f);
-          addLog('event', '【朋友】聚会上你认识了新朋友「' + f.name + '」（' + tag + '）。');
+        if ((state.datingLove || 0) > 85) {
+          marryTo('求婚');
+        } else {
+          addLog('danger', '【求婚】对方说「我们还没准备好」，然后提了分手。');
+          breakUp();
         }
+      }
+    },
+    /* v3.34：跳过本月（直接跳到下月结算，缓解点击疲劳） */
+    {
+      id: 'skipMonth',
+      name: '跳过本月',
+      description: '这个月没什么好做的，直接跳到下个月。',
+      costDays: 1,
+      effects: { mood: -8 },
+      displayEffects: { mood: -8 },
+      hideWhenLocked: false,
+      requires: { minAge: 16 },
+      onRun: function () {
+        if (window.IS_SIMULATION) return;   // v3.34：平衡模拟环境跳过跳月（skipMonth 是 UI 便利，不该影响 Agent 平衡）
+        var left = daysInMonth(state.y, state.m) - state.d + 1;   // 本月剩余天数
+        advanceDays(left);   // 逐天推进到月底（触发完整日/月结算与事件抽取，不用 skipMonths 以免漏事件）
+        markJobChange();     // 跳月不等于跳槽，重置跳槽冷却
       }
     }
   ];

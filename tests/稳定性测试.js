@@ -539,7 +539,7 @@
     // 生活成本 1500 + 家用 1500（10000×15%）= −3000；发薪 +10000；感情 −1
     // v3.2：生活成本 3200（10k × 32%）+ 家用 3200（10k × 15% → 取 max(800,1500)=1500? 见下）
     ok('L7 家庭月结扣家用并掉感情',
-      S().familyCost === 1500 && S().love === 69 && S().money === 105300,
+      S().familyCost === 1500 && S().love === 69 && S().money === 104500,   // v3.34：发薪 10000×(1−8%社保)=9200，故 −800
       'cost=' + S().familyCost + ' love=' + S().love + ' money=' + S().money);
 
     // 冷战两次 → 顺延队列里排入离婚事件
@@ -591,7 +591,7 @@
     // 相亲门槛：未婚进池、已婚不进池
     restore(PRISTINE); S().age = 30; S().cha = 60; S().eq = 60;
     ok('L13 未婚时相亲在池内', RJS.eligibleEvents().indexOf('E_MARRY_SEEK') > -1, '');
-    restore(PRISTINE); S().age = 30; S().married = true; S().spouse = '林晓'; S().cha = 60; S().eq = 60;
+    restore(PRISTINE); S().age = 30; S().married = true; S().spouse = '林晓'; S().loveState = 'married'; S().cha = 60; S().eq = 60;
     ok('L14 已婚时相亲与旧情复燃都不进池',
       RJS.eligibleEvents().indexOf('E_MARRY_SEEK') === -1 && RJS.eligibleEvents().indexOf('E_LOVE_GROWN') === -1, '');
 
@@ -1575,7 +1575,7 @@
       var MEET = NEED.slice(0, 5);
       var badMeet = MEET.filter(function (id) {
         var r = (byId[id] && byId[id].requires) || {};
-        return r.onceEver !== true || r.loveState !== 'single' || r.single !== true || Number(r.minAge) < 22;
+        return r.onceEver !== true || r.loveState !== 'single' || Number(r.minAge) < 22;
       });
       ok('D7b 起手 5 条均为 onceEver + loveState:single + minAge≥22', badMeet.length === 0, badMeet.join(',') || 'uniform');
 

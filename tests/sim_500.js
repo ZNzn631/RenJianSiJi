@@ -85,7 +85,7 @@
     RJS.simChoose(best);
   }
   function randomAction(sabotage) {
-    var EXCLUDE = sabotage ? { moveCity: 1 } : { resign: 1, buyStock: 1, moveCity: 1 };
+    var EXCLUDE = sabotage ? { moveCity: 1, skipMonth: 1 } : { resign: 1, buyStock: 1, moveCity: 1, skipMonth: 1, propose: 1 };
     for (var k = 0; k < 40; k++) {
       var id = ACTS[Math.floor(Math.random() * ACTS.length)];
       if (EXCLUDE[id]) continue;

@@ -2198,6 +2198,9 @@
 
     $('sAge').textContent = getAge() + ' 岁  [' + cityName() + ']';   // v3.24：城市标签
     $('sEdu').textContent = state.edu || '无';
+    if (state.loveState === 'dating') {   // v3.34：交往中显式显示恋爱好感度
+      $('sEdu').textContent += ' · 恋爱好感度 ' + (state.datingLove || 0);
+    }
     $('sJob').textContent = state.job || '无业';
     $('sSalary').textContent = state.salary > 0 ? '月薪 ¥' + state.salary.toLocaleString('en-US') : '';
     if (state.salary > 0) {
@@ -2260,6 +2263,8 @@
       text = money < 3000
         ? '先打零工撑住现金流（存款 ¥' + money.toLocaleString('en-US') + '）'
         : '找份工作，先有稳定收入';
+    } else if (state.housing === 'own') {
+      text = '你已经有房了，安心经营生活';   // v3.34：已买房则不再提示攒首付
     } else if (money < HOUSE) {
       text = '攒首付 ¥' + money.toLocaleString('en-US') + ' / ¥' + HOUSE.toLocaleString('en-US');
     } else {
@@ -2598,7 +2603,7 @@
         + (locked ? ' aria-disabled="true" tabindex="-1" title="' + esc(tip) + '"' : '')
         + '>'
         + '<span class="act-top">'
-        +   '<span class="act-name">' + esc(act.name) + '</span>'
+        +   '<span class="act-name">' + esc(typeof act.name === 'function' ? act.name() : act.name) + '</span>'
         +   '<span class="act-days num">' + (locked ? '条件不足' : actionDays(act) + ' 天') + '</span>'
         + '</span>'
         + '<span class="act-meta">' + esc(effectText(act)) + '</span>'
