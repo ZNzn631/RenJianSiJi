@@ -15,5 +15,6 @@ Desktop.ini
 *.tmp
 _stability_run.html
 _sim_run.html
+_sim_result.json
 _sim_direct.html
 _sim_batch_*.html
