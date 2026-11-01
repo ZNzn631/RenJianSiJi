@@ -3367,6 +3367,126 @@
       options: [
         { label: '一气呵成，写完那个故事', effects: { mood: 8 }, result: '你写到天亮，眼泪和墨水混在了一起。', onChoose: function () { var sk = state.skills || (state.skills = {}); sk.writing = (sk.writing || 0) + 20; addLog('event', '【顿悟】写作 +20，当前 ' + sk.writing + '。'); } }
       ]
+    },
+    /* ================= v3.38 原生家庭与亲戚事件（10 条） =================
+       防穿模：全部为常规池事件（无 nextEventId / 无 chainOnly），天然无死链、无孤儿。
+       金钱惩罚 ≤10000；每个事件都留有一个不扣钱的兜底选项，避免破产死锁。 */
+    {
+      id: 'E_REL_URGE_MARRY',
+      title: '过年催婚',
+      description: '年夜饭吃到一半，三姑六婆把火力对准了你：「都这个岁数了，还不带个人回来？」',
+      weight: 3,
+      requires: { minAge: 22, maxAge: 40, single: true, monthIn: [1] },   // v3.38：未婚才被催婚，过年（1月）
+      options: [
+        { label: '敷衍过去', effects: { mood: -2 }, result: '你点头如捣蒜，心里盘算着明年找个借口不回来。' },
+        { label: '把话题转到工作上', effects: { mood: -1, eq: 2 }, result: '「我最近升职了」四个字，成功堵住了所有人的嘴。' },
+        { label: '认真说「还没准备好」', effects: { mood: -3, eq: 1 }, result: '桌上安静了两秒，你妈叹了口气。' }
+      ]
+    },
+    {
+      id: 'E_REL_BORROW',
+      title: '亲戚借钱',
+      description: '远房表哥打来电话，说孩子要交学费，想问你借一笔。',
+      weight: 3,
+      requires: { minAge: 25, money: { min: 30000 } },   // v3.38：有点积蓄才借得起
+      options: [
+        { label: '借一部分（3000）', effects: { money: -3000, mood: -2 }, result: '你转了一部分，说「剩下的我也紧」。' },
+        { label: '借足额（6000）', effects: { money: -6000, mood: -3 }, result: '你咬咬牙转了账，心里却有点没底。' },
+        { label: '婉拒', effects: { mood: -3, eq: 1 }, result: '你说最近手头也紧，表哥「哦」了一声挂了电话。' }
+      ]
+    },
+    {
+      id: 'E_REL_KID_FIGURE',
+      title: '熊孩子弄坏手办',
+      description: '过年亲戚带孩子来拜年，一声脆响——你柜子里最贵的手办摔成了两截。',
+      weight: 3,
+      requires: { minAge: 20, money: { min: 5000 } },   // v3.38：买得起手办说明有闲钱
+      options: [
+        { label: '算了算了', effects: { mood: -4 }, result: '你笑着说不值钱，回头把碎片扫进了垃圾桶。' },
+        { label: '让家长照价赔', effects: { money: 500, mood: -2 }, result: '亲戚赔了钱，从此两家见面有点尴尬。' },
+        { label: '憋着火教育两句', effects: { mood: -3, eq: -1 }, result: '孩子哇的一声哭了，你成了「小气」的那个人。' }
+      ]
+    },
+    {
+      id: 'E_REL_GATHERING',
+      title: '家族聚会',
+      description: '长辈张罗了一场大聚餐，微信群里@了所有人。',
+      weight: 3,
+      requires: { minAge: 16, monthIn: [1, 10] },   // v3.38：节假日聚会
+      options: [
+        { label: '热闹热闹', effects: { money: -200, mood: 4, eq: 1 }, result: '饭桌上聊到了很晚，你发现自己还挺想他们的。' },
+        { label: '找借口不去', effects: { mood: -2 }, result: '你发了个「加班」的表情包，关掉了群消息。' }
+      ]
+    },
+    {
+      id: 'E_REL_URGE_BABY',
+      title: '父母催生',
+      description: '你妈又开始旁敲侧击：「隔壁老王家都抱上孙子了。」',
+      weight: 3,
+      requires: { married: true, minAge: 25, maxAge: 45 },
+      options: [
+        { label: '敷衍「再等等」', effects: { mood: -3 }, result: '「等稳定了再说」，这句话你已经说了第三年。' },
+        { label: '好好聊聊顾虑', effects: { mood: -2, eq: 1 }, result: '你把房贷和育儿成本摊开算了一遍，你妈不说话了。' }
+      ]
+    },
+    {
+      id: 'E_REL_BRAG',
+      title: '亲戚炫耀孩子',
+      description: '饭桌上，二姨的手机在你眼前晃：「你看我家孩子，又考了年级第一。」',
+      weight: 3,
+      requires: { minAge: 22, maxAge: 55 },
+      options: [
+        { label: '微笑着听', effects: { mood: -3 }, result: '你点头夸「真厉害」，低头扒了两口饭。' },
+        { label: '借故离开', effects: { mood: -1 }, result: '你说去洗手间，在走廊刷了十分钟手机。' },
+        { label: '也夸自家两句', effects: { mood: 2, eq: -1 }, result: '你把自己夸得天花乱坠，桌上的人听得一愣一愣。' }
+      ]
+    },
+    {
+      id: 'E_REL_REDPACKET',
+      title: '家族群抢红包',
+      description: '大年初一，家族群里下起了红包雨。',
+      weight: 3,
+      requires: { minAge: 16, money: { min: 100 }, monthIn: [1, 2] },   // v3.38：春节抢红包
+      options: [
+        { label: '抢到手软', effects: { money: 80, mood: 3 }, result: '你手速惊人，抢了三个「手气最佳」。' },
+        { label: '发个大点的', effects: { money: -500, mood: 2 }, result: '你包了 500 发出去，群里一片「老板大气」。' },
+        { label: '潜水', effects: { mood: -1 }, result: '你看着满屏的「谢谢老板」，默默关掉了提醒。' }
+      ]
+    },
+    {
+      id: 'E_REL_SALARY',
+      title: '亲戚打听工资',
+      description: '「你现在一个月挣多少啊？」三姨凑过来，声音不大，全桌都听见了。',
+      weight: 3,
+      requires: { employed: true, minAge: 22, maxAge: 55 },
+      options: [
+        { label: '含糊其辞', effects: { mood: -2 }, result: '你说「够花」，三姨显然不太满意。' },
+        { label: '往高了吹', effects: { mood: 2, eq: -1 }, result: '你报了个虚数，桌上安静了三秒。' },
+        { label: '老实说', effects: { mood: -1, eq: 1 }, result: '你报了个实数，三姨「哦」了一声，转头问别人去了。' }
+      ]
+    },
+    {
+      id: 'E_REL_ANCESTOR',
+      title: '祭祖',
+      description: '清明，长辈喊你回老家上坟。',
+      weight: 3,
+      requires: { minAge: 16, monthIn: [4] },   // v3.38：清明（4月）祭祖
+      options: [
+        { label: '虔诚上香', effects: { mood: 2, will: 1 }, result: '你在墓碑前站了很久，心里忽然踏实了。' },
+        { label: '心里默念几句', effects: { mood: 1 }, result: '你鞠了三个躬，把想说的话咽回了肚子里。' },
+        { label: '没去', effects: { mood: -2 }, result: '你在电话里道了歉，那头沉默了很久。' }
+      ]
+    },
+    {
+      id: 'E_REL_INTRO',
+      title: '亲戚介绍对象',
+      description: '姑姑神秘兮兮地推来一张照片：「这姑娘/小伙不错，见见？」',
+      weight: 3,
+      requires: { loveState: 'single', minAge: 22, maxAge: 40 },   // v3.38：无对象才被介绍
+      options: [
+        { label: '见一面', effects: { mood: 2 }, result: '你答应周末去喝杯咖啡，心里有点期待。' },
+        { label: '婉拒', effects: { mood: -2, eq: 1 }, result: '你说最近忙，姑姑失望地收起了手机。' }
+      ]
     }
   ];
   // 合并回全局 eventsData（保持引擎抽取逻辑不变）
