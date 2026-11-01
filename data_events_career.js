@@ -775,7 +775,7 @@
           effects: { eq: -10, mood: -15 },
           result: '你骂了四十分钟，直播间被封。解封通知写着「违规行为，封禁 30 天」。',
           onChoose: function () {
-            state.salary = 0;
+            state.streamerBanMonths = 1;   // v3.37：封禁 1 个月（不清 job/salary，封禁期由 monthlySettle 拦截发薪）
             addLog('danger', '【封禁】直播间被封一个月，收入归零。');
           }
         }

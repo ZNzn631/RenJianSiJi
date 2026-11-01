@@ -663,6 +663,7 @@
       mood: 80,
       stockValue: 0,        // v3.22：股票市值（买入即 +1 万成本，settleStocks 每月按运气/随机涨跌）
       stockLockUntil: 0,    // v3.36：股票持仓锁定的绝对月数（买入后 3 个月不能卖），0=未锁定
+      streamerBanMonths: 0, // v3.37：主播封禁剩余月数（>0 期间不发薪），0=未封禁
       city: 'normal',       // v3.24：出生城市（默认普通城市，三系数全 1.0）
       housing: 'home',    // v3.5.4：居住状态 home/dorm/rent/own（开局住家，上大学→dorm，工作→rent，买房→own）
       commute: 0,         // v3.31：通勤时长（分钟），由租房类型/买房决定；>60 每月扣心情/体力
@@ -1023,13 +1024,23 @@
 
     // 有工作：月底发薪，顺带消耗体质与心情
     if (state.salary > 0) {
-      var pay = Math.round(state.salary * talentMul('work_money') * cityFactors().salary * 0.92);   // v3.34：天赋工资倍率 × 城市系数 ×（1−8% 社保）
-      state.money += pay;
-      if (state.sta >= 5) state.sta += PAY_STAMINA;
-      state.mood += PAY_MOOD;
-      clampStats();
-      addLog('month', '【发薪日】你获得了工资 ' + pay + ' 元（已扣 8% 社保），上班让你有些疲惫');
-      SoundFX.play('coin');                              // v3.5：发薪成功播金币音效
+      if ((state.streamerBanMonths || 0) > 0) {
+        // v3.37：主播封禁期不发薪
+        state.streamerBanMonths -= 1;
+        addLog('danger', '【封禁中】你被平台封杀，本月没有收入（还剩 ' + state.streamerBanMonths + ' 个月）。');
+        if (state.streamerBanMonths <= 0) {
+          addLog('event', '【解封】你终于熬过了封禁期，恢复了直播，下个月开始正常发薪！');
+        }
+      } else {
+        var pay = Math.round(state.salary * talentMul('work_money') * cityFactors().salary * 0.92);   // v3.34：天赋工资倍率 × 城市系数 ×（1−8% 社保）
+        state.money += pay;
+        window.__salaryGained = (window.__salaryGained || 0) + pay;   // v3.37：发薪计量（不变式审计专用）
+        if (state.sta >= 5) state.sta += PAY_STAMINA;
+        state.mood += PAY_MOOD;
+        clampStats();
+        addLog('month', '【发薪日】你获得了工资 ' + pay + ' 元（已扣 8% 社保），上班让你有些疲惫');
+        SoundFX.play('coin');                              // v3.5：发薪成功播金币音效
+      }
     }
 
     // 负债：跨月时强制扣健康
@@ -2182,6 +2193,7 @@
       mood: asInt(s.mood, 80, 0, moodMaxVal),
       stockValue: asInt(s.stockValue, 0, 0, 999999999),   // v3.22：旧档缺失 → 0
       stockLockUntil: asInt(s.stockLockUntil, 0, 0, 999999),   // v3.36：持仓锁定月份，旧档缺失 → 0
+      streamerBanMonths: asInt(s.streamerBanMonths, 0, 0, 999),   // v3.37：主播封禁剩余月数，旧档缺失 → 0
       city: (typeof s.city === 'string' && s.city) ? s.city : 'normal',   // v3.24：旧档缺失/非法 → 普通城市（系数 1.0）
       housing: (s.housing === 'dorm' || s.housing === 'rent' || s.housing === 'own') ? s.housing : 'home',   // v3.5.4：居住状态，旧档缺省 home；v3.31：+own 已买房
       commute: asInt(s.commute, 0, 0, 300),    // v3.31：通勤时长（分钟），旧档缺失 → 0
