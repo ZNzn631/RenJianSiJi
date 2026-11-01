@@ -34,7 +34,7 @@
   var MONEY = [0, 3000, 30000, 150000, 600000, 1000000];
   var STA = [0, 20, 60, 95];
   var MOOD = [10, 50, 90];
-  var ATTR = [10, 60, 200];
+  var ATTR = [10, 60, 200, 260];   // v3.36：补 260 覆盖技能突破门槛（智力≥250）
   var MONTHS = [1, 2, 3, 5, 7, 9, 12];
   var JOBS = ['无业', '普通文员', '普通程序员', '大厂程序员', '人民教师', '外卖骑手', '网红主播'];
 
@@ -93,6 +93,7 @@
     s.friends = friendsOf(cfg.friendsMode, s.y * 12 + s.m);   // v3.32：朋友采样
     s.recentSetback = cfg.setback ? (s.y * 12 + s.m) : 0;     // v3.32：挫折采样
     s.skills = cfg.skills || { coding: 0, writing: 0, cooking: 0 };   // v3.34：技能采样
+    s.coldMonths = cfg.coldMonths || 0;   // v3.36：冷战采样
     return s;
   }
 
@@ -107,7 +108,8 @@
       offset: pick([0, 2, 3, 6, 9, 12]), lastMarry: 0,
       loveVal: pick([0, 15, 35, 60, 85, 100]),
       friendsMode: Math.floor(Math.random() * 5), setback: Math.random() < 0.5,
-      skills: Math.random() < 0.5 ? { coding: 60, writing: 60, cooking: 60 } : { coding: 0, writing: 0, cooking: 0 }
+      skills: Math.random() < 0.5 ? { coding: 60, writing: 60, cooking: 60 } : { coding: 0, writing: 0, cooking: 0 },
+      coldMonths: Math.random() < 0.5 ? 2 : 0
     };
   }
 
@@ -201,6 +203,17 @@
       for (var sn in val) {
         if (Object.prototype.hasOwnProperty.call(val, sn)) sk2[sn] = Math.max(0, Number(val[sn]) - 1);
       }
+      return true;
+    }
+    if (key === 'skillMax') {
+      var sk3 = s.skills || (s.skills = {});
+      for (var sn2 in val) {
+        if (Object.prototype.hasOwnProperty.call(val, sn2)) sk3[sn2] = Number(val[sn2]) + 1;
+      }
+      return true;
+    }
+    if (key === 'coldMonths') {
+      s.coldMonths = Math.max(0, Number(val) - 1);
       return true;
     }
     // 属性区间

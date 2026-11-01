@@ -469,6 +469,39 @@
         detail: '需要 ' + parts.join('、'),
         suffix: true
       };
+    },
+    // 技能上限（v3.36）：skillMax: { coding: 49 } = coding ≤49 才满足（练到 50 后置灰，需机缘突破）
+    skillMax: function (v) {
+      var sk = state.skills || {};
+      var miss = [];
+      for (var name in v) {
+        if (!Object.prototype.hasOwnProperty.call(v, name)) continue;
+        var cap = Number(v[name]);
+        if (!isFinite(cap)) continue;
+        if ((Number(sk[name]) || 0) > cap) miss.push(name);
+      }
+      if (!miss.length) return null;
+      var label = { coding: '编程', writing: '写作', cooking: '厨艺' };
+      var parts = [];
+      for (var i = 0; i < miss.length; i++) {
+        parts.push((label[miss[i]] || miss[i]) + '已达 ' + (Number(sk[miss[i]]) || 0) + '（瓶颈 ' + v[miss[i]] + '）');
+      }
+      return {
+        key: 'skillMax', title: '已达瓶颈',
+        detail: parts.join('、') + '，需要机缘突破',
+        suffix: false
+      };
+    },
+    // 连续冷战（v3.36）：coldMonths: 2 = 连续冷战 ≥2 月才满足
+    coldMonths: function (v) {
+      var need = Number(v) || 2;
+      var cur = Number(state.coldMonths) || 0;
+      if (cur >= need) return null;
+      return {
+        key: 'coldMonths', title: '冷战不足',
+        detail: '连续冷战 ' + cur + ' 个月（需满 ' + need + ' 个月）',
+        suffix: true
+      };
     }
   };
 
@@ -629,6 +662,7 @@
       money: 2800,
       mood: 80,
       stockValue: 0,        // v3.22：股票市值（买入即 +1 万成本，settleStocks 每月按运气/随机涨跌）
+      stockLockUntil: 0,    // v3.36：股票持仓锁定的绝对月数（买入后 3 个月不能卖），0=未锁定
       city: 'normal',       // v3.24：出生城市（默认普通城市，三系数全 1.0）
       housing: 'home',    // v3.5.4：居住状态 home/dorm/rent/own（开局住家，上大学→dorm，工作→rent，买房→own）
       commute: 0,         // v3.31：通勤时长（分钟），由租房类型/买房决定；>60 每月扣心情/体力
@@ -1931,7 +1965,7 @@
 
     // 链式剧情：不关窗，直接换下一段
     var next = opt.nextEventId ? findEvent(opt.nextEventId) : null;
-    if (next) {
+    if (next && checkRequires(next).length === 0) {   // v3.36：链式跳转前校验目标事件 requires，防年龄/条件越级
       addLog('sys', '【事件】剧情继续：' + next.title + '。');
       openEvent(next);
       return true;
@@ -2147,6 +2181,7 @@
       money: isFinite(Number(s.money)) ? Math.round(Number(s.money)) : 2800,
       mood: asInt(s.mood, 80, 0, moodMaxVal),
       stockValue: asInt(s.stockValue, 0, 0, 999999999),   // v3.22：旧档缺失 → 0
+      stockLockUntil: asInt(s.stockLockUntil, 0, 0, 999999),   // v3.36：持仓锁定月份，旧档缺失 → 0
       city: (typeof s.city === 'string' && s.city) ? s.city : 'normal',   // v3.24：旧档缺失/非法 → 普通城市（系数 1.0）
       housing: (s.housing === 'dorm' || s.housing === 'rent' || s.housing === 'own') ? s.housing : 'home',   // v3.5.4：居住状态，旧档缺省 home；v3.31：+own 已买房
       commute: asInt(s.commute, 0, 0, 300),    // v3.31：通勤时长（分钟），旧档缺失 → 0

@@ -721,6 +721,7 @@
       description: '两本结婚证摊在桌上，对方说：「房子归你，别的我不要。」窗外在下雨。',
       weight: 1,
       chainOnly: true,
+      requires: { coldMonths: 2, loveMax: 20 },   // v3.36：连续冷战 ≥2 月且感情 ≤20 才允许协议离婚
       options: [
         {
           label: '协议离婚，财产对半',
@@ -3345,6 +3346,27 @@
         { label: '上门催款', effects: { money: 3000, mood: -6, stamina: -3 }, result: '你在对方公司坐了一下午，终于拿到了钱。' },
         { label: '再等等，别撕破脸', effects: { mood: -4, eq: 2 }, result: '你回了个「好」。这一等，又是半个月。' }
       ]
+    },
+    /* v3.36：技能突破（50 级后死练无效，只能靠机缘——智力≥250 且运气≥100） */
+    {
+      id: 'E_SKILL_BREAK_CODE',
+      title: '编程顿悟',
+      description: '你盯着屏幕看了很久，突然之间，那些晦涩的概念像拼图一样对上了。',
+      weight: 3,
+      requires: { skill: { coding: 50 }, intelligence: { min: 250 }, luck: { min: 100 }, minAge: 18 },
+      options: [
+        { label: '趁热打铁，写个自己的作品', effects: { mood: 8 }, result: '你一夜没睡，写出了人生第一个像样的项目。', onChoose: function () { var sk = state.skills || (state.skills = {}); sk.coding = (sk.coding || 0) + 20; addLog('event', '【顿悟】编程 +20，当前 ' + sk.coding + '。'); } }
+      ]
+    },
+    {
+      id: 'E_SKILL_BREAK_WRITE',
+      title: '写作顿悟',
+      description: '你写下第一个字的时候，忽然明白了一直卡住你的那个问题。',
+      weight: 3,
+      requires: { skill: { writing: 50 }, intelligence: { min: 250 }, luck: { min: 100 }, minAge: 18 },
+      options: [
+        { label: '一气呵成，写完那个故事', effects: { mood: 8 }, result: '你写到天亮，眼泪和墨水混在了一起。', onChoose: function () { var sk = state.skills || (state.skills = {}); sk.writing = (sk.writing || 0) + 20; addLog('event', '【顿悟】写作 +20，当前 ' + sk.writing + '。'); } }
+      ]
     }
   ];
   // 合并回全局 eventsData（保持引擎抽取逻辑不变）
@@ -3357,14 +3379,15 @@
       name: '自学编程',
       description: '对着教程敲代码，一坐就是一下午。',
       costDays: 1,
-      effects: { mood: -3 },
-      displayEffects: { mood: -3 },
+      effects: { mood: -5, stamina: -3 },
+      displayEffects: { mood: -5, stamina: -3 },
       hideWhenLocked: false,
-      requires: { minAge: 12 },
+      requires: { minAge: 12, skillMax: { coding: 49 } },
+      denyText: { skillMax: '编程已达 50 瓶颈，需要机缘突破。' },
       onRun: function () {
         var sk = state.skills || (state.skills = {});
         sk.coding = (sk.coding || 0) + 10;
-        addLog('event', '【技能】你埋头敲了一下午代码（编程 +10，当前 ' + sk.coding + '）。');
+        addLog('event', '【技能】你埋头敲了一下午代码（编程 +10，体力 -3 心情 -5，当前 ' + sk.coding + '）。');
       }
     },
     {
@@ -3372,14 +3395,15 @@
       name: '练习写作',
       description: '把想说的话写下来，一个字一个字地磨。',
       costDays: 1,
-      effects: { mood: -2 },
-      displayEffects: { mood: -2 },
+      effects: { mood: -5, stamina: -3 },
+      displayEffects: { mood: -5, stamina: -3 },
       hideWhenLocked: false,
-      requires: { minAge: 12 },
+      requires: { minAge: 12, skillMax: { writing: 49 } },
+      denyText: { skillMax: '写作已达 50 瓶颈，需要机缘突破。' },
       onRun: function () {
         var sk = state.skills || (state.skills = {});
         sk.writing = (sk.writing || 0) + 10;
-        addLog('event', '【技能】你写了几千字，删删改改（写作 +10，当前 ' + sk.writing + '）。');
+        addLog('event', '【技能】你写了几千字，删删改改（写作 +10，体力 -3 心情 -5，当前 ' + sk.writing + '）。');
       }
     },
     {

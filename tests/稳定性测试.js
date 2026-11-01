@@ -1305,6 +1305,7 @@
         s.friends = cfg.friends || [];   // v3.32：朋友采样
         s.recentSetback = cfg.setback ? (s.y * 12 + s.m) : 0;   // v3.32：挫折采样
         s.skills = cfg.skills || { coding: 0, writing: 0, cooking: 0 };   // v3.34：技能采样
+        s.coldMonths = cfg.coldMonths || 0;   // v3.36：冷战采样
         s.dink = cfg.dink; s.lostChild = 0;
         s.hadTeenLove = cfg.teenLove === true; s.triggeredEvents = []; s.usage = {};
         s.pendingExam = null; s.isStudent = cfg.edu === '本科' && cfg.age < 22;
@@ -1367,6 +1368,7 @@
           childrenMode: Math.floor(Math.random() * 4),
           friends: pick(FRIENDS_VARIANTS), setback: Math.random() < 0.5,
           skills: pick([{ coding: 0, writing: 0, cooking: 0 }, { coding: 60, writing: 60, cooking: 60 }]),
+          coldMonths: Math.random() < 0.5 ? 2 : 0,
           int: pick(INTS), cha: pick(CHAS), eq: pick(EQS), will: pick(WILLS), luck: pick(LUCKS),
           teenLove: Math.random() < 0.3
         });
@@ -1513,7 +1515,7 @@
       dReset();
       var s = S();
       s.age = 30; s.married = true; s.loveState = 'married'; s.spouse = '林知';
-      s.partnerName = '林知'; s.inLove = true; s.love = 20; s.moodMax = 110; s.mood = 60;
+      s.partnerName = '林知'; s.inLove = true; s.love = 20; s.coldMonths = 2; s.moodMax = 110; s.mood = 60;   // v3.36：补 coldMonths=2 满足离婚门槛
       s.money = 30000; s.kids = 0; s.children = []; s.triggeredEvents = [];
 
       ok('D6a 「婚后争吵」可打开', RJS.openEventById('E_MARRIED_QUARREL'), 'ok');
@@ -1709,8 +1711,8 @@
       var s2 = S();
       s2.age = 25; s2.money = 50000; s2.stockValue = 0; s2.d = 15;
       ok('S2 买入成功', RJS.doAction('buyStock') === true, 'ok');
-      ok('S3 买入后 money −10100（含 100 手续费）/ stockValue +10000',
-        S().money === 39900 && S().stockValue === 10000,
+      ok('S3 买入后 money −10150（含 150 手续费）/ stockValue +10000',
+        S().money === 39850 && S().stockValue === 10000,
         'money=' + S().money + ' stock=' + S().stockValue);
 
       // S4 卖出门槛：无持仓时锁
@@ -1726,8 +1728,8 @@
       var s5 = S();
       s5.age = 25; s5.money = 30000; s5.stockValue = 15000; s5.d = 15;
       RJS.doAction('sellStock');
-      ok('S5 卖出后 money +14850（15000 − 1% 手续费）/ stockValue 清零',
-        S().money === 44850 && S().stockValue === 0,
+      ok('S5 卖出后 money +14775（15000 − 1.5% 手续费）/ stockValue 清零',
+        S().money === 44775 && S().stockValue === 0,
         'money=' + S().money + ' stock=' + S().stockValue);
 
       // S6 settleStocks：牛市 ×1.5，且不动 money（只动 stockValue）

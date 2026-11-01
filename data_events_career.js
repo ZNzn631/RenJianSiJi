@@ -918,8 +918,9 @@
       denyText: { money: '现金不足 10000，买不起。' },
       onRun: function () {
         state.stockValue = (state.stockValue || 0) + 10000;
-        state.money -= 100;   // v3.23：交易摩擦，买入固定手续费 100
-        addLog('event', '【股票】买入 10000 元（手续费 100），当前市值 ' + state.stockValue + ' 元。');
+        state.money -= 150;   // v3.36：交易摩擦，买入手续费 1.5%
+        state.stockLockUntil = nowMonth() + 3;   // v3.36：持仓锁定 3 个月
+        addLog('event', '【股票】买入 10000 元（手续费 150），持仓锁定 3 个月，当前市值 ' + state.stockValue + ' 元。');
       }
     },
     {
@@ -933,12 +934,16 @@
       requires: { stockValue: { min: 1 }, minAge: 18 },
       onRun: function () {
         var v = state.stockValue || 0;
+        if (nowMonth() < (state.stockLockUntil || 0)) {
+          addLog('sys', '【股票】持仓锁定中，还需 ' + (state.stockLockUntil - nowMonth()) + ' 个月才能卖出。');
+          return;
+        }
         if (v > 0) {
-          var fee = Math.max(1, Math.round(v * 0.01));   // v3.23：卖出 1% 手续费
+          var fee = Math.max(1, Math.round(v * 0.015));   // v3.36：卖出 1.5% 手续费
           state.money += v - fee;
           addLog('event', '【股票】卖出全部持仓 ' + v + ' 元，扣手续费 ' + fee + '，到手 ' + (v - fee) + ' 元。');
+          state.stockValue = 0;
         }
-        state.stockValue = 0;
       }
     },
   ];
