@@ -1534,6 +1534,19 @@
         { label: '和老师同学道别', effects: { mood: 8, eq: 2 }, result: '你说「常联系」，转身红了眼眶。' },
         { label: '站在校门口，看人来人往', effects: { mood: 6, will: 3 }, result: '你站了很久，然后转身，走向下一段人生。' }
       ]
+    },
+    /* v3.43：辅导员开年级大会（必发，提示四六级） */
+    {
+      id: 'E_U_COUNSELOR',
+      title: '辅导员开年级大会',
+      description: '辅导员站在讲台上敲桌子：「我再强调一遍，没过英语四级的同学抓紧了，拿不到学位证别怪我没提醒！」',
+      weight: 5,
+      priority: true,
+      requires: { isStudent: true, minAge: 18, maxAge: 22 },
+      options: [
+        { label: '记下来，回去备考', effects: { mood: -2, intelligence: 2 }, result: '你在笔记本上重重写下「四级」。这次，一定要过。' },
+        { label: '左耳进右耳出', effects: { mood: -1 }, result: '你刷着手机，直到散会也没记住辅导员说了啥。' }
+      ]
     }
 ,
   ];

@@ -707,6 +707,7 @@
       school: '',                                      // 当前学校名
       schoolTier: '普通',                              // 重点 / 普通 / 职高
       major: '',                                       // v3.42：大学专业（''=未填志愿 / 计算机/临床医学/法学/金融学/土木建筑/师范/艺术）
+      certificates: [],                                // v3.43：已获证书（['cet4','cet6','teacher','lawyer','cpa']）
       schoolBonus: 0,                                  // 高考加分（学校档次）
       examLog: [],                                     // 历次升学考核
       milestones: [],                                  // 已触发的年龄节点
@@ -1093,6 +1094,11 @@
     if (state.age >= 80) { endLife('age'); return; }
 
     checkMilestones();                             // 18 岁高考里程碑（只排队，不弹窗）
+
+    // v3.43 毕业卡口：22 岁毕业时没过四级 → 红字警告（不改 state.edu，只警告 + 拦求职）
+    if (state.age === 22 && (state.edu === '本科' || state.edu === '专科') && (state.certificates || []).indexOf('cet4') === -1) {
+      addLog('danger', '【毕业】你未能拿到学位证（未过英语四级），只能以结业生身份求职。');
+    }
 
     if (state.salary > 0) {
       state.totalWorkYears += 1;
@@ -2263,6 +2269,7 @@
       school: '',
       schoolTier: '普通',
       major: (typeof s.major === 'string' && s.major) ? s.major : '',   // v3.42：大学专业，旧档缺失 → ''
+      certificates: (Array.isArray(s.certificates)) ? s.certificates.filter(function (x) { return typeof x === 'string'; }) : [],   // v3.43：证书，旧档缺失 → []
       schoolBonus: 0,
       examLog: [],
       milestones: [],

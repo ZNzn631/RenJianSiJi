@@ -1974,6 +1974,19 @@
   </div>
 </div>
 
+<!-- 考证中心（v3.43）：闭关考证弹窗 -->
+<div class="modal-mask" id="certMask" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="certTitle">
+    <div class="panel-h">
+      <span>考证中心</span>
+      <span class="hint" id="certDate">闭关备考，一次拿一张证</span>
+    </div>
+    <div class="event-title" id="certTitle">—</div>
+    <p class="event-desc">达标绿色【报考】，不达标置灰并提示缺什么。</p>
+    <div class="job-list" id="certList"></div>
+  </div>
+</div>
+
 <!-- 童年前史（v3.28）：只播 6–15 岁的回忆，不推进时间 -->
 <div class="modal-mask" id="prologueMask" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="prologueTitle">
@@ -2616,10 +2629,29 @@
   function openingMiss(op) {
     var miss = [];
     var age = getAge();
+    var certs = state.certificates || [];
     if (age < (op.minAge || 0)) miss.push('年龄差 ' + ((op.minAge || 0) - age) + ' 岁');
     if (op.minEdu && (EDU_RANK[state.edu] || 0) < (EDU_RANK[op.minEdu] || 0)) miss.push('学历需 ' + op.minEdu);
+
+    // v3.43 结业卡口：已毕业且没过四级 → 学历岗位（专科+）拒收（不改 state.edu，只拦求职）
+    if (!isStudentNow() && certs.indexOf('cet4') === -1 && op.minEdu && (EDU_RANK[op.minEdu] || 0) >= (EDU_RANK['专科'] || 0)) {
+      miss.push('无学位证（未过四级），学历岗位不接收结业生');
+    }
+
     if (op.schoolTier && state.schoolTier !== op.schoolTier) miss.push('需 ' + op.schoolTier + '院校');
     if (op.major && state.major !== op.major) miss.push('专业不对口（需 ' + op.major + '）');
+
+    // v3.43 证书门槛
+    if (op.cert) {
+      if (op.cert === 'cet6') {
+        if (certs.indexOf('cet6') === -1 && certs.indexOf('cet4') === -1) miss.push('需英语四级/六级证书');
+        // 有四级无六级：不置灰，入职月薪打 8 折（applyJobByName 处理）
+      } else {
+        var certName = { lawyer: '法考证书', cpa: 'CPA 注会', teacher: '教师资格证' }[op.cert] || op.cert;
+        if (certs.indexOf(op.cert) === -1) miss.push('需 ' + certName);
+      }
+    }
+
     if (op.req) {
       for (var k in op.req) {
         if (!Object.prototype.hasOwnProperty.call(op.req, k)) continue;
@@ -2666,8 +2698,13 @@
   window.applyJobByName = function (jobName) {
     var op = (JOB_OPENINGS || []).filter(function (o) { return o.job === jobName; })[0];
     if (!op || openingMiss(op).length) return false;
+    var salary = op.salary;
+    var certs = state.certificates || [];
+    if (op.cert === 'cet6' && certs.indexOf('cet6') === -1 && certs.indexOf('cet4') > -1) {
+      salary = Math.round(salary * 0.8);   // v3.43：有四级无六级，月薪打 8 折
+    }
     state.job = op.job;
-    state.salary = op.salary;
+    state.salary = salary;
     state.housing = 'rent';
     state.totalWorkYears = 0;
     state.currentPositionYears = 0;
@@ -2681,10 +2718,74 @@
     var miss = openingMiss(op);
     if (miss.length) { toast(miss.join('；')); return; }
     applyJobByName(jobName);
-    addLog('event', '你入职了「' + op.job + '」，月薪 ' + op.salary + '。');
+    var finalSalary = state.salary;
+    addLog('event', '你入职了「' + op.job + '」，月薪 ' + finalSalary + '。');
     closeJobMarket();
     render();
   }
+
+  /* ================= [UI层] 考证中心（v3.43） ================= */
+  function certMiss(cert) {
+    var miss = [];
+    var certs = state.certificates || [];
+    if (certs.indexOf(cert.id) > -1) miss.push('已持有');
+    if (cert.prereq && cert.prereq.length) {
+      for (var i = 0; i < cert.prereq.length; i++) {
+        if (certs.indexOf(cert.prereq[i]) === -1) {
+          var preName = { cet4: '英语四级', cet6: '英语六级' }[cert.prereq[i]] || cert.prereq[i];
+          miss.push('需先拿 ' + preName);
+        }
+      }
+    }
+    if (cert.studentOnly && !isStudentNow()) miss.push('仅在校大学生可报考');
+    if (cert.major && state.major !== cert.major) miss.push('需 ' + cert.major + '专业');
+    if (cert.minEdu && (EDU_RANK[state.edu] || 0) < (EDU_RANK[cert.minEdu] || 0)) miss.push('学历需 ' + cert.minEdu);
+    if ((Number(state.int) || 0) < cert.intNeed) miss.push('智力差 ' + (cert.intNeed - (Number(state.int) || 0)));
+    return miss;
+  }
+
+  function renderCertMarket() {
+    var list = $('certList');
+    if (!list) return;
+    $('certTitle').textContent = '闭关考证 · 智力 ' + state.int;
+    list.innerHTML = (CERTIFICATES || []).map(function (cert) {
+      var miss = certMiss(cert);
+      var ok = miss.length === 0;
+      return '<div class="job-item">'
+        + '<div class="job-top"><span class="job-name">' + esc(cert.name) + '</span><span class="job-salary">' + cert.costDays + ' 天</span></div>'
+        + '<div class="job-desc">' + esc(cert.desc || '') + '</div>'
+        + (ok ? '' : '<div class="job-req">' + esc(miss.join('；')) + '</div>')
+        + '<button class="job-btn' + (ok ? '' : ' is-locked') + '" type="button" data-cert="' + esc(cert.id) + '"' + (ok ? '' : ' disabled') + '>' + (ok ? '报考' : '不达标') + '</button>'
+        + '</div>';
+    }).join('');
+  }
+
+  function openCertMarket() {
+    renderCertMarket();
+    $('certMask').hidden = false;
+  }
+
+  function closeCertMarket() {
+    $('certMask').hidden = true;
+  }
+
+  function applyCert(certId) {
+    var cert = (CERTIFICATES || []).filter(function (c) { return c.id === certId; })[0];
+    if (!cert) return;
+    if (certMiss(cert).length) { toast('条件不满足'); return; }
+    closeCertMarket();
+    advanceDaysAutoSave(cert.costDays);   // 扣天数（考证耗时，可能触发跨月）
+    if ((Number(state.int) || 0) >= cert.intNeed) {
+      if (state.certificates.indexOf(cert.id) === -1) state.certificates.push(cert.id);
+      addLog('event', '【考证】你通过了「' + cert.name + '」，证书到手！');
+    } else {
+      state.mood = Math.max(0, state.mood - 10);
+      addLog('danger', '【考证】「' + cert.name + '」差一点没过，心情 -10，继续努力。');
+    }
+    render();
+  }
+
+  window.jobOpeningOk = window.jobOpeningOk;
 
   /* ================= [UI层] 按钮渲染（遍历 actionsData） ================= */
   function actionDays(act) { return Math.max(1, Math.round(Number(act.costDays) || 1)); }
@@ -3457,6 +3558,21 @@
       jmMask.addEventListener('click', function (e) { if (e.target === jmMask) closeJobMarket(); });
     }
 
+    var certMask = $('certMask');
+    if (certMask) {
+      $('certList').addEventListener('click', function (e) {
+        var node = e.target;
+        while (node && node !== this) {
+          if (node.getAttribute && node.getAttribute('data-cert') !== null) {
+            applyCert(node.getAttribute('data-cert'));
+            return;
+          }
+          node = node.parentNode;
+        }
+      });
+      certMask.addEventListener('click', function (e) { if (e.target === certMask) closeCertMarket(); });
+    }
+
     bindDevTools();
     $('btnSave').addEventListener('click', saveGame);
     $('btnLoad').addEventListener('click', loadGame);
@@ -3593,6 +3709,10 @@
     applyJobByName: applyJobByName,
     openJobMarket: openJobMarket,
     closeJobMarket: closeJobMarket,
+    openCertMarket: openCertMarket,
+    closeCertMarket: closeCertMarket,
+    applyCert: applyCert,
+    certMiss: certMiss,
 
     // ---- 平衡性模拟专用：只转发既有函数，不改任何逻辑 ----
     simPendingEvent: function () { return pendingEvent; },

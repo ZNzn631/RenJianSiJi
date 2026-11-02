@@ -150,6 +150,12 @@
 
     if (s.mood < 12) return 'rest';
 
+    // v3.43：在校期间考证（先过四级；做题家再冲六级）
+    var certs = s.certificates || [];
+    var isStd = (s.edu === '本科' || s.edu === '专科') && s.age < 22;
+    if (isStd && certs.indexOf('cet4') === -1 && s.int >= 80) return '@cert:cet4';
+    if (isStd && certs.indexOf('cet4') > -1 && certs.indexOf('cet6') === -1 && s.int >= 150 && PERSONA === 'striver') return '@cert:cet6';
+
     if (PERSONA === 'striver') {
       if (!s.salary) {
         if (s.age < 18 || (s.isStudent && s.age < 22)) return 'study';
@@ -214,7 +220,9 @@
       var id = smartAction();                 // v3.25：所有平衡模拟统一用理性 Agent
       if (!id) { steps++; continue; }
       s.logs.length = 0;
-      if (id.charAt(0) === '@') {
+      if (id.indexOf('@cert:') === 0) {
+        RJS.applyCert(id.slice(6));           // v3.43：@cert:cet4 → 考四级
+      } else if (id.charAt(0) === '@') {
         RJS.applyJobByName(id.slice(1));      // v3.39：@职位名 → 直接入职
       } else {
         RJS.doAction(id);

@@ -3487,6 +3487,18 @@
         { label: '见一面', effects: { mood: 2 }, result: '你答应周末去喝杯咖啡，心里有点期待。' },
         { label: '婉拒', effects: { mood: -2, eq: 1 }, result: '你说最近忙，姑姑失望地收起了手机。' }
       ]
+    },
+    /* v3.43：考场踩点（随机事件，考证前的小插曲） */
+    {
+      id: 'E_EXAM_SITE',
+      title: '考场踩点',
+      description: '明天就考试了，你打算提前去考场看看路线，还是先睡一觉再说？',
+      weight: 3,
+      requires: { minAge: 18 },
+      options: [
+        { label: '提前看考场', effects: { intelligence: 2, mood: 1 }, result: '你提前摸清了路线，第二天稳稳当当进了考场。' },
+        { label: '睡过头', effects: { mood: -3 }, result: '闹钟没响，你差点迟到，一路狂奔才赶进考场。' }
+      ]
     }
   ];
   // 合并回全局 eventsData（保持引擎抽取逻辑不变）

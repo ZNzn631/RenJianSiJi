@@ -321,6 +321,20 @@
         openJobMarket();
       }
     },
+    /* v3.43：闭关考证（点击打开考证中心，考证书耗天数 + 智力判定） */
+    {
+      id: 'certStudy',
+      name: '📖 闭关考证',
+      description: '闭关备考，拿下一张证书。',
+      costDays: 1,
+      effects: {},
+      displayEffects: {},
+      hideWhenLocked: false,
+      requires: { minAge: 18 },
+      onRun: function () {
+        openCertMarket();
+      }
+    },
     {
       id: 'promote',
       name: '申请晋升',
@@ -906,18 +920,18 @@
   var JOB_OPENINGS = window.JOB_OPENINGS = [
     { job: '普通文员',   salary: 5000,  minAge: 22, minEdu: '专科', req: { intelligence: 100 }, desc: '坐办公室，先有份工作。' },
     { job: '普通程序员', salary: 15000, minAge: 22, minEdu: '本科', req: { intelligence: 130 }, desc: '小公司外包，先上车再说。' },
-    { job: '大厂程序员', salary: 24000, minAge: 22, minEdu: '本科', schoolTier: '重点', major: '计算机', req: { intelligence: 180 }, desc: '投了三百份简历。' },
-    { job: '人民教师',   salary: 7000,  minAge: 22, minEdu: '本科', major: '师范', req: { eq: 40 }, desc: '考编，然后是几十年的黑板。' },
+    { job: '大厂程序员', salary: 24000, minAge: 22, minEdu: '本科', schoolTier: '重点', major: '计算机', req: { intelligence: 180 }, cert: 'cet6', desc: '投了三百份简历。' },
+    { job: '人民教师',   salary: 7000,  minAge: 22, minEdu: '本科', major: '师范', req: { eq: 40 }, cert: 'teacher', desc: '考编，然后是几十年的黑板。' },
     { job: '外卖骑手',   salary: 8000,  minAge: 20, req: { stamina: 50 }, desc: '今天就能上线，靠腿吃饭。' },
     { job: '网红主播',   salary: 9000,  minAge: 18, req: { cha: 55, luck: 45, money: 1500 }, desc: '补光灯、声卡、一张能说会道的嘴。' },
     { job: '医生',       salary: 15000, minAge: 26, minEdu: '本科', major: '临床医学', req: { intelligence: 200 }, desc: '规培三年，才配拿起第一把手术刀。' },
     { job: '警察',       salary: 9000,  minAge: 22, minEdu: '专科', req: { stamina: 60, will: 50 }, desc: '穿上这身警服，就没有节假日。' },
-    { job: '金融分析师', salary: 18000, minAge: 24, minEdu: '本科', major: '金融学', req: { intelligence: 220 }, desc: '高薪，但你的每个判断都值几千万。' },
+    { job: '金融分析师', salary: 18000, minAge: 24, minEdu: '本科', major: '金融学', req: { intelligence: 220 }, cert: 'cpa', desc: '高薪，但你的每个判断都值几千万。' },
     { job: '设计师',     salary: 12000, minAge: 22, minEdu: '专科', major: '艺术', req: { intelligence: 140, cha: 60 }, desc: '五彩斑斓的黑，是入门第一课。' },
     { job: '厨师',       salary: 7000,  minAge: 20, req: { stamina: 50 }, desc: '热油和菜刀，比想象中更近。' },
-    { job: '律师',       salary: 14000, minAge: 25, minEdu: '本科', major: '法学', req: { intelligence: 200, will: 60 }, desc: '法考通过只是开始。' },
+    { job: '律师',       salary: 14000, minAge: 25, minEdu: '本科', major: '法学', req: { intelligence: 200, will: 60 }, cert: 'lawyer', desc: '法考通过只是开始。' },
     { job: '销售',       salary: 10000, minAge: 22, req: { cha: 65, eq: 55 }, desc: '提成上不封顶，胃也是。' },
-    { job: '公务员',     salary: 8000,  minAge: 24, minEdu: '本科', major: '法学', req: { intelligence: 100 }, desc: '铁饭碗，也是温水。' },
+    { job: '公务员',     salary: 8000,  minAge: 24, minEdu: '本科', major: '法学', req: { intelligence: 100 }, cert: 'cet6', desc: '铁饭碗，也是温水。' },
     /* v3.40：16 个新职业（体质门槛已换算到 0-100） */
     { job: '消防员',   salary: 8000,  minAge: 20, minEdu: '高中', req: { stamina: 60 }, desc: '火场里，没有人等你准备好。' },
     { job: '军人',     salary: 7000,  minAge: 18, minEdu: '高中', req: { stamina: 70 }, desc: '穿上军装，你的命就不再只属于自己。' },
@@ -935,6 +949,15 @@
     { job: '建筑师',   salary: 12000, minAge: 24, minEdu: '本科', major: '土木建筑', req: { intelligence: 250 }, desc: '一栋楼，几代人的身家。' },
     { job: '科研人员', salary: 10000, minAge: 26, minEdu: '硕士', req: { intelligence: 300 }, desc: '几年青春，换一行数据。' },
     { job: '自由职业者', salary: 6000, minAge: 18, req: { cha: 100 }, desc: '收入波动，自由也波动。' }
+  ];
+  // v3.43：证书数据表（闭关考证中心渲染 + 报考判定）
+  // studentOnly=在校大学生专属；prereq=前置证书；major=专业要求；minEdu=学历要求；intNeed=智力硬门槛
+  var CERTIFICATES = window.CERTIFICATES = [
+    { id: 'cet4',    name: '英语四级',   costDays: 10, intNeed: 80,  prereq: [],               studentOnly: true,  desc: '在校大学生专属，难度较低。' },
+    { id: 'cet6',    name: '英语六级',   costDays: 15, intNeed: 150, prereq: ['cet4'],         studentOnly: true,  desc: '前置：需四级证书，难度中等。' },
+    { id: 'teacher', name: '教师资格证', costDays: 15, intNeed: 150, prereq: [], minEdu: '本科', desc: '本科以上，无专业限制，难度中等。' },
+    { id: 'lawyer',  name: '法考证书',   costDays: 30, intNeed: 250, prereq: [], major: '法学', desc: '需法学专业，极高难度。' },
+    { id: 'cpa',     name: 'CPA 注会',   costDays: 30, intNeed: 250, prereq: [], major: '金融学', desc: '需金融专业，极高难度。' }
   ];
   // 兼容旧引用（入职时按职业取名薪）
   var JOBS = {};
