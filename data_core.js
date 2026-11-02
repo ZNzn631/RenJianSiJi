@@ -822,7 +822,84 @@
     // 公务员（3 级）
     '公务员':     { salary: 8000,  next: '副科',     prev: null, requiredIntelligence: 100, req: { workYears: 3, intelligence: 160 } },
     '副科':       { salary: 12000, next: '正科',     prev: '公务员', requiredIntelligence: 160, req: { workYears: 4, intelligence: 220 } },
-    '正科':       { salary: 16000, next: null,       prev: '副科', requiredIntelligence: 220 }
+    '正科':       { salary: 16000, next: null,       prev: '副科', requiredIntelligence: 220 },
+
+    /* v3.40：终极扩充，16 个新职业（最低级 = 职业名，供专属事件 job 判定；体质门槛已换算到 0-100） */
+    // 消防员（3 级）
+    '消防员': { salary: 8000,  next: '班长',   prev: null, requiredIntelligence: 60,  req: { workYears: 2, intelligence: 90 } },
+    '班长':   { salary: 11000, next: '中队长', prev: '消防员', requiredIntelligence: 90,  req: { workYears: 3, intelligence: 120 } },
+    '中队长': { salary: 15000, next: null,     prev: '班长', requiredIntelligence: 120 },
+
+    // 军人（3 级）
+    '军人': { salary: 7000,  next: '士官', prev: null, requiredIntelligence: 60, req: { workYears: 2, intelligence: 90 } },
+    '士官': { salary: 10000, next: '军官', prev: '军人', requiredIntelligence: 90, req: { workYears: 3, intelligence: 120 } },
+    '军官': { salary: 15000, next: null,   prev: '士官', requiredIntelligence: 120 },
+
+    // 司机（2 级）
+    '司机':   { salary: 6000, next: '车队队长', prev: null, requiredIntelligence: 40, req: { workYears: 2, intelligence: 70 } },
+    '车队队长': { salary: 9000, next: null,     prev: '司机', requiredIntelligence: 70 },
+
+    // 快递员（2 级）
+    '快递员':   { salary: 6500, next: '站点站长', prev: null, requiredIntelligence: 45, req: { workYears: 2, intelligence: 80 } },
+    '站点站长': { salary: 9500, next: null,     prev: '快递员', requiredIntelligence: 80 },
+
+    // 电商运营（3 级）
+    '电商运营': { salary: 8000,  next: '运营主管', prev: null, requiredIntelligence: 150, req: { workYears: 2, intelligence: 200 } },
+    '运营主管': { salary: 12000, next: '运营总监', prev: '电商运营', requiredIntelligence: 200, req: { workYears: 3, intelligence: 250 } },
+    '运营总监': { salary: 18000, next: null,     prev: '运营主管', requiredIntelligence: 250 },
+
+    // 作家（3 级）
+    '作家':   { salary: 5000,  next: '签约作家', prev: null, requiredIntelligence: 180, req: { workYears: 2, intelligence: 230 } },
+    '签约作家': { salary: 8000,  next: '白金大神', prev: '作家', requiredIntelligence: 230, req: { workYears: 3, intelligence: 280 } },
+    '白金大神': { salary: 15000, next: null,     prev: '签约作家', requiredIntelligence: 280 },
+
+    // 画家（3 级）
+    '画家':   { salary: 4000, next: '艺术家', prev: null, requiredIntelligence: 150, req: { workYears: 2, intelligence: 200 } },
+    '艺术家': { salary: 7000, next: '名家',   prev: '画家', requiredIntelligence: 200, req: { workYears: 3, intelligence: 250 } },
+    '名家':   { salary: 12000, next: null,   prev: '艺术家', requiredIntelligence: 250 },
+
+    // 音乐人（3 级）
+    '音乐人':     { salary: 5000,  next: '独立音乐人', prev: null, requiredIntelligence: 180, req: { workYears: 2, intelligence: 230 } },
+    '独立音乐人': { salary: 9000,  next: '明星',       prev: '音乐人', requiredIntelligence: 230, req: { workYears: 3, intelligence: 280 } },
+    '明星':       { salary: 20000, next: null,         prev: '独立音乐人', requiredIntelligence: 280 },
+
+    // 演员（3 级）
+    '演员': { salary: 4000,  next: '配角',     prev: null, requiredIntelligence: 250, req: { workYears: 2, intelligence: 300 } },
+    '配角': { salary: 8000,  next: '影帝影后', prev: '演员', requiredIntelligence: 300, req: { workYears: 3, intelligence: 350 } },
+    '影帝影后': { salary: 25000, next: null,   prev: '配角', requiredIntelligence: 350 },
+
+    // 运动员（3 级）
+    '运动员': { salary: 8000,  next: '省队',   prev: null, requiredIntelligence: 70, req: { workYears: 2, intelligence: 100 } },
+    '省队':   { salary: 12000, next: '国家队', prev: '运动员', requiredIntelligence: 100, req: { workYears: 3, intelligence: 130 } },
+    '国家队': { salary: 20000, next: null,     prev: '省队', requiredIntelligence: 130 },
+
+    // 健身教练（3 级）
+    '健身教练': { salary: 7000,  next: '私人教练', prev: null, requiredIntelligence: 200, req: { workYears: 2, intelligence: 230 } },
+    '私人教练': { salary: 11000, next: '店长',     prev: '健身教练', requiredIntelligence: 230, req: { workYears: 3, intelligence: 260 } },
+    '店长':     { salary: 16000, next: null,       prev: '私人教练', requiredIntelligence: 260 },
+
+    // 护士（3 级）
+    '护士':   { salary: 7000,  next: '护师',   prev: null, requiredIntelligence: 150, req: { workYears: 2, intelligence: 200 } },
+    '护师':   { salary: 10000, next: '护士长', prev: '护士', requiredIntelligence: 200, req: { workYears: 3, intelligence: 240 } },
+    '护士长': { salary: 14000, next: null,     prev: '护师', requiredIntelligence: 240 },
+
+    // 药剂师（3 级）
+    '药剂师':   { salary: 8000,  next: '药师',     prev: null, requiredIntelligence: 200, req: { workYears: 2, intelligence: 240 } },
+    '药师':     { salary: 12000, next: '主管药师', prev: '药剂师', requiredIntelligence: 240, req: { workYears: 3, intelligence: 280 } },
+    '主管药师': { salary: 16000, next: null,       prev: '药师', requiredIntelligence: 280 },
+
+    // 建筑师（3 级）
+    '建筑师':   { salary: 12000, next: '高级建筑师', prev: null, requiredIntelligence: 250, req: { workYears: 2, intelligence: 300 } },
+    '高级建筑师': { salary: 18000, next: '总建筑师', prev: '建筑师', requiredIntelligence: 300, req: { workYears: 3, intelligence: 350 } },
+    '总建筑师':   { salary: 26000, next: null,     prev: '高级建筑师', requiredIntelligence: 350 },
+
+    // 科研人员（3 级）
+    '科研人员':   { salary: 10000, next: '副研究员', prev: null, requiredIntelligence: 300, req: { workYears: 2, intelligence: 350 } },
+    '副研究员':   { salary: 15000, next: '首席科学家', prev: '科研人员', requiredIntelligence: 350, req: { workYears: 3, intelligence: 400 } },
+    '首席科学家': { salary: 22000, next: null,       prev: '副研究员', requiredIntelligence: 400 },
+
+    // 自由职业者（无晋升链）
+    '自由职业者': { salary: 6000, next: null, prev: null, requiredIntelligence: 100 }
   };
   // v3.39：人才市场职位表（求职中心 UI 渲染 + 投递简历判定）
   // req 用 ATTRS 的属性名（intelligence/stamina/cha/will/eq/luck/money），key 映射见 ATTRS
@@ -840,7 +917,24 @@
     { job: '厨师',       salary: 7000,  minAge: 20, req: { stamina: 50 }, desc: '热油和菜刀，比想象中更近。' },
     { job: '律师',       salary: 14000, minAge: 25, minEdu: '本科', req: { intelligence: 200, will: 60 }, desc: '法考通过只是开始。' },
     { job: '销售',       salary: 10000, minAge: 22, req: { cha: 65, eq: 55 }, desc: '提成上不封顶，胃也是。' },
-    { job: '公务员',     salary: 8000,  minAge: 24, minEdu: '本科', req: { intelligence: 100 }, desc: '铁饭碗，也是温水。' }
+    { job: '公务员',     salary: 8000,  minAge: 24, minEdu: '本科', req: { intelligence: 100 }, desc: '铁饭碗，也是温水。' },
+    /* v3.40：16 个新职业（体质门槛已换算到 0-100） */
+    { job: '消防员',   salary: 8000,  minAge: 20, minEdu: '高中', req: { stamina: 60 }, desc: '火场里，没有人等你准备好。' },
+    { job: '军人',     salary: 7000,  minAge: 18, minEdu: '高中', req: { stamina: 70 }, desc: '穿上军装，你的命就不再只属于自己。' },
+    { job: '司机',     salary: 6000,  minAge: 22, req: { stamina: 40 }, desc: '一单接一单，方向盘就是饭碗。' },
+    { job: '快递员',   salary: 6500,  minAge: 18, req: { stamina: 45 }, desc: '风里雨里，包裹等你。' },
+    { job: '电商运营', salary: 8000,  minAge: 22, minEdu: '专科', req: { intelligence: 150, eq: 150 }, desc: '流量和转化，是唯一信仰。' },
+    { job: '作家',     salary: 5000,  minAge: 18, req: { intelligence: 180 }, desc: '稿费浮动，灵感靠天。' },
+    { job: '画家',     salary: 4000,  minAge: 18, req: { cha: 150 }, desc: '卖画为生，也卖自己。' },
+    { job: '音乐人',   salary: 5000,  minAge: 18, req: { cha: 180 }, desc: '版权、演出、驻唱，总得先活着。' },
+    { job: '演员',     salary: 4000,  minAge: 18, minEdu: '专科', req: { cha: 250 }, desc: '片酬看脸，也看命。' },
+    { job: '运动员',   salary: 8000,  minAge: 16, req: { stamina: 70 }, desc: '巅峰很短，伤病很长。' },
+    { job: '健身教练', salary: 7000,  minAge: 22, minEdu: '专科', req: { stamina: 50, cha: 150 }, desc: '好身材就是活广告。' },
+    { job: '护士',     salary: 7000,  minAge: 22, minEdu: '专科', req: { stamina: 45, will: 150 }, desc: '白班夜班，脚不沾地。' },
+    { job: '药剂师',   salary: 8000,  minAge: 24, minEdu: '本科', req: { intelligence: 200 }, desc: '抓错一味药，就是一条命。' },
+    { job: '建筑师',   salary: 12000, minAge: 24, minEdu: '本科', req: { intelligence: 250 }, desc: '一栋楼，几代人的身家。' },
+    { job: '科研人员', salary: 10000, minAge: 26, minEdu: '硕士', req: { intelligence: 300 }, desc: '几年青春，换一行数据。' },
+    { job: '自由职业者', salary: 6000, minAge: 18, req: { cha: 100 }, desc: '收入波动，自由也波动。' }
   ];
   // 兼容旧引用（入职时按职业取名薪）
   var JOBS = {};
@@ -1168,7 +1262,7 @@
   var DEBT_STAMINA = 0;                  // v3.3：负债不再扣体质（穷不等于死）
   var DEBT_MOOD = 6;                     // v3.3：改为每月心情 -6
   var PENSION = 1600;                    // v3.2：60 岁起每月养老金（否则退休必然破产）
-  var BENEFIT = 500;                     // v3.2：22 岁以上失业且快没钱时的低保（v3.39：480→500，对冲 16 职场事件引入后的事件池稀释）
+  var BENEFIT = 530;                     // v3.2：22 岁以上失业且快没钱时的低保（v3.40：500→530，对冲 16 新职业+16 事件的事件池稀释）
   var BENEFIT_THRESHOLD = 2000;          // 手头低于这个数才触发低保
   var PENSION_AGE = 60;
 

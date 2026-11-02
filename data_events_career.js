@@ -1108,6 +1108,209 @@
         { label: '耐心解决', effects: { mood: 2, eq: 2 }, result: '你蹲下来，帮他把漏雨的屋顶修好了。老汉塞给你两个煮鸡蛋。' },
         { label: '摆烂应付', effects: { mood: -3, eq: -1 }, result: '你拍完照填完表就走了。回城的路上，你总觉得那老汉还在门口看着你。' }
       ]
+    },
+    /* ================= v3.40 终极职场事件（16 条） =================
+       防穿模：严格 requires { job: '职业名', minAge: 22 }，无业游民触发不了。 */
+    {
+      id: 'E_FIRE_RESCUE',
+      title: '抢险救灾',
+      description: '火场三楼还有两个人没出来，浓烟已经卷到了楼梯口。队长在对讲机里喊：「别上！等云梯！」',
+      weight: 2,
+      requires: { job: '消防员', minAge: 22 },
+      options: [
+        { label: '冲进去救人', effects: { mood: -6 }, result: '', onChoose: function () {
+          if (Math.random() < 0.5) {
+            state.sta = Math.max(0, state.sta - 25); state.will += 5;
+            addLog('event', '【抢险】你把两人背了出来，自己被呛得进了医院。胸前多了枚勋章。');
+            state.hospitalCount = (state.hospitalCount || 0) + 1;
+          } else {
+            state.sta = Math.max(0, state.sta - 10); state.will += 3;
+            addLog('event', '【抢险】你冲进去把人救了出来，只是轻微灼伤。');
+          }
+        } },
+        { label: '撤退保命', effects: { mood: -4, will: -2 }, result: '你退到了安全线外。火被扑灭后，那两个人没能出来。' }
+      ]
+    },
+    {
+      id: 'E_ARMY_RESCUE',
+      title: '抢险救灾',
+      description: '洪水冲垮了堤坝，你所在的分队接到命令，连夜开赴灾区。',
+      weight: 2,
+      requires: { job: '军人', minAge: 22 },
+      options: [
+        { label: '冲在最前面', effects: { mood: -5 }, result: '', onChoose: function () {
+          if (Math.random() < 0.4) {
+            state.sta = Math.max(0, state.sta - 20); state.will += 5;
+            addLog('event', '【抢险】你扛着沙袋冲了一夜，腰伤复发，但守住了村子。');
+            state.hospitalCount = (state.hospitalCount || 0) + 1;
+          } else {
+            state.sta = Math.max(0, state.sta - 8); state.will += 3;
+            addLog('event', '【抢险】你泡在泥水里奋战一夜，天亮了，村民给你递了碗热姜汤。');
+          }
+        } },
+        { label: '服从调度，保存体力', effects: { mood: -2, eq: 1 }, result: '你按命令搬运物资。没有勋章，但你也没逞英雄。' }
+      ]
+    },
+    {
+      id: 'E_ACTOR_RULE',
+      title: '潜规则',
+      description: '试镜结束后，副导演把你单独叫进办公室：「想演主角，总得付出点代价。」',
+      weight: 2,
+      requires: { job: '演员', minAge: 22 },
+      options: [
+        { label: '拒绝', effects: { mood: 3, will: 2 }, result: '你摔门而出。那个角色给了别人，但你不后悔。' },
+        { label: '妥协换资源', effects: { cha: 10, mood: -8, eq: -3 }, result: '你得到了角色，却总在深夜里惊醒。' }
+      ]
+    },
+    {
+      id: 'E_ACTOR_FAME',
+      title: '一夜爆红',
+      description: '你演的一个配角突然全网刷屏，热搜第一，经纪人电话被打爆。',
+      weight: 2,
+      requires: { job: '演员', minAge: 22 },
+      options: [
+        { label: '趁热打铁，接下所有通告', effects: { money: 200000, mood: -10, stamina: -8 }, result: '你赚到了第一桶金，但你的住址、家人、前男友全被扒了个底朝天。' },
+        { label: '低调一段时间', effects: { mood: 2, eq: 1 }, result: '你关掉了手机，回了老家。热度会过去，你不会。' }
+      ]
+    },
+    {
+      id: 'E_MUSIC_RULE',
+      title: '潜规则',
+      description: '音乐制作人拍着你的肩：「你的嗓子不错，但想上节目，得先听我的安排。」',
+      weight: 2,
+      requires: { job: '音乐人', minAge: 22 },
+      options: [
+        { label: '拒绝', effects: { mood: 3, will: 2 }, result: '你背起吉他走了。有些舞台，不上也罢。' },
+        { label: '妥协换资源', effects: { cha: 10, mood: -8, eq: -3 }, result: '你上了节目，红了。但有些事，你永远没法跟别人说。' }
+      ]
+    },
+    {
+      id: 'E_MUSIC_FAME',
+      title: '一夜爆红',
+      description: '你随手录的一段 demo 被短视频带火了，一夜之间涨粉百万。',
+      weight: 2,
+      requires: { job: '音乐人', minAge: 22 },
+      options: [
+        { label: '趁热打铁，全国巡演', effects: { money: 100000, mood: -8, stamina: -6 }, result: '你赚到了版权和演出费，但你的私生活成了网友的谈资。' },
+        { label: '保持神秘，慢慢来', effects: { mood: 2, eq: 1 }, result: '你只接了几场小演出。热度会散，作品不会。' }
+      ]
+    },
+    {
+      id: 'E_ATHLETE_INJURY',
+      title: '跟腱断裂',
+      description: '训练场上，你听到「啪」的一声。跟腱断了，你的职业生涯，可能也断了。',
+      weight: 2,
+      requires: { job: '运动员', minAge: 22 },
+      options: [
+        { label: '动手术康复', effects: { money: -50000, stamina: -30, will: 3 }, result: '你躺在手术台上想：赌一把，还能不能站回赛场。' },
+        { label: '退役转行', effects: { mood: -15 }, result: '你挂了靴。队里给你开了欢送会，你笑着，心里空了一大块。', onChoose: function () { state.job = '无业'; state.salary = 0; state.totalWorkYears = 0; state.currentPositionYears = 0; markJobChange(); addLog('event', '【退役】你退役了。'); } }
+      ]
+    },
+    {
+      id: 'E_WRITER_BLOCK',
+      title: '灵感枯竭',
+      description: '你对着空白文档坐了一下午，一个字也写不出来。编辑在催稿，催了十七次。',
+      weight: 2,
+      requires: { job: '作家', minAge: 22 },
+      options: [
+        { label: '硬写', effects: { mood: -12, stamina: -5 }, result: '你写出来的东西，连自己都看不下去。' },
+        { label: '出去走走', effects: { mood: 2, stamina: 2 }, result: '你在江边坐了一下午。灵感没来，但心情好多了。' }
+      ]
+    },
+    {
+      id: 'E_PAINTER_BLOCK',
+      title: '灵感枯竭',
+      description: '你盯着画布看了半天，调色盘上的颜料都干了，一笔也画不出来。',
+      weight: 2,
+      requires: { job: '画家', minAge: 22 },
+      options: [
+        { label: '硬画', effects: { mood: -12, stamina: -5 }, result: '你画了又刮，刮了又画，画布上只剩一片灰。' },
+        { label: '去美术馆转转', effects: { mood: 2, eq: 1 }, result: '你在别人的画前站了很久。也许，先放下也是一种前进。' }
+      ]
+    },
+    {
+      id: 'E_SCIENCE_FAIL',
+      title: '实验失败',
+      description: '你熬了三年做的项目，数据全部推倒重来。实验室的灯，陪着你一起熬到天亮。',
+      weight: 2,
+      requires: { job: '科研人员', minAge: 22 },
+      options: [
+        { label: '从头再来', effects: { mood: -15, money: -5000, will: 3 }, result: '你把实验记录翻到第一页，从头开始。科研这条路，从来不是直线。' },
+        { label: '换个方向', effects: { mood: -8, eq: 1 }, result: '你把课题调整了方向。有时候，放弃也是一种策略。' }
+      ]
+    },
+    {
+      id: 'E_SCIENCE_FRAUD',
+      title: '学术造假诱惑',
+      description: '你的实验数据一直出不来，但隔壁组靠「调整数据」发了顶刊，名利双收。',
+      weight: 2,
+      requires: { job: '科研人员', minAge: 22 },
+      options: [
+        { label: '坚守底线', effects: { mood: 3, will: 3 }, result: '你把数据原样提交，论文被拒了。但至少，你还能睡踏实。' },
+        { label: '造假赌一把', effects: { mood: -20, eq: -5 }, result: '论文发了，但有人举报了。你的名字被钉在了学术不端的名单上，身败名裂。', onChoose: function () { state.job = '无业'; state.salary = 0; state.totalWorkYears = 0; state.currentPositionYears = 0; markJobChange(); addLog('danger', '【身败名裂】你被开除，学术生涯终结。'); } }
+      ]
+    },
+    {
+      id: 'E_NURSE_DISPUTE',
+      title: '医患纠纷',
+      description: '病人家属在护士站拍桌子，骂你「态度差、不负责」。你已经连续上了十二个小时的班。',
+      weight: 2,
+      requires: { job: '护士', minAge: 22 },
+      options: [
+        { label: '耐心解释', effects: { mood: -8, eq: 2 }, result: '你压着火解释了一遍又一遍，家属终于消了气。你的眼眶却红了。' },
+        { label: '喊保安', effects: { mood: -5, eq: -1 }, result: '保安把家属请了出去。护士长叹了口气：「这行，就是这么熬的。」' }
+      ]
+    },
+    {
+      id: 'E_COURIER_LOST',
+      title: '丢件赔偿',
+      description: '你的三轮车被人撬了，一车的快递没了。客户在电话里骂，站点说要你赔。',
+      weight: 2,
+      requires: { job: '快递员', minAge: 22 },
+      options: [
+        { label: '自己掏腰包赔', effects: { money: -3000, mood: -5 }, result: '你赔了三千块，这个月白干了。' },
+        { label: '报警，让平台处理', effects: { mood: -3, eq: 1 }, result: '你报了警，平台启动了丢失险。钱少赔了点，但流程拖了很久。' }
+      ]
+    },
+    {
+      id: 'E_DRIVER_FATIGUE',
+      title: '疲劳驾驶',
+      description: '你已经连跑了十四个小时，眼皮越来越沉。手机又响了，一单新的派单。',
+      weight: 2,
+      requires: { job: '司机', minAge: 22 },
+      options: [
+        { label: '继续接单', effects: { stamina: -10, money: 300 }, result: '', onChoose: function () {
+          if (Math.random() < 0.3) {
+            state.money -= 2000; state.sta = Math.max(0, state.sta - 10);
+            addLog('danger', '【事故】你追尾了前车，赔了两千。');
+          } else {
+            addLog('event', '【跑单】你又熬了一夜，多赚了三百。');
+          }
+        } },
+        { label: '靠边休息', effects: { mood: 2, stamina: 3 }, result: '你把车停在路边，眯了二十分钟。钱是赚不完的，命只有一条。' }
+      ]
+    },
+    {
+      id: 'E_ECOMMERCE_PROMO',
+      title: '大促通宵',
+      description: '双十一零点，流量暴涨，后台告警一个接一个。老板在群里@你：「稳住！今晚不能崩！」',
+      weight: 2,
+      requires: { job: '电商运营', minAge: 22 },
+      options: [
+        { label: '通宵盯盘', effects: { stamina: -12, money: 3000, mood: -5 }, result: '你熬到早上六点，大促破了纪录。你趴在工位上睡着了。' },
+        { label: '请假回家', effects: { mood: 1, eq: -1 }, result: '你请了假。第二天，同事告诉你昨晚系统崩了十分钟。' }
+      ]
+    },
+    {
+      id: 'E_COACH_INJURY',
+      title: '学员意外',
+      description: '你带学员做硬拉，他逞强加了重量，腰椎「咔」的一声。健身房围上来一群人。',
+      weight: 2,
+      requires: { job: '健身教练', minAge: 22 },
+      options: [
+        { label: '赔钱私了', effects: { money: -5000, mood: -4 }, result: '你赔了五千，馆里扣了你的提成。' },
+        { label: '据理力争，责任划分', effects: { mood: -3, eq: 1 }, result: '监控显示他擅自加重量。你不用赔，但这件事在会员群里传开了。' }
+      ]
     }
   ];
   // 合并回全局 eventsData（保持引擎抽取逻辑不变）
