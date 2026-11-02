@@ -306,74 +306,19 @@
         }
       }
     },
+    /* v3.39：统一求职中心入口（移除散落应聘按钮，人才市场统一投递） */
     {
-      id: 'clerk',
-      name: '应聘普通文员',
-      description: '先有份工作，再想别的。',
+      id: 'jobCenter',
+      name: '💼 投递简历',
+      description: '打开人才市场，看看有什么工作。',
       costDays: 1,
-      effects: { mood: 2, stamina: -1, eq: 1 },
-      displayEffects: { mood: 2, stamina: -1 },
-      hideWhenLocked: true,
-      requires: { minAge: 22, minEdu: '专科', isStudent: false, unemployed: true },   // v3.5.3：坐办公室全职需专科+22岁，18岁只能打零工；v3.7：在校生不投全职
-      onRun: function (act) {
-        state.job = '普通文员';
-        state.salary = JOBS['普通文员'].salary;
-        state.housing = 'rent';                  // v3.5.4：正式工作后租房
-        state.totalWorkYears = 0;                // 新工作，工龄从头算
-        state.currentPositionYears = 0;
-        markJobChange();                         // 入职同样开始计冷却
-        addLog('event', '入职文员，每月月底发薪。');
-      }
-    },
-    {
-      id: 'coderRegular',
-      name: '应聘普通程序员',
-      description: '小公司外包项目，先上车再说。',
-      costDays: 1,
-      effects: { mood: 2, eq: 1 },
-      displayEffects: { mood: 2 },
-      hideWhenLocked: true,
-      requires: {
-        minAge: 22,
-        minEdu: '本科',                          // v3.6：本科即可，不要求 985/211
-        isStudent: false,                        // v3.7：在校生不投全职
-        intelligence: { min: 130 },
-        unemployed: true
-      },
+      effects: {},
+      displayEffects: {},
+      hideWhenLocked: false,
+      requires: { minAge: 18, unemployed: true },
+      denyText: { unemployed: '已有工作，先辞职再来。', minAge: '18 岁才能投递简历。' },
       onRun: function () {
-        state.job = '普通程序员';
-        state.salary = JOBS['普通程序员'].salary;
-        state.housing = 'rent';
-        state.totalWorkYears = 0;
-        state.currentPositionYears = 0;
-        markJobChange();
-        addLog('event', '你入职了一家普通公司做开发，月薪 9000。');
-      }
-    },
-    {
-      id: 'coder',
-      name: '应聘大厂程序员',
-      description: '投了三百份简历。',
-      costDays: 1,
-      effects: { mood: -2, eq: 1 },
-      displayEffects: { mood: -2 },
-      hideWhenLocked: true,
-      requires: {
-        minAge: 22,
-        minEdu: '本科',
-        schoolTier: '重点',                      // v3.6：985/211 才能进大厂
-        isStudent: false,                        // v3.7：在校生不投全职
-        intelligence: { min: 180 },              // v3.6：新数值下达 180 已属千里挑一
-        unemployed: true
-      },
-      onRun: function () {
-        state.job = '大厂程序员';
-        state.salary = JOBS['大厂程序员'].salary;
-        state.housing = 'rent';                  // v3.5.4：正式工作后租房
-        state.totalWorkYears = 0;                // 新工作，工龄从头算
-        state.currentPositionYears = 0;
-        markJobChange();                         // 入职同样开始计冷却
-        addLog('event', '你成功入职大厂，月薪2万。');
+        openJobMarket();
       }
     },
     {
@@ -500,64 +445,6 @@
       }
     },
 
-    /* v3.19：三个新职业的入职入口（数据层新增，不改引擎；晋升/降职对平级职业自动锁死） */
-    {
-      id: 'jobTeacher',
-      name: '应聘人民教师',
-      description: '考编，然后是几十年的黑板。',
-      costDays: 1,
-      effects: { mood: -1, eq: 2 },
-      displayEffects: { mood: -1, eq: 2 },
-      hideWhenLocked: true,
-      requires: { minAge: 22, minEdu: '本科', isStudent: false, unemployed: true, eq: { min: 40 } },
-      onRun: function () {
-        state.job = '人民教师';
-        state.salary = JOBS['人民教师'].salary;
-        state.housing = 'rent';
-        state.totalWorkYears = 0;
-        state.currentPositionYears = 0;
-        markJobChange();
-        addLog('event', '你考上了编制，成了一名教师，月薪 7000。');
-      }
-    },
-    {
-      id: 'jobRider',
-      name: '注册外卖骑手',
-      description: '租车、买箱、领工服，今天就能上线。',
-      costDays: 1,
-      effects: { mood: 1, stamina: -2 },
-      displayEffects: { mood: 1, stamina: -2 },
-      hideWhenLocked: true,
-      requires: { minAge: 20, unemployed: true, stamina: { min: 50 } },
-      onRun: function () {
-        state.job = '外卖骑手';
-        state.salary = JOBS['外卖骑手'].salary;
-        state.housing = 'rent';
-        state.totalWorkYears = 0;
-        state.currentPositionYears = 0;
-        markJobChange();
-        addLog('event', '你成了众包骑手，跑得多月入 8000 上下，全靠这双腿。');
-      }
-    },
-    {
-      id: 'jobStreamer',
-      name: '开播试试',
-      description: '补光灯、声卡、一张能说会道的嘴。',
-      costDays: 1,
-      effects: { mood: 2, stamina: -1, money: -1500 },
-      displayEffects: { mood: 2, money: -1500 },
-      hideWhenLocked: true,
-      requires: { minAge: 18, unemployed: true, cha: { min: 55 }, luck: { min: 45 }, money: { min: 1500 } },
-      onRun: function () {
-        state.job = '网红主播';
-        state.salary = JOBS['网红主播'].salary;
-        state.housing = 'rent';
-        state.totalWorkYears = 0;
-        state.currentPositionYears = 0;
-        markJobChange();
-        addLog('event', '你开了第一个直播间，前三个月月流水 9000 上下，很不稳定。');
-      }
-    },
     /* v3.31：买房（原 E_DOWNPAY 事件改为点击行动触发，成功后 housing='own'） */
     {
       id: 'buyHouse',
@@ -893,8 +780,68 @@
     /* v3.19：职业专属事件需要的三个平级职业（无晋升链，靠跳槽涨薪） */
     '人民教师':   { salary: 7000,  next: null, prev: null, requiredIntelligence: 80 },
     '外卖骑手':   { salary: 8000,  next: null, prev: null, requiredIntelligence: 30 },
-    '网红主播':   { salary: 9000,  next: null, prev: null, requiredIntelligence: 40 }
+    '网红主播':   { salary: 9000,  next: null, prev: null, requiredIntelligence: 40 },
+
+    /* v3.39：8 个高差异化新职业（最低级 = 职业名，晋升链 3-4 级） */
+    // 医生（4 级）
+    '医生':       { salary: 15000, next: '主治医师',   prev: null, requiredIntelligence: 200, req: { workYears: 2, intelligence: 260 } },
+    '主治医师':   { salary: 22000, next: '副主任医师', prev: '医生', requiredIntelligence: 260, req: { workYears: 3, intelligence: 320 } },
+    '副主任医师': { salary: 32000, next: '主任医师',   prev: '主治医师', requiredIntelligence: 320, req: { workYears: 4, intelligence: 380 } },
+    '主任医师':   { salary: 45000, next: null,         prev: '副主任医师', requiredIntelligence: 380 },
+
+    // 警察（3 级）
+    '警察':       { salary: 9000,  next: '刑侦队长', prev: null, requiredIntelligence: 80,  req: { workYears: 2, intelligence: 120 } },
+    '刑侦队长':   { salary: 15000, next: '分局局长', prev: '警察', requiredIntelligence: 120, req: { workYears: 3, intelligence: 180 } },
+    '分局局长':   { salary: 22000, next: null,       prev: '刑侦队长', requiredIntelligence: 180 },
+
+    // 金融分析师（3 级）
+    '金融分析师': { salary: 18000, next: '高级分析师', prev: null, requiredIntelligence: 220, req: { workYears: 2, intelligence: 280 } },
+    '高级分析师': { salary: 26000, next: '基金经理', prev: '金融分析师', requiredIntelligence: 280, req: { workYears: 3, intelligence: 340 } },
+    '基金经理':   { salary: 40000, next: null,       prev: '高级分析师', requiredIntelligence: 340 },
+
+    // 设计师（3 级）
+    '设计师':     { salary: 12000, next: '高级设计师', prev: null, requiredIntelligence: 140, req: { workYears: 2, intelligence: 200 } },
+    '高级设计师': { salary: 18000, next: '设计总监', prev: '设计师', requiredIntelligence: 200, req: { workYears: 3, intelligence: 260 } },
+    '设计总监':   { salary: 25000, next: null,       prev: '高级设计师', requiredIntelligence: 260 },
+
+    // 厨师（3 级）
+    '厨师':       { salary: 7000,  next: '主厨',     prev: null, requiredIntelligence: 40,  req: { workYears: 2, intelligence: 100 } },
+    '主厨':       { salary: 12000, next: '行政总厨', prev: '厨师', requiredIntelligence: 100, req: { workYears: 3, intelligence: 160 } },
+    '行政总厨':   { salary: 18000, next: null,       prev: '主厨', requiredIntelligence: 160 },
+
+    // 律师（3 级）
+    '律师':       { salary: 14000, next: '执业律师', prev: null, requiredIntelligence: 200, req: { workYears: 2, intelligence: 260 } },
+    '执业律师':   { salary: 24000, next: '合伙人', prev: '律师', requiredIntelligence: 260, req: { workYears: 3, intelligence: 320 } },
+    '合伙人':     { salary: 38000, next: null,       prev: '执业律师', requiredIntelligence: 320 },
+
+    // 销售（3 级）
+    '销售':       { salary: 10000, next: '销售经理', prev: null, requiredIntelligence: 60,  req: { workYears: 2, intelligence: 120 } },
+    '销售经理':   { salary: 16000, next: '销售总监', prev: '销售', requiredIntelligence: 120, req: { workYears: 3, intelligence: 180 } },
+    '销售总监':   { salary: 24000, next: null,       prev: '销售经理', requiredIntelligence: 180 },
+
+    // 公务员（3 级）
+    '公务员':     { salary: 8000,  next: '副科',     prev: null, requiredIntelligence: 100, req: { workYears: 3, intelligence: 160 } },
+    '副科':       { salary: 12000, next: '正科',     prev: '公务员', requiredIntelligence: 160, req: { workYears: 4, intelligence: 220 } },
+    '正科':       { salary: 16000, next: null,       prev: '副科', requiredIntelligence: 220 }
   };
+  // v3.39：人才市场职位表（求职中心 UI 渲染 + 投递简历判定）
+  // req 用 ATTRS 的属性名（intelligence/stamina/cha/will/eq/luck/money），key 映射见 ATTRS
+  var JOB_OPENINGS = window.JOB_OPENINGS = [
+    { job: '普通文员',   salary: 5000,  minAge: 22, minEdu: '专科', req: { intelligence: 100 }, desc: '坐办公室，先有份工作。' },
+    { job: '普通程序员', salary: 15000, minAge: 22, minEdu: '本科', req: { intelligence: 130 }, desc: '小公司外包，先上车再说。' },
+    { job: '大厂程序员', salary: 24000, minAge: 22, minEdu: '本科', schoolTier: '重点', req: { intelligence: 180 }, desc: '投了三百份简历。' },
+    { job: '人民教师',   salary: 7000,  minAge: 22, minEdu: '本科', req: { eq: 40 }, desc: '考编，然后是几十年的黑板。' },
+    { job: '外卖骑手',   salary: 8000,  minAge: 20, req: { stamina: 50 }, desc: '今天就能上线，靠腿吃饭。' },
+    { job: '网红主播',   salary: 9000,  minAge: 18, req: { cha: 55, luck: 45, money: 1500 }, desc: '补光灯、声卡、一张能说会道的嘴。' },
+    { job: '医生',       salary: 15000, minAge: 26, minEdu: '本科', req: { intelligence: 200 }, desc: '规培三年，才配拿起第一把手术刀。' },
+    { job: '警察',       salary: 9000,  minAge: 22, minEdu: '专科', req: { stamina: 60, will: 50 }, desc: '穿上这身警服，就没有节假日。' },
+    { job: '金融分析师', salary: 18000, minAge: 24, minEdu: '本科', req: { intelligence: 220 }, desc: '高薪，但你的每个判断都值几千万。' },
+    { job: '设计师',     salary: 12000, minAge: 22, minEdu: '专科', req: { intelligence: 140, cha: 60 }, desc: '五彩斑斓的黑，是入门第一课。' },
+    { job: '厨师',       salary: 7000,  minAge: 20, req: { stamina: 50 }, desc: '热油和菜刀，比想象中更近。' },
+    { job: '律师',       salary: 14000, minAge: 25, minEdu: '本科', req: { intelligence: 200, will: 60 }, desc: '法考通过只是开始。' },
+    { job: '销售',       salary: 10000, minAge: 22, req: { cha: 65, eq: 55 }, desc: '提成上不封顶，胃也是。' },
+    { job: '公务员',     salary: 8000,  minAge: 24, minEdu: '本科', req: { intelligence: 100 }, desc: '铁饭碗，也是温水。' }
+  ];
   // 兼容旧引用（入职时按职业取名薪）
   var JOBS = {};
   for (var _job in CAREER) JOBS[_job] = { salary: CAREER[_job].salary };
@@ -1221,7 +1168,7 @@
   var DEBT_STAMINA = 0;                  // v3.3：负债不再扣体质（穷不等于死）
   var DEBT_MOOD = 6;                     // v3.3：改为每月心情 -6
   var PENSION = 1600;                    // v3.2：60 岁起每月养老金（否则退休必然破产）
-  var BENEFIT = 480;                     // v3.2：22 岁以上失业且快没钱时的低保（v3.38：450→480，对冲亲戚事件引入后的平凡率波动）
+  var BENEFIT = 500;                     // v3.2：22 岁以上失业且快没钱时的低保（v3.39：480→500，对冲 16 职场事件引入后的事件池稀释）
   var BENEFIT_THRESHOLD = 2000;          // 手头低于这个数才触发低保
   var PENSION_AGE = 60;
 

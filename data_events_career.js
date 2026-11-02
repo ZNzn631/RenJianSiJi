@@ -897,6 +897,217 @@
           result: '你把手机翻过去继续睡。后来才知道，那天夜里确实有人一夜暴富，也有人一夜上天台。'
         }
       ]
+    },
+    /* ================= v3.39 职场专属事件（8 职业 × 2，共 16 入口 + 1 链式结果） =================
+       防穿模：全部严格 requires { job: '职业名', minAge: 22 }，无业游民绝对触发不了。
+       厨师「盘店创业」为链式：E_CHEF_STARTUP → E_CHEF_STARTUP_RESULT（chainOnly，无孤儿）。 */
+    {
+      id: 'E_DOCTOR_RIOT',
+      title: '医闹危机',
+      description: '家属拉起了横幅，白底黑字写着「还我命来」。你值完夜班，白大褂上还沾着上一台手术的血。',
+      weight: 3,
+      requires: { job: '医生', minAge: 22 },
+      options: [
+        { label: '赔钱私了', effects: { money: -10000, mood: -6 }, result: '医院赔了钱，你写了份情况说明。那一刻，你第一次怀疑自己为什么要当医生。' },
+        { label: '报警硬刚', effects: { mood: -5, will: 2 }, result: '警察来了，家属散了。但第二天，你的照片被人挂上了网。' }
+      ]
+    },
+    {
+      id: 'E_DOCTOR_SHIFT',
+      title: '连续值班',
+      description: '你已经连续值班 48 小时，站都站不稳了。护士说，还有三台手术在等你。',
+      weight: 3,
+      requires: { job: '医生', minAge: 22 },
+      options: [
+        { label: '喝咖啡硬撑', effects: { stamina: -8, mood: -3 }, result: '你灌下第三杯咖啡，手抖得差点拿不住手术刀。' },
+        { label: '请假休息', effects: { mood: 3, eq: 1 }, result: '你第一次请了假。睡醒时，天已经黑了。' }
+      ]
+    },
+    {
+      id: 'E_POLICE_CHASE',
+      title: '危险追捕',
+      description: '巷子口，一个男人攥着刀，刀尖对着你。手台里队长在喊：「别冲动，等支援！」',
+      weight: 3,
+      requires: { job: '警察', minAge: 22 },
+      options: [
+        { label: '挺身而出', effects: { mood: -8 }, result: '', onChoose: function () {
+          if (state.sta >= 60) {
+            state.sta = Math.max(0, state.sta - 30);
+            addLog('danger', '【追捕】你制伏了歹徒，但腰上挨了一刀，住院半个月。');
+            state.hospitalCount = (state.hospitalCount || 0) + 1;
+          } else {
+            state.sta = Math.max(0, state.sta - 15);
+            addLog('event', '【追捕】你扑上去的时候腿软了，好在队友及时赶到。');
+          }
+        } },
+        { label: '呼叫支援', effects: { mood: -3, eq: 1 }, result: '你举着盾牌稳住局面，三分钟后支援赶到，歹徒被按在地上。' }
+      ]
+    },
+    {
+      id: 'E_POLICE_FESTIVAL',
+      title: '春节值班',
+      description: '大年三十，别人家里包饺子，你在派出所值班室的泡面还冒着热气。',
+      weight: 3,
+      requires: { job: '警察', minAge: 22 },
+      options: [
+        { label: '给家里打个电话', effects: { mood: -5, will: 1 }, result: '电话那头很热闹，你笑着说「明年一定回去」。' },
+        { label: '专心值守', effects: { mood: -8, will: 2 }, result: '你把对讲机别回腰上，出门巡逻。万家灯火，有一盏是你的责任。' }
+      ]
+    },
+    {
+      id: 'E_FINANCE_CRASH',
+      title: '股灾背锅',
+      description: '客户亏了三百万，把一杯水泼在你脸上，说「当初是你让我买的」。',
+      weight: 3,
+      requires: { job: '金融分析师', minAge: 22 },
+      options: [
+        { label: '忍气吞声', effects: { mood: -6, eq: 1 }, result: '你擦干脸，说「我们再看看仓位」。走出会议室，你在楼梯间蹲了很久。' },
+        { label: '霸气回怼', effects: { mood: 3, eq: -2 }, result: '「风险揭示书是您自己签的字。」你平静地说完，转身走了。' }
+      ]
+    },
+    {
+      id: 'E_FINANCE_HEART',
+      title: '过劳心梗',
+      description: '凌晨两点，你盯着满屏的绿字，胸口突然一阵剧痛。手机屏幕还亮着，上面是老板的消息：「报告明早八点要」。',
+      weight: 3,
+      requires: { job: '金融分析师', minAge: 22 },
+      options: [
+        { label: '叫救护车', effects: { money: -5000, stamina: -15, mood: -6 }, result: '你在 ICU 躺了三天。主治医生说，再晚半小时，人就没了。', onChoose: function () { state.hospitalCount = (state.hospitalCount || 0) + 1; } },
+        { label: '吞两片药继续', effects: { stamina: -12, mood: -8 }, result: '你硬撑到天亮。这份报告救了你的职位，但没救你的心脏。' }
+      ]
+    },
+    {
+      id: 'E_DESIGN_CLIENT',
+      title: '奇葩甲方',
+      description: '甲方发来第七版修改意见：「我要的是五彩斑斓的黑，现在这个，太黑了。」',
+      weight: 3,
+      requires: { job: '设计师', minAge: 22 },
+      options: [
+        { label: '改到半夜', effects: { stamina: -8, mood: -5, money: 2000 }, result: '你改到凌晨四点，第八版终于过了。甲方说「还是第一版好」。' },
+        { label: '怒骂甲方', effects: { mood: 2 }, result: '你把键盘拍在桌上，骂了整整十分钟。第二天，HR 把你叫进了办公室。', onChoose: function () { state.job = '无业'; state.salary = 0; state.totalWorkYears = 0; state.currentPositionYears = 0; markJobChange(); addLog('danger', '【被开除】你被开除了。'); } }
+      ]
+    },
+    {
+      id: 'E_DESIGN_OVERTIME',
+      title: '熬夜猝死边缘',
+      description: '连续一个月凌晨下班，你盯着屏幕，眼前开始发黑，心跳快得像要跳出嗓子。',
+      weight: 3,
+      requires: { job: '设计师', minAge: 22 },
+      options: [
+        { label: '继续肝完', effects: { stamina: -12, mood: -6 }, result: '你赶在死线前交了稿，然后趴在桌上睡着了，醒来浑身冷汗。' },
+        { label: '关电脑回家睡觉', effects: { mood: 4, stamina: 3 }, result: '你第一次把没做完的稿子关掉了。天塌不下来，命会。' }
+      ]
+    },
+    {
+      id: 'E_CHEF_BURN',
+      title: '热油烫伤',
+      description: '热油溅起来，你左胳膊瞬间红了一片，痛得你倒吸一口凉气。',
+      weight: 3,
+      requires: { job: '厨师', minAge: 22 },
+      options: [
+        { label: '坚持炒完', effects: { stamina: -8, will: 2 }, result: '你咬着牙把菜出锅。这桌客人不会知道，这道菜里掺了你的血汗。' },
+        { label: '去医院处理', effects: { money: -2000, stamina: 5 }, result: '医生给你涂了药。你看着伤疤，想起师父说的「这行，是拿命换的」。' }
+      ]
+    },
+    {
+      id: 'E_CHEF_STARTUP',
+      title: '盘店创业',
+      description: '你攒够了钱，看中一家临街的小店面。主厨的日子再熬下去，不如自己当老板。',
+      weight: 3,
+      requires: { job: '厨师', minAge: 22, money: { min: 100000 } },
+      options: [
+        { label: '盘下这个店', effects: { money: -100000, mood: -6 }, result: '你交完了转让费，看着空荡荡的后厨，手心全是汗。', nextEventId: 'E_CHEF_STARTUP_RESULT' },
+        { label: '再攒两年', effects: { mood: -2 }, result: '你关掉了中介的微信，继续在后厨颠勺。' }
+      ]
+    },
+    {
+      id: 'E_CHEF_STARTUP_RESULT',
+      title: '一年后',
+      description: '你站在自己店门口，招牌上的字被雨淋得有点掉色。',
+      weight: 1,
+      chainOnly: true,
+      options: [
+        {
+          label: '推门进去',
+          effects: {},
+          result: '',
+          onChoose: function () {
+            if (Math.random() < 0.5) {
+              state.money += 300000; state.mood = Math.min(moodMaxOf(), state.mood + 10);
+              addLog('event', '【创业】你的店成了网红店，一年净赚 30 万！');
+            } else {
+              state.money = Math.max(0, state.money - 50000); state.mood -= 15;
+              addLog('danger', '【创业】店倒闭了，你赔掉了 5 万，还欠着供货商的货款。');
+            }
+          }
+        }
+      ]
+    },
+    {
+      id: 'E_LAWYER_MORAL',
+      title: '良心与金钱',
+      description: '你翻着案卷，突然发现——你的当事人，就是真凶。而胜诉的律师费，够你买半套房。',
+      weight: 3,
+      requires: { job: '律师', minAge: 22 },
+      options: [
+        { label: '继续辩护，拿巨款', effects: { money: 50000, mood: -8 }, result: '你赢了官司。夜里，你梦见死者站在你床头，一句话不说。' },
+        { label: '揭发真相', effects: { mood: 5, eq: 3 }, result: '你退出了案子，当事人被重新调查。钱没了，但你能睡个好觉了。' }
+      ]
+    },
+    {
+      id: 'E_LAWYER_EVIDENCE',
+      title: '取证挨打',
+      description: '你蹲在巷口拍证据，突然被人从背后一脚踹倒。相机摔出去，滚进了下水道。',
+      weight: 3,
+      requires: { job: '律师', minAge: 22 },
+      options: [
+        { label: '爬起来继续', effects: { money: -3000, stamina: -10, mood: -5, will: 2 }, result: '你报了警，重新买了个相机。这案子，你非打到底不可。' },
+        { label: '先撤一步', effects: { mood: -3, eq: 1 }, result: '你躲进便利店，看着那些人走远。命比证据重要。' }
+      ]
+    },
+    {
+      id: 'E_SALES_DRINK',
+      title: '酒桌拼酒',
+      description: '客户举起满满一杯白酒：「干了这杯，千万大单就是你的。」你胃里已经开始翻江倒海。',
+      weight: 3,
+      requires: { job: '销售', minAge: 22 },
+      options: [
+        { label: '继续喝', effects: { money: 10000, stamina: -10, mood: -4 }, result: '你仰头干了，胃里像烧起来一样。单子签了，你在洗手间吐到后半夜。' },
+        { label: '摔杯子走人', effects: { money: -2000, mood: 2, eq: -1 }, result: '你把酒杯放下，说「这单我不做了」。客户的脸，比酒还难看。' }
+      ]
+    },
+    {
+      id: 'E_SALES_RUN',
+      title: '客户跑路',
+      description: '客户公司一夜之间人去楼空。你的提成没了，公司还要你「负责」这笔坏账。',
+      weight: 3,
+      requires: { job: '销售', minAge: 22 },
+      options: [
+        { label: '认了，扣提成', effects: { money: -8000, mood: -8 }, result: '你看着工资条上的负数，第一次觉得「业绩」这两个字这么重。' },
+        { label: '和公司据理力争', effects: { mood: -4, eq: 1 }, result: '你翻出合同，证明自己只负责签单不负责回款。公司没再扣钱，但以后好的客户资源不会给你了。' }
+      ]
+    },
+    {
+      id: 'E_CIVIL_CHECK',
+      title: '迎检突击',
+      description: '上级明天来检查，台账还差三本。你看着满桌的文件夹，太阳穴突突地跳。',
+      weight: 3,
+      requires: { job: '公务员', minAge: 22 },
+      options: [
+        { label: '通宵补台账', effects: { stamina: -10, mood: -4 }, result: '你补到天亮，字写得越来越飘。检查通过了，你不知道该不该高兴。' },
+        { label: '如实上报', effects: { mood: -3, eq: 1 }, result: '你写了份说明，承认台账不齐。领导的脸黑了一整天。' }
+      ]
+    },
+    {
+      id: 'E_CIVIL_POVERTY',
+      title: '基层扶贫',
+      description: '帮扶户的老汉蹲在门口抽旱烟：「你们城里人，来拍个照就走。」',
+      weight: 3,
+      requires: { job: '公务员', minAge: 22 },
+      options: [
+        { label: '耐心解决', effects: { mood: 2, eq: 2 }, result: '你蹲下来，帮他把漏雨的屋顶修好了。老汉塞给你两个煮鸡蛋。' },
+        { label: '摆烂应付', effects: { mood: -3, eq: -1 }, result: '你拍完照填完表就走了。回城的路上，你总觉得那老汉还在门口看着你。' }
+      ]
     }
   ];
   // 合并回全局 eventsData（保持引擎抽取逻辑不变）

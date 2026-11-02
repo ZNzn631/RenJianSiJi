@@ -28,6 +28,7 @@
     if ($('eventMask')) $('eventMask').hidden = true;
     if ($('examMask')) $('examMask').hidden = true;
     if ($('endMask')) $('endMask').hidden = true;
+    if ($('jobMarketMask')) $('jobMarketMask').hidden = true;
   }
   function bounds(tag) {
     var s = S(), b = [];
@@ -175,7 +176,7 @@
   /* ================= B8. 新增【社交】行动 ================= */
   (function social() {
     var act = RJS.actions.filter(function (a) { return a.id === 'social'; })[0];
-    ok('B8 社交行动已注册（共 ' + RJS.actions.length + ' 个行动）', !!act && RJS.actions.length === 32,
+    ok('B8 社交行动已注册（共 ' + RJS.actions.length + ' 个行动）', !!act && RJS.actions.length === 27,
       act ? 'costDays=' + act.costDays : '缺 social');
     if (!act) return;
     restore(PRISTINE);
@@ -517,7 +518,7 @@
 
     // 陪伴行动
     var comp = RJS.actions.filter(function (a) { return a.id === 'companion'; })[0];
-    ok('L4 陪伴已注册（共 ' + RJS.actions.length + ' 个行动）', !!comp && RJS.actions.length === 32, RJS.actions.length);
+    ok('L4 陪伴已注册（共 ' + RJS.actions.length + ' 个行动）', !!comp && RJS.actions.length === 27, RJS.actions.length);
     restore(PRISTINE); S().age = 30;
     ok('L5 单身也能陪伴（不再锁已婚）', RJS.checkRequires(comp).length === 0, '');
     restore(PRISTINE); S().age = 30; S().married = true; S().spouse = '林晓'; S().love = 50; S().money = 5000;
@@ -829,7 +830,7 @@
       alive: true, support: 0, supportDone: false, hasChild: false, lastGrow: kc.y * 12 + kc.m }];
     kc.kids = 1;
     var kact = RJS.actions.filter(function (a) { return a.id === 'kidcare'; })[0];
-    ok('M17 陪孩子已注册（共 ' + RJS.actions.length + ' 个行动）', !!kact && RJS.actions.length === 32, RJS.actions.length);
+    ok('M17 陪孩子已注册（共 ' + RJS.actions.length + ' 个行动）', !!kact && RJS.actions.length === 27, RJS.actions.length);
     S().d = 10;                                     // 固定非月末，避免跨月结算干扰
     var kb = { money: S().money, mood: S().mood, rel: S().children[0].relation };
     RJS.doAction('kidcare');
@@ -1277,7 +1278,7 @@
       var MOODS = [0, 12, 45, 80, 100];
       var LOVES = [0, 15, 35, 60, 85, 100];
       var OFFS = [0, 2, 3, 6, 9, 12];
-      var JOBS = ['无业', '普通文员', '普通程序员', '大厂程序员', '人民教师', '外卖骑手', '网红主播'];   // v3.19：覆盖新职业，否则职业事件会被误判为死事件
+      var JOBS = ['无业', '普通文员', '普通程序员', '大厂程序员', '人民教师', '外卖骑手', '网红主播', '医生', '警察', '金融分析师', '设计师', '厨师', '律师', '销售', '公务员'];   // v3.39：补 8 新职业，否则职业事件会被误判为死事件
       var CITIES = ['normal', 'beijing', 'chengdu', 'changsha', 'hegang', 'county'];   // v3.31.1：覆盖城市，否则城市专属事件会被误判为死事件
       var FRIENDS_VARIANTS = [
         [],

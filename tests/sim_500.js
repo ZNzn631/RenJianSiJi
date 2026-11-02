@@ -101,6 +101,13 @@
     }
     return null;
   }
+  // v3.39：找第一个达标的职位（求职中心统一入职，返回 '@职位名' 供 life() 识别）
+  function firstJobOk(order) {
+    for (var i = 0; i < order.length; i++) {
+      if (RJS.jobOpeningOk && RJS.jobOpeningOk(order[i])) return '@' + order[i];
+    }
+    return null;
+  }
   // v3.27：分层 Agent —— 模拟「社会的参差」。
   //   35% 内卷做题家：读书考大学 → 程序员 → 晋升 → 高收入
   //   35% 普通打工人：不卷学历 → 文员/骑手 → 精打细算
@@ -135,14 +142,14 @@
         if (s.age < 18 || (s.isStudent && s.age < 22)) return 'study';
         if (s.sta < 50) return 'rest';
         if (s.age >= 22) {
-          var j = firstOk(['coder', 'coderRegular', 'clerk', 'jobTeacher', 'jobRider']);
+          var j = firstJobOk(['大厂程序员', '医生', '金融分析师', '律师', '普通程序员', '设计师']);
           if (j) return j;
         }
         return firstOk(['oddjob']) || 'rest';
       }
       if (s.sta < 40) return 'rest';
       if (firstOk(['promote'])) return 'promote';
-      if (s.int < 220) return 'study';
+      if (s.int < 280) return 'study';
       if (s.sta < 70) return 'train';
       return randomAction();
     }
@@ -152,7 +159,7 @@
         if (s.age < 18) return 'rest';                        // 不卷学历
         if (s.sta < 50) return 'rest';
         if (s.age >= 22) {
-          var j = firstOk(['clerk', 'jobTeacher', 'jobRider', 'coderRegular']);
+          var j = firstJobOk(['普通文员', '外卖骑手', '厨师', '销售', '普通程序员']);
           if (j) return j;
         }
         return firstOk(['oddjob']) || 'rest';
@@ -167,7 +174,7 @@
     if (s.mood < 25) return 'rest';
     if (s.sta < 20) return 'rest';
     if (s.age >= 20 && s.sta >= 50 && Math.random() < 0.2) {
-      var j = firstOk(['jobRider']);
+      var j = firstJobOk(['外卖骑手', '厨师']);
       if (j) return j;
     }
     return firstOk(['oddjob']) || 'rest';
@@ -194,7 +201,11 @@
       var id = smartAction();                 // v3.25：所有平衡模拟统一用理性 Agent
       if (!id) { steps++; continue; }
       s.logs.length = 0;
-      RJS.doAction(id);
+      if (id.charAt(0) === '@') {
+        RJS.applyJobByName(id.slice(1));      // v3.39：@职位名 → 直接入职
+      } else {
+        RJS.doAction(id);
+      }
       steps++;
       var mk = s.y * 12 + s.m;
       if (mk !== lastMonth) {

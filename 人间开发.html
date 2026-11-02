@@ -235,6 +235,19 @@
   .opt-meta{font-size:10px;color:var(--soft);letter-spacing:.02em}
   .event-opt:hover .opt-meta{color:#d0d0d0}
 
+  /* 人才市场（v3.39） */
+  .job-list{display:flex;flex-direction:column;gap:8px;padding:0 18px 18px;max-height:52vh;overflow-y:auto}
+  .job-item{border:1px solid var(--ink);padding:10px 12px;display:flex;flex-direction:column;gap:5px}
+  .job-item .job-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .job-item .job-name{font-size:14px;letter-spacing:.12em}
+  .job-item .job-salary{font-size:11px;font-family:'Press Start 2P','Zpix',monospace;color:#8a8a8a}
+  .job-item .job-desc{font-size:11px;color:#666;line-height:1.6}
+  .job-item .job-req{font-size:10px;color:#c62828;line-height:1.6}
+  .job-item .job-btn{align-self:flex-end;appearance:none;cursor:pointer;font-family:inherit;background:var(--paper);color:var(--ink);border:1px solid var(--ink);padding:5px 14px;font-size:12px;letter-spacing:.1em}
+  .job-item .job-btn:hover{background:var(--ink);color:var(--paper)}
+  .job-item .job-btn.is-locked{opacity:.42;border-style:dashed;cursor:not-allowed}
+  .job-item .job-btn.is-locked:hover{background:var(--paper);color:var(--ink)}
+
   /* 人生结算面板 */
   .end-modal{box-shadow:8px 8px 0 rgba(17,17,17,.14)}
   .end-hero{padding:18px 18px 12px;border-bottom:1px solid var(--hair)}
@@ -1948,6 +1961,19 @@
   </div>
 </div>
 
+<!-- 人才市场（v3.39）：统一求职中心，投递简历后弹出 -->
+<div class="modal-mask" id="jobMarketMask" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="jobMarketTitle">
+    <div class="panel-h">
+      <span>人才市场</span>
+      <span class="hint" id="jobMarketDate">18 岁起可投递</span>
+    </div>
+    <div class="event-title" id="jobMarketTitle">—</div>
+    <p class="event-desc">达标显示绿色【投递】，不达标置灰并提示缺什么。</p>
+    <div class="job-list" id="jobMarketList"></div>
+  </div>
+</div>
+
 <!-- 童年前史（v3.28）：只播 6–15 岁的回忆，不推进时间 -->
 <div class="modal-mask" id="prologueMask" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="prologueTitle">
@@ -2584,6 +2610,79 @@
     }
 
     openSetup();                                // v3.4-S4：真实玩家 → 回设置页重新起名/抽天赋
+  }
+
+  /* ================= [UI层] 人才市场（v3.39 求职中心） ================= */
+  function openingMiss(op) {
+    var miss = [];
+    var age = getAge();
+    if (age < (op.minAge || 0)) miss.push('年龄差 ' + ((op.minAge || 0) - age) + ' 岁');
+    if (op.minEdu && (EDU_RANK[state.edu] || 0) < (EDU_RANK[op.minEdu] || 0)) miss.push('学历需 ' + op.minEdu);
+    if (op.schoolTier && state.schoolTier !== op.schoolTier) miss.push('需 ' + op.schoolTier + '院校');
+    if (op.req) {
+      for (var k in op.req) {
+        if (!Object.prototype.hasOwnProperty.call(op.req, k)) continue;
+        var at = ATTRS[k];
+        if (!at) continue;
+        var need = op.req[k];
+        var cur = Number(state[at.key]) || 0;
+        if (cur < need) miss.push((at.label || k) + '差 ' + (need - cur));
+      }
+    }
+    return miss;
+  }
+
+  function renderJobMarket() {
+    var list = $('jobMarketList');
+    if (!list) return;
+    $('jobMarketTitle').textContent = '求职中心 · ' + cityName();
+    list.innerHTML = (JOB_OPENINGS || []).map(function (op) {
+      var miss = openingMiss(op);
+      var ok = miss.length === 0;
+      return '<div class="job-item">'
+        + '<div class="job-top"><span class="job-name">' + esc(op.job) + '</span><span class="job-salary">¥' + op.salary.toLocaleString('en-US') + '/月</span></div>'
+        + '<div class="job-desc">' + esc(op.desc || '') + '</div>'
+        + (ok ? '' : '<div class="job-req">' + esc(miss.join('；')) + '</div>')
+        + '<button class="job-btn' + (ok ? '' : ' is-locked') + '" type="button" data-job="' + esc(op.job) + '"' + (ok ? '' : ' disabled') + '>' + (ok ? '投递' : '不达标') + '</button>'
+        + '</div>';
+    }).join('');
+  }
+
+  function openJobMarket() {
+    renderJobMarket();
+    $('jobMarketMask').hidden = false;
+  }
+
+  function closeJobMarket() {
+    $('jobMarketMask').hidden = true;
+  }
+
+  window.jobOpeningOk = function (jobName) {
+    var op = (JOB_OPENINGS || []).filter(function (o) { return o.job === jobName; })[0];
+    return !!op && openingMiss(op).length === 0;
+  };
+
+  window.applyJobByName = function (jobName) {
+    var op = (JOB_OPENINGS || []).filter(function (o) { return o.job === jobName; })[0];
+    if (!op || openingMiss(op).length) return false;
+    state.job = op.job;
+    state.salary = op.salary;
+    state.housing = 'rent';
+    state.totalWorkYears = 0;
+    state.currentPositionYears = 0;
+    markJobChange();
+    return true;
+  };
+
+  function applyJob(jobName) {
+    var op = (JOB_OPENINGS || []).filter(function (o) { return o.job === jobName; })[0];
+    if (!op) return;
+    var miss = openingMiss(op);
+    if (miss.length) { toast(miss.join('；')); return; }
+    applyJobByName(jobName);
+    addLog('event', '你入职了「' + op.job + '」，月薪 ' + op.salary + '。');
+    closeJobMarket();
+    render();
   }
 
   /* ================= [UI层] 按钮渲染（遍历 actionsData） ================= */
@@ -3342,6 +3441,21 @@
       });
     }
 
+    var jmMask = $('jobMarketMask');
+    if (jmMask) {
+      $('jobMarketList').addEventListener('click', function (e) {
+        var node = e.target;
+        while (node && node !== this) {
+          if (node.getAttribute && node.getAttribute('data-job') !== null) {
+            applyJob(node.getAttribute('data-job'));
+            return;
+          }
+          node = node.parentNode;
+        }
+      });
+      jmMask.addEventListener('click', function (e) { if (e.target === jmMask) closeJobMarket(); });
+    }
+
     bindDevTools();
     $('btnSave').addEventListener('click', saveGame);
     $('btnLoad').addEventListener('click', loadGame);
@@ -3472,6 +3586,12 @@
     devSubInt: devSubInt,
     devAddAge: devAddAge,
     devSetEdu: devSetEdu,
+
+    // ---- v3.39：求职中心（供模拟 Agent 与测试复用）----
+    jobOpeningOk: jobOpeningOk,
+    applyJobByName: applyJobByName,
+    openJobMarket: openJobMarket,
+    closeJobMarket: closeJobMarket,
 
     // ---- 平衡性模拟专用：只转发既有函数，不改任何逻辑 ----
     simPendingEvent: function () { return pendingEvent; },
