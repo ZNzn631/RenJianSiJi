@@ -1311,6 +1311,397 @@
         { label: '赔钱私了', effects: { money: -5000, mood: -4 }, result: '你赔了五千，馆里扣了你的提成。' },
         { label: '据理力争，责任划分', effects: { mood: -3, eq: 1 }, result: '监控显示他擅自加重量。你不用赔，但这件事在会员群里传开了。' }
       ]
+    },
+    /* ================= v3.41 终极专属事件全量补全（28 入口 + 5 链式） =================
+       防穿模：严格 requires { job: '具体职业名', minAge: 22 }；链式事件均 chainOnly，无孤儿无死链。 */
+    {
+      id: 'E_CODER_35',
+      title: '35 岁大限',
+      description: 'HR 把你请进会议室，桌上放着一份 N+1 的补偿协议：「公司需要年轻血液，你懂的。」',
+      weight: 3,
+      requires: { job: '普通程序员', minAge: 22 },
+      options: [
+        { label: '拿钱走人', effects: { money: 60000, mood: -6 }, result: '你签了字，抱着纸箱走出大楼。外面阳光很好，你不知道该往哪走。', onChoose: function () { state.job = '无业'; state.salary = 0; state.totalWorkYears = 0; state.currentPositionYears = 0; markJobChange(); } },
+        { label: '降薪苟活', effects: { money: -3000, mood: -8 }, result: '你接受了降薪 30%。工位保住了，但每天路过那张协议，心里都堵得慌。' }
+      ]
+    },
+    {
+      id: 'E_CODER_OPENSOURCE',
+      title: '开源爆火',
+      description: '你随手开源的项目突然火了，GitHub 星标一夜破万，投资人找上门来。',
+      weight: 2,
+      requires: { job: '普通程序员', minAge: 22 },
+      options: [
+        { label: '辞职创业', effects: { mood: -4 }, result: '你辞了职，把全部身家押在了这个项目上。', nextEventId: 'E_CODER_OPENSOURCE_RESULT' },
+        { label: '维护社区，积攒声誉', effects: { cha: 5, mood: 3 }, result: '你利用业余时间维护项目，成了圈子里小有名气的人。' }
+      ]
+    },
+    {
+      id: 'E_CODER_OPENSOURCE_RESULT',
+      title: '半年后',
+      description: '创业半年，你的项目要么拿到了融资，要么已经凉了。',
+      weight: 1,
+      chainOnly: true,
+      options: [
+        { label: '看看账户', effects: {}, result: '', onChoose: function () {
+          if (Math.random() < 0.4) { state.money += 300000; state.mood += 8; addLog('event', '【创业】你拿到了 A 轮融资，估值千万！'); }
+          else { state.money = Math.max(0, state.money - 30000); state.mood -= 12; addLog('danger', '【创业】项目凉了，你赔了 3 万，只能回去继续投简历。'); }
+        } }
+      ]
+    },
+    {
+      id: 'E_CODER_DB',
+      title: '删库边缘',
+      description: '你手一抖，在生产库里执行了一条 DELETE 语句，没有 WHERE。屏幕上的提示，像一盆冰水。',
+      weight: 3,
+      requires: { job: '普通程序员', minAge: 22 },
+      options: [
+        { label: '通宵恢复', effects: { stamina: -10, mood: -5 }, result: '你从备份里一点一点恢复，天亮时，数据回来了。你的后背全湿了。' },
+        { label: '提桶跑路', effects: { mood: -8 }, result: '你关了电脑，订了张回老家的票。', onChoose: function () { state.job = '无业'; state.salary = 0; state.totalWorkYears = 0; state.currentPositionYears = 0; markJobChange(); } }
+      ]
+    },
+    {
+      id: 'E_DOCTOR_GIFT',
+      title: '红包诱惑',
+      description: '病人家属把你拉到楼梯间，往你白大褂口袋里塞了个厚厚的红包：「医生，您多费心。」',
+      weight: 3,
+      requires: { job: '医生', minAge: 22 },
+      options: [
+        { label: '收下', effects: { money: 10000, mood: -5 }, result: '你把红包揣进口袋。夜里，你盯着它，怎么也睡不着。' },
+        { label: '严词拒绝', effects: { will: 3, eq: 2 }, result: '你把红包塞回去：「治病救人，是我的本分。」家属愣了一下，连声道谢。' }
+      ]
+    },
+    {
+      id: 'E_FINANCE_INSIDER',
+      title: '内幕交易',
+      description: '你无意中看到上司电脑上的并购方案。这消息要是提前买入，能赚几十万。',
+      weight: 3,
+      requires: { job: '金融分析师', minAge: 22 },
+      options: [
+        { label: '偷偷买入，赌一把', effects: { mood: -6 }, result: '', onChoose: function () {
+          if (Math.random() < 0.5) { state.money += 50000; addLog('event', '【内幕】你赚了 5 万，但每天都在担心被查到。'); }
+          else { state.money = Math.max(0, state.money - 30000); state.mood -= 12; addLog('danger', '【内幕】消息走漏，你被证监会调查，罚款 3 万。'); }
+        } },
+        { label: '举报上司', effects: { will: 3, mood: 2 }, result: '你向上级举报了。上司被带走调查，你被调去了另一个组。' }
+      ]
+    },
+    {
+      id: 'E_TEACHER_STAR',
+      title: '状元导师',
+      description: '你带的学生考了全市状元。记者扛着摄像机堵在校门口，校长笑成了一朵花。',
+      weight: 3,
+      requires: { job: '人民教师', minAge: 22 },
+      options: [
+        { label: '接受采访', effects: { cha: 5, mood: 3 }, result: '你在镜头前说「是孩子自己努力」。台下掌声雷动。' },
+        { label: '趁机开辅导班赚钱', effects: { money: 20000, mood: -3 }, result: '你开了个冲刺班，家长挤破了门。钱是赚到了，但你知道，这不是你当老师的初心。' }
+      ]
+    },
+    {
+      id: 'E_CIVIL_PROMOTE',
+      title: '提拔边缘',
+      description: '单位有个副科的空缺，领导把你叫进办公室：「这次，就看你会不会做人了。」',
+      weight: 3,
+      requires: { job: '公务员', minAge: 22 },
+      options: [
+        { label: '送 5 万', effects: { money: -50000, mood: -5 }, result: '', onChoose: function () { if (Math.random() < 0.3) { state.job = '副科'; state.salary = 12000; addLog('event', '【提拔】你如愿升了副科。'); } else { state.money -= 50000; addLog('danger', '【落空】钱打了水漂，位子给了别人。'); } } },
+        { label: '靠业绩硬刚', effects: { will: 2, mood: -2 }, result: '你把手头的工作做得无可挑剔。领导没再提那件事。' }
+      ]
+    },
+    {
+      id: 'E_WRITER_COPYRIGHT',
+      title: '影视化版权',
+      description: '你的小说被影视公司看中，版权费开到两百万。合同就摆在桌上。',
+      weight: 2,
+      requires: { job: '作家', minAge: 22 },
+      options: [
+        { label: '签了', effects: { money: 200000, mood: -3 }, result: '你签了字。从此，你的故事不再只属于你自己。', nextEventId: 'E_WRITER_COPYRIGHT_RESULT' },
+        { label: '不卖，保持纯粹', effects: { mood: 2, will: 2 }, result: '你把合同推了回去。有些故事，不该被资本改得面目全非。' }
+      ]
+    },
+    {
+      id: 'E_WRITER_COPYRIGHT_RESULT',
+      title: '开拍之后',
+      description: '影视化开拍后，你被邀请去探班。',
+      weight: 1,
+      chainOnly: true,
+      options: [
+        { label: '去片场看看', effects: {}, result: '', onChoose: function () {
+          if (Math.random() < 0.5) { state.money += 100000; state.mood += 6; addLog('event', '【版权】剧爆了，你又拿到一笔分红。'); }
+          else { state.mood -= 8; addLog('sys', '【版权】剧扑了，原著也被骂上了热搜。'); }
+        } }
+      ]
+    },
+    {
+      id: 'E_PAINTER_VANGOGH',
+      title: '梵高困境',
+      description: '你的画挂了一个月，一幅也没卖出去。房东又来催房租了。',
+      weight: 3,
+      requires: { job: '画家', minAge: 22 },
+      options: [
+        { label: '继续画', effects: { mood: -8, will: 3 }, result: '你用最后一点颜料画了幅自画像。很多年后，它成了你的代表作。' },
+        { label: '转行求生', effects: { mood: -5 }, result: '你收起了画笔，找了份工作。画，只能等以后了。', onChoose: function () { state.job = '无业'; state.salary = 0; state.totalWorkYears = 0; state.currentPositionYears = 0; markJobChange(); } }
+      ]
+    },
+    {
+      id: 'E_PAINTER_GALLERY',
+      title: '画廊赏识',
+      description: '一家画廊看中了你的作品，想给你办个展。',
+      weight: 2,
+      requires: { job: '画家', minAge: 22 },
+      options: [
+        { label: '办展', effects: { money: 50000, cha: 5 }, result: '开展那天，你的画卖掉了大半。你站在自己的画前，眼眶有点湿。' },
+        { label: '低调拒绝', effects: { mood: 2 }, result: '你觉得时候未到，婉拒了。画廊老板留了张名片。' }
+      ]
+    },
+    {
+      id: 'E_MUSIC_STREET',
+      title: '地下通道卖唱',
+      description: '你在天桥下摆开琴盒，一首接一首地唱。路过的人，偶尔丢下几个硬币。',
+      weight: 3,
+      requires: { job: '音乐人', minAge: 22 },
+      options: [
+        { label: '唱到深夜', effects: { money: 500, cha: 2, mood: -2 }, result: '你唱到嗓子哑了，琴盒里有几张纸币，和一个陌生人的字条：「加油」。' },
+        { label: '收摊回家', effects: { mood: -2 }, result: '你收起琴，走了。有些歌，唱给懂的人听就够了。' }
+      ]
+    },
+    {
+      id: 'E_MUSIC_COPY',
+      title: '抄袭风波',
+      description: '你的新歌被指抄袭，网上骂声一片，合作方要求解约。',
+      weight: 3,
+      requires: { job: '音乐人', minAge: 22 },
+      options: [
+        { label: '自证清白', effects: { eq: 2, mood: -3 }, result: '你翻出创作手稿，逐段对比。真相大白，骂你的人散了。' },
+        { label: '沉默冷处理', effects: { mood: -5, cha: -5 }, result: '你选择沉默。热度退了，但「抄袭」两个字粘在了你的名字上。' }
+      ]
+    },
+    {
+      id: 'E_ACTOR_EXTRA',
+      title: '横店群演死尸',
+      description: '你在横店演一具死尸，躺在泥地里一整天，脸上糊着假血。',
+      weight: 3,
+      requires: { job: '演员', minAge: 22 },
+      options: [
+        { label: '认真演，等一个镜头', effects: { money: 200, cha: 3, mood: -2 }, result: '副导演注意到了你：「那个死尸，演得不错，明天来试个台词。」' },
+        { label: '躺平摸鱼', effects: { mood: -3 }, result: '你在泥地里睡了一觉，收工时领了份盒饭。' }
+      ]
+    },
+    {
+      id: 'E_ACTOR_DINNER',
+      title: '金主饭局',
+      description: '经纪人把你拉到饭局上，金主端着酒杯笑：「陪我喝高兴了，女主就是你的。」',
+      weight: 3,
+      requires: { job: '演员', minAge: 22 },
+      options: [
+        { label: '陪酒换女主', effects: { money: 100000, mood: -10, eq: -3 }, result: '你拿到了女主，却在片场总想吐。' },
+        { label: '拒绝', effects: { mood: 3, will: 2 }, result: '你放下酒杯走了。那个角色给了别人，但你还挺得住。' }
+      ]
+    },
+    {
+      id: 'E_ATHLETE_GOLD',
+      title: '奥运选拔夺金',
+      description: '奥运选拔赛，你站在起跑线上。这一枪，可能改变你的一生。',
+      weight: 2,
+      requires: { job: '运动员', minAge: 22 },
+      options: [
+        { label: '全力冲刺', effects: { mood: -4 }, result: '', onChoose: function () {
+          if (Math.random() < 0.4) { state.money += 100000; state.cha += 10; addLog('event', '【夺金】你夺冠了！国歌响起，你泪流满面。'); }
+          else { state.mood -= 8; addLog('sys', '【遗憾】你差了 0.01 秒，与奖牌擦肩而过。'); }
+        } },
+        { label: '保守应战', effects: { mood: 1 }, result: '你发挥稳定，进了前八。虽没夺金，也算对得起自己。' }
+      ]
+    },
+    {
+      id: 'E_FIRE_FAMILY',
+      title: '家属劝转行',
+      description: '妻子把手机新闻递到你面前：「又牺牲一个。你能不能……为了我和孩子，换个工作？」',
+      weight: 3,
+      requires: { job: '消防员', minAge: 22 },
+      options: [
+        { label: '继续留下', effects: { will: 3, mood: -2 }, result: '你抱住她：「总得有人去。我保证，每次都会平安回来。」' },
+        { label: '听劝转行', effects: { mood: 2 }, result: '你交了调岗申请。离开那天，你把头盔擦得干干净净。', onChoose: function () { state.job = '无业'; state.salary = 0; state.totalWorkYears = 0; state.currentPositionYears = 0; markJobChange(); } }
+      ]
+    },
+    {
+      id: 'E_ARMY_RETIRE',
+      title: '退伍转业',
+      description: '服役期满，你面临抉择：是留队继续，还是转业回到地方？',
+      weight: 3,
+      requires: { job: '军人', minAge: 22 },
+      options: [
+        { label: '转业', effects: { mood: -3 }, result: '你办完手续，脱下军装，叠得整整齐齐。', nextEventId: 'E_ARMY_RETIRE_RESULT' },
+        { label: '继续留队', effects: { will: 2, mood: -2 }, result: '你递交了留队申请，继续在军营里摸爬滚打。' }
+      ]
+    },
+    {
+      id: 'E_ARMY_RETIRE_RESULT',
+      title: '转业安置',
+      description: '地方安置的消息下来了。',
+      weight: 1,
+      chainOnly: true,
+      options: [
+        { label: '看结果', effects: {}, result: '', onChoose: function () {
+          if (Math.random() < 0.5) { state.job = '公务员'; state.salary = 8000; addLog('event', '【转业】你被安置进了事业单位，端上了铁饭碗。'); }
+          else { state.job = '无业'; state.salary = 0; addLog('sys', '【待业】安置没落实，你先回了老家。'); }
+          state.totalWorkYears = 0; state.currentPositionYears = 0; markJobChange();
+        } }
+      ]
+    },
+    {
+      id: 'E_COACH_RICH',
+      title: '富婆学员的诱惑',
+      description: '一位富婆学员课后把你拉到一边：「陪我上私教，学费翻三倍，另有一份心意。」',
+      weight: 3,
+      requires: { job: '健身教练', minAge: 22 },
+      options: [
+        { label: '接受', effects: { money: 30000, mood: -8 }, result: '你接下了这份私教。钱不少，但你总觉得哪里不对劲。' },
+        { label: '拒绝，保持专业', effects: { will: 2, mood: 1 }, result: '你婉拒了：「我只教健身，不教别的。」富婆笑了笑，没再提。' }
+      ]
+    },
+    {
+      id: 'E_COURIER_STEAL',
+      title: '私吞贵重快递',
+      description: '你分拣时发现一个包裹没贴单，里面是一台最新款的手机。四下无人。',
+      weight: 3,
+      requires: { job: '快递员', minAge: 22 },
+      options: [
+        { label: '私吞', effects: { money: 5000, mood: -8 }, result: '', onChoose: function () {
+          if (Math.random() < 0.4) { state.money -= 5000; state.mood -= 10; addLog('danger', '【东窗事发】监控拍到了你，你被开除并赔了五千。'); }
+          else { addLog('sys', '【侥幸】没人发现，但你的手一直在抖。'); }
+        } },
+        { label: '上交', effects: { will: 2, mood: 1 }, result: '你把它交到了失物处。站长拍着你的肩说「好样的」。' }
+      ]
+    },
+    {
+      id: 'E_DRIVER_TRAP',
+      title: '乘客仙人跳',
+      description: '深夜，乘客下车后，几个壮汉围了上来，说你在车里「不老实」，要你赔钱。',
+      weight: 3,
+      requires: { job: '司机', minAge: 22 },
+      options: [
+        { label: '破财消灾', effects: { money: -3000, mood: -5 }, result: '你转了三万，他们才散。这一夜，白干了。' },
+        { label: '报警', effects: { eq: 2, mood: -2 }, result: '你锁了车门报了警。警察来了，那伙人跑了。' }
+      ]
+    },
+    {
+      id: 'E_ECOMMERCE_BAN',
+      title: '刷单被封店',
+      description: '你刷单冲销量的店铺被平台判定违规，一夜之间封了。',
+      weight: 3,
+      requires: { job: '电商运营', minAge: 22 },
+      options: [
+        { label: '申诉', effects: { mood: -4 }, result: '你熬夜写了申诉材料，等待平台回复。', nextEventId: 'E_ECOMMERCE_BAN_RESULT' },
+        { label: '认罚，重开一店', effects: { money: -10000, mood: -5 }, result: '你交了罚款，重新起号。一切从头再来。' }
+      ]
+    },
+    {
+      id: 'E_ECOMMERCE_BAN_RESULT',
+      title: '申诉结果',
+      description: '平台申诉的结果出来了。',
+      weight: 1,
+      chainOnly: true,
+      options: [
+        { label: '查看结果', effects: {}, result: '', onChoose: function () {
+          if (Math.random() < 0.5) { state.money += 5000; addLog('event', '【申诉成功】店解封了，平台还赔了点补偿金。'); }
+          else { state.money -= 8000; state.mood -= 8; addLog('danger', '【申诉失败】店永久封禁，你损失惨重。'); }
+        } }
+      ]
+    },
+    {
+      id: 'E_ARCH_BLAME',
+      title: '图纸出事背锅',
+      description: '工地出了事故，追责追到了你画的图纸。领导说：「年轻人，扛一下，回头补偿你。」',
+      weight: 3,
+      requires: { job: '建筑师', minAge: 22 },
+      options: [
+        { label: '主动担责', effects: { money: -20000, mood: -6, will: 2 }, result: '你签了责任认定书。罚款交完，你在工地上站了很久。' },
+        { label: '推给下属', effects: { eq: -3, mood: -3 }, result: '你把责任推给了画图的实习生。他没吭声，第二天辞了职。' }
+      ]
+    },
+    {
+      id: 'E_ARCH_WAGE',
+      title: '烂尾楼讨薪',
+      description: '项目烂尾，开发商跑路，你带着一群工人去讨薪。',
+      weight: 3,
+      requires: { job: '建筑师', minAge: 22 },
+      options: [
+        { label: '带头讨薪', effects: { will: 3, mood: -4 }, result: '', onChoose: function () {
+          if (Math.random() < 0.5) { state.money += 30000; addLog('event', '【讨薪成功】工钱要回来了一部分，你分到了三万。'); }
+          else { state.money -= 5000; state.mood -= 6; addLog('danger', '【讨薪失败】对方躲了，你垫了五千给最困难的工人。'); }
+        } },
+        { label: '自认倒霉', effects: { money: -5000, mood: -8 }, result: '你没去讨薪，自己贴了五千。这行，水太深了。' }
+      ]
+    },
+    {
+      id: 'E_SCIENCE_BOOM',
+      title: '实验爆炸',
+      description: '一声巨响，反应釜炸了。你被气浪掀翻在地，实验室里浓烟滚滚。',
+      weight: 3,
+      requires: { job: '科研人员', minAge: 22 },
+      options: [
+        { label: '爬起来检查原因', effects: { stamina: -10, mood: -5, will: 2 }, result: '你忍着痛排查事故原因。安全报告写完，天已经亮了。' },
+        { label: '暂停项目', effects: { mood: -3 }, result: '你申请暂停了项目。安全第一，这条命还等着你出成果。' }
+      ]
+    },
+    {
+      id: 'E_SCIENCE_NATURE',
+      title: '发 Nature 顶刊',
+      description: '你的论文被 Nature 接收了。这是你熬了六年的成果。',
+      weight: 2,
+      requires: { job: '科研人员', minAge: 22 },
+      options: [
+        { label: '接受百万年薪挖角', effects: { money: 500000, mood: -2 }, result: '你签了挖角协议，年薪百万。', nextEventId: 'E_SCIENCE_NATURE_RESULT' },
+        { label: '留在原单位', effects: { mood: 3, will: 2 }, result: '你留了下来，继续带学生。荣誉归你，也归实验室。' }
+      ]
+    },
+    {
+      id: 'E_SCIENCE_NATURE_RESULT',
+      title: '新实验室',
+      description: '新单位给了你一整层楼。',
+      weight: 1,
+      chainOnly: true,
+      options: [
+        { label: '开始新征程', effects: {}, result: '', onChoose: function () {
+          state.money += 300000; state.cha += 5;
+          addLog('event', '【顶刊】你成了首席科学家，年薪百万，团队几十人。');
+        } }
+      ]
+    },
+    {
+      id: 'E_NURSE_DRUG',
+      title: '发错药危机',
+      description: '你核对时发现，自己把 7 床和 9 床的药发反了。冷汗瞬间下来了。',
+      weight: 3,
+      requires: { job: '护士', minAge: 22 },
+      options: [
+        { label: '立即上报补救', effects: { stamina: -8, mood: -6, eq: 2 }, result: '你第一时间上报，医生及时处理，病人无碍。护士长拍了拍你：「下次，再慢一点。」' },
+        { label: '隐瞒', effects: { mood: -10 }, result: '', onChoose: function () {
+          if (Math.random() < 0.4) { state.money -= 8000; state.mood -= 10; addLog('danger', '【医疗事故】病人出了状况，你被追责。'); }
+          else { addLog('sys', '【侥幸】病人没大碍，但你再也睡不踏实了。'); }
+        } }
+      ]
+    },
+    {
+      id: 'E_PHARM_KICKBACK',
+      title: '医药代表给回扣',
+      description: '医药代表把一个信封推到你面前：「下个月，多进点我们家的药。」',
+      weight: 3,
+      requires: { job: '药剂师', minAge: 22 },
+      options: [
+        { label: '收下', effects: { money: 20000, mood: -5 }, result: '你收下了信封。从此，每次进货你都绕不开这家。' },
+        { label: '拒绝', effects: { will: 3 }, result: '你把信封推了回去：「药，我只认疗效。」代表悻悻地走了。' }
+      ]
+    },
+    {
+      id: 'E_FREELANCE_STARVE',
+      title: '吃了上顿没下顿',
+      description: '这个月一个单子也没接到，你看着账户余额，盘算着还能撑几天。',
+      weight: 3,
+      requires: { job: '自由职业者', minAge: 22 },
+      options: [
+        { label: '接急单', effects: { money: 1000, stamina: -5, mood: -3 }, result: '你接了个急单，熬了一夜。钱到账了，人快没了。' },
+        { label: '吃老本', effects: { money: -2000, mood: -4 }, result: '你从存款里又取了两千。自由是真自由，穷也是真穷。' }
+      ]
     }
   ];
   // 合并回全局 eventsData（保持引擎抽取逻辑不变）
