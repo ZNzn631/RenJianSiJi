@@ -59,6 +59,19 @@
       RJS.simChoose(cBest);
       return;
     }
+    // v3.42：专业绑定 —— 按人设选专业，避免「专业不对口」卡死职业路径
+    if (ev.id === 'E_APPLY_MAJOR') {
+      if (PERSONA === 'striver') {
+        // 做题家：计算机（目标大厂程序员）优先，其次金融
+        RJS.simChoose(free.indexOf(0) > -1 ? 0 : (free.indexOf(3) > -1 ? 3 : free[0]));
+      } else if (PERSONA === 'worker') {
+        // 打工人：师范（稳定）优先，其次计算机
+        RJS.simChoose(free.indexOf(5) > -1 ? 5 : (free.indexOf(0) > -1 ? 0 : free[0]));
+      } else {
+        RJS.simChoose(free[Math.floor(Math.random() * free.length)]);
+      }
+      return;
+    }
     // 10% 作死：偏要挑最「伤」的（硬扛疾病、冲动花大钱）
     if (Math.random() < 0.10) {
       var worst = free[0], worstScore = Infinity;

@@ -2619,6 +2619,7 @@
     if (age < (op.minAge || 0)) miss.push('年龄差 ' + ((op.minAge || 0) - age) + ' 岁');
     if (op.minEdu && (EDU_RANK[state.edu] || 0) < (EDU_RANK[op.minEdu] || 0)) miss.push('学历需 ' + op.minEdu);
     if (op.schoolTier && state.schoolTier !== op.schoolTier) miss.push('需 ' + op.schoolTier + '院校');
+    if (op.major && state.major !== op.major) miss.push('专业不对口（需 ' + op.major + '）');
     if (op.req) {
       for (var k in op.req) {
         if (!Object.prototype.hasOwnProperty.call(op.req, k)) continue;

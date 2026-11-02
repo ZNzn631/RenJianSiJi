@@ -102,18 +102,18 @@
     {
       id: 'E_APPLY_MAJOR',
       title: '填报志愿',
-      description: '志愿表摊在桌上。热门专业分数线悬在头顶，爸妈在旁边说「稳一点好」。',
+      description: '志愿表摊在桌上。这一次，你要为自己选一条路。',
       weight: 4,
-      requires: { onceEver: true, alreadyExam: true, minAge: 18, maxAge: 19, education: ['高中'] },   // v3.5.6：先高考再填志愿（alreadyExam 保证参加过高考）
+      requires: { onceEver: true, alreadyExam: true, minAge: 18, maxAge: 19, education: ['高中'] },   // v3.5.6：先高考再填志愿
       options: [
-        {
-          label: '冲热门计算机',
-          effects: { intelligence: 6, mood: -8 },
-          result: '你被调剂到了「信息管理」，课程表上一半的课看不懂。',
-          nextEventId: 'E_FAMILY_QUARREL'
-        },
-        { label: '稳妥选师范', effects: { mood: 5, intelligence: 2 }, result: '录取通知书寄到那天，爸妈请了三桌。' },
-        { label: '全听爸妈的', effects: { mood: -10, intelligence: 3 }, result: '你签完字才意识到，这个专业你根本不喜欢。' }
+        { label: '冲计算机（高薪）', effects: { intelligence: 6, mood: -4 }, result: '你选了计算机。未来十年，代码就是你的饭碗。', nextEventId: 'E_FAMILY_QUARREL', onChoose: function () { state.major = '计算机'; } },
+        { label: '学临床医学（当医生）', effects: { intelligence: 6, will: 2, mood: -4 }, result: '你选了临床医学。这条路很长，但穿上白大褂的那一刻，值。', onChoose: function () { state.major = '临床医学'; } },
+        { label: '学法，考律师', effects: { intelligence: 5, mood: -3 }, result: '你选了法学。从此，逻辑和证据就是你的武器。', onChoose: function () { state.major = '法学'; } },
+        { label: '学金融，进投行', effects: { intelligence: 6, mood: -4 }, result: '你选了金融学。钱生钱的世界，等着你。', onChoose: function () { state.major = '金融学'; } },
+        { label: '学土木/建筑', effects: { intelligence: 5, stamina: 2, mood: -3 }, result: '你选了土木建筑。钢筋水泥里，藏着你的图纸。', onChoose: function () { state.major = '土木建筑'; } },
+        { label: '稳妥选师范', effects: { mood: 5, intelligence: 2 }, result: '你选了师范。三尺讲台，桃李满园。', onChoose: function () { state.major = '师范'; } },
+        { label: '走艺术路线', effects: { mood: 3, cha: 5, intelligence: 1 }, result: '你选了艺术。这条路不好走，但你认了。', onChoose: function () { state.major = '艺术'; } },
+        { label: '全听爸妈的', effects: { mood: -10, intelligence: 3 }, result: '', onChoose: function () { var majors = ['计算机', '临床医学', '法学', '金融学', '土木建筑', '师范', '艺术']; state.major = majors[Math.floor(Math.random() * majors.length)]; addLog('sys', '爸妈帮你选了「' + state.major + '」。'); } }
       ]
     },
     {
@@ -1382,6 +1382,157 @@
           effects: { mood: -6, will: 2, eq: 1 },
           result: '你选的其实是他们选的。你后来花了很多年才接受这件事。'
         }
+      ]
+    },
+    /* ================= v3.42 大学专属事件（12 条 + 1 链式） =================
+       防穿模：严格 requires { isStudent: true, minAge: 18, maxAge: 22 }，毕业/非在校生绝对触发不了。 */
+    {
+      id: 'E_U_MATH_FAIL',
+      title: '高数挂科',
+      description: '高数期末成绩出来了：59 分。就差一分，你挂了。',
+      weight: 4,
+      requires: { isStudent: true, minAge: 18, maxAge: 22 },
+      options: [
+        { label: '给老师送礼求情', effects: { money: -2000, mood: -4 }, result: '你拎着水果去了办公室。老师没收，但把平时分往上提了提。' },
+        { label: '通宵补考', effects: { stamina: -8, mood: -5, intelligence: 2 }, result: '你熬了一周，补考过了。高数，这辈子不想再见。' }
+      ]
+    },
+    {
+      id: 'E_U_CET4_FAIL',
+      title: '四六级考试',
+      description: '英语四级成绩出来了，你差了 12 分。辅导员说，四级不过，拿不到学位证。',
+      weight: 4,
+      requires: { isStudent: true, minAge: 18, maxAge: 22 },
+      options: [
+        { label: '花 5000 报辅导班', effects: { money: -5000, intelligence: 3, mood: -2 }, result: '你报了班，天天背单词。下次考试，过了。' },
+        { label: '裸考碰运气', effects: { mood: -2 }, result: '', onChoose: function () { if (Math.random() < 0.5) { state.int += 2; addLog('event', '【四级】你运气不错，压线过了。'); } else { addLog('sys', '【四级】又没过，你只能再战。'); } } }
+      ]
+    },
+    {
+      id: 'E_U_MAJOR_SPLIT',
+      title: '专业分流',
+      description: '大二了，专业要分流。你站在岔路口，得选个方向。',
+      weight: 4,
+      requires: { isStudent: true, minAge: 18, maxAge: 22 },
+      options: [
+        { label: '选热门方向', effects: { intelligence: 5, mood: -2 }, result: '你选了竞争最激烈的方向。卷，但是有前途。' },
+        { label: '选感兴趣的', effects: { mood: 4, intelligence: 2 }, result: '你选了自己喜欢的。课业累，但心里踏实。' },
+        { label: '随大流', effects: { mood: -1, eq: 1 }, result: '你看室友选什么就选什么。省心，但没主见。' }
+      ]
+    },
+    {
+      id: 'E_U_INTERN',
+      title: '大厂实习',
+      description: '大三，你拿到了大厂的实习 offer。但实习意味着翘课、通勤、熬夜。',
+      weight: 4,
+      requires: { isStudent: true, minAge: 18, maxAge: 22 },
+      options: [
+        { label: '去实习', effects: { money: 3000, intelligence: 5, mood: -3 }, result: '你挤早高峰地铁去实习，晚上回来补作业。累，但简历好看了。' },
+        { label: '专心考研', effects: { intelligence: 5, mood: 1 }, result: '你拒了 offer，回图书馆占座。考研，才是你的目标。' }
+      ]
+    },
+    {
+      id: 'E_U_LAB',
+      title: '实验室搬砖',
+      description: '导师把你叫进实验室：「这个项目，你帮着跑跑数据。没工资，但能学东西。」',
+      weight: 4,
+      requires: { isStudent: true, minAge: 18, maxAge: 22 },
+      options: [
+        { label: '任劳任怨', effects: { intelligence: 5, stamina: -5, mood: -3 }, result: '你跑了三个月数据，熬了无数个夜。论文二作上有你的名字。' },
+        { label: '摸鱼', effects: { mood: 2, eq: -2 }, result: '你三天打鱼两天晒网。导师在组会上点名批评了你。' }
+      ]
+    },
+    {
+      id: 'E_U_THESIS',
+      title: '毕业论文',
+      description: '论文查重结果出来了：重复率 48%。导师说，降到 10% 以下才能答辩。',
+      weight: 4,
+      requires: { isStudent: true, minAge: 18, maxAge: 22 },
+      options: [
+        { label: '花 3000 找代写', effects: { money: -3000, mood: -4 }, result: '', onChoose: function () { if (Math.random() < 0.3) { state.money -= 3000; state.mood -= 10; addLog('danger', '【代写】被查出学术不端，你被记过了！'); } else { state.int += 2; addLog('sys', '【代写】论文过了，但你心里有愧。'); } } },
+        { label: '熬夜自己改', effects: { stamina: -10, mood: -5, intelligence: 3 }, result: '你逐句改写，熬了整整一周。查重率降到了 8%，顺利答辩。' }
+      ]
+    },
+    {
+      id: 'E_U_DORM_GAME',
+      title: '宿舍开黑',
+      description: '室友又开黑了，键盘声、喊麦声此起彼伏。你明天还有早八。',
+      weight: 4,
+      requires: { isStudent: true, minAge: 18, maxAge: 22 },
+      options: [
+        { label: '加入他们', effects: { mood: 6, stamina: -3, intelligence: -1 }, result: '你们打到凌晨三点，早八的课全翘了。' },
+        { label: '戴耳塞忍了', effects: { mood: -4, stamina: -1 }, result: '你盯着天花板，直到声音停下。' },
+        { label: '让他小点声', effects: { mood: -2, intelligence: 1 }, result: '他嘴上答应了，声音只小了三分钟。' }
+      ]
+    },
+    {
+      id: 'E_U_LOVE',
+      title: '大学恋爱',
+      description: '图书馆靠窗的位置，有个人每天都在。你偷偷看了 TA 一整个学期。',
+      weight: 4,
+      requires: { isStudent: true, minAge: 18, maxAge: 22 },
+      options: [
+        { label: '主动搭话', effects: { mood: 2 }, result: '你鼓起勇气走过去：「这个位置，有人吗？」', nextEventId: 'E_U_LOVE_RESULT' },
+        { label: '默默离开', effects: { mood: -2 }, result: '你抱着书走了。有些心动，只适合留在心里。' }
+      ]
+    },
+    {
+      id: 'E_U_LOVE_RESULT',
+      title: '后来',
+      description: '你们聊了起来，越聊越投机。',
+      weight: 1,
+      chainOnly: true,
+      options: [
+        { label: '看看结果', effects: {}, result: '', onChoose: function () {
+          if (Math.random() < 0.5) { state.loveState = 'dating'; state.datingLove = 50; state.partnerName = 'TA'; state.mood += 8; addLog('event', '【恋爱】你们在一起了。校园里的日子，突然有了颜色。'); }
+          else { state.mood -= 4; addLog('sys', '【错过】TA 说已经有喜欢的人了。你笑了笑，说「那祝福你们」。'); }
+        } }
+      ]
+    },
+    {
+      id: 'E_U_GRAD_CHOICE',
+      title: '考研抉择',
+      description: '大三下学期，你站在三岔路口：考研、考公，还是直接就业？',
+      weight: 4,
+      requires: { isStudent: true, minAge: 18, maxAge: 22 },
+      options: [
+        { label: '考研', effects: { intelligence: 8, mood: -3 }, result: '你买齐了资料，住进了自习室。' },
+        { label: '考公', effects: { mood: 1, will: 2 }, result: '你开始刷行测申论，目标是上岸。' },
+        { label: '直接就业', effects: { mood: 1, eq: 1 }, result: '你开始改简历，投了出去。' }
+      ]
+    },
+    {
+      id: 'E_U_STUDENT_UNION',
+      title: '学生会主席',
+      description: '换届竞选，你站上了讲台。台下几百双眼睛看着你。',
+      weight: 4,
+      requires: { isStudent: true, minAge: 18, maxAge: 22 },
+      options: [
+        { label: '全力竞选', effects: { cha: 5, eq: 3, mood: 2, stamina: -3 }, result: '你当选了学生会主席。从此，会议和活动填满了你的课余。' },
+        { label: '专心学习', effects: { mood: 1, intelligence: 3 }, result: '你没参加竞选，把时间留给了图书馆。' }
+      ]
+    },
+    {
+      id: 'E_U_TUTOR',
+      title: '兼职家教',
+      description: '周末的家教兼职又来了。学生是个调皮的中学生，教起来很费劲。',
+      weight: 4,
+      requires: { isStudent: true, minAge: 18, maxAge: 22 },
+      options: [
+        { label: '认真教', effects: { money: 800, mood: -2, intelligence: 1 }, result: '你把知识点掰开揉碎讲，学生终于听懂了。' },
+        { label: '糊弄过去', effects: { money: 500, mood: -1, eq: -1 }, result: '你随便讲了讲。家长看你的眼神，不太对。' }
+      ]
+    },
+    {
+      id: 'E_U_GRADUATION',
+      title: '毕业典礼',
+      description: '学士帽抛向天空，四年的时光，在这一刻盖了章。',
+      weight: 3,
+      requires: { isStudent: true, minAge: 18, maxAge: 22 },
+      options: [
+        { label: '拍下这一刻', effects: { mood: 12 }, result: '你举着毕业证，笑得像个孩子。' },
+        { label: '和老师同学道别', effects: { mood: 8, eq: 2 }, result: '你说「常联系」，转身红了眼眶。' },
+        { label: '站在校门口，看人来人往', effects: { mood: 6, will: 3 }, result: '你站了很久，然后转身，走向下一段人生。' }
       ]
     }
 ,

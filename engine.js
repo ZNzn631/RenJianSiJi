@@ -706,6 +706,7 @@
       talents: talents,                                // [{ id, level }]
       school: '',                                      // 当前学校名
       schoolTier: '普通',                              // 重点 / 普通 / 职高
+      major: '',                                       // v3.42：大学专业（''=未填志愿 / 计算机/临床医学/法学/金融学/土木建筑/师范/艺术）
       schoolBonus: 0,                                  // 高考加分（学校档次）
       examLog: [],                                     // 历次升学考核
       milestones: [],                                  // 已触发的年龄节点
@@ -2261,6 +2262,7 @@
       talents: [],
       school: '',
       schoolTier: '普通',
+      major: (typeof s.major === 'string' && s.major) ? s.major : '',   // v3.42：大学专业，旧档缺失 → ''
       schoolBonus: 0,
       examLog: [],
       milestones: [],
