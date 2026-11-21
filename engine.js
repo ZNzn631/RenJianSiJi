@@ -502,6 +502,19 @@
         detail: '连续冷战 ' + cur + ' 个月（需满 ' + need + ' 个月）',
         suffix: true
       };
+    },
+    // v3.44：大学年级（grade: 3 = 大三；grade: 5 = 已毕业）
+    grade: function (v) {
+      var need = Number(v);
+      if (!isFinite(need)) return null;
+      var cur = Number(state.grade) || 0;
+      if (cur === need) return null;
+      var label = { 1: '大一', 2: '大二', 3: '大三', 4: '大四', 5: '毕业' };
+      return {
+        key: 'grade', title: '年级不符',
+        detail: '需 ' + (label[need] || (need + ' 年级')) + '（当前 ' + (label[cur] || '未入学') + '）',
+        suffix: false
+      };
     }
   };
 
@@ -509,7 +522,8 @@
 
   // 在校生统一判定（与 REQUIRE_RULES.isStudent 同源，避免两处漂移）
   function isStudentNow() {
-    return (state.edu === '本科' || state.edu === '专科') && getAge() < 22;
+    var g = Number(state.grade) || 0;
+    return (state.edu === '本科' || state.edu === '专科') && g >= 1 && g <= 4;   // v3.44：改用年级判定
   }
 
   // 高考后暑假过渡态：懒初始化 + 到期自动清除，只读/写 state 新字段
@@ -707,7 +721,8 @@
       school: '',                                      // 当前学校名
       schoolTier: '普通',                              // 重点 / 普通 / 职高
       major: '',                                       // v3.42：大学专业（''=未填志愿 / 计算机/临床医学/法学/金融学/土木建筑/师范/艺术）
-      certificates: [],                                // v3.43：已获证书（['cet4','cet6','teacher','lawyer','cpa']）
+      certificates: [],                                // v3.43：已获证书
+      grade: 0,                                        // v3.44：大学年级（1-4=大一~大四，5=毕业，0=未入学）
       schoolBonus: 0,                                  // 高考加分（学校档次）
       examLog: [],                                     // 历次升学考核
       milestones: [],                                  // 已触发的年龄节点
@@ -1095,9 +1110,17 @@
 
     checkMilestones();                             // 18 岁高考里程碑（只排队，不弹窗）
 
-    // v3.43 毕业卡口：22 岁毕业时没过四级 → 红字警告（不改 state.edu，只警告 + 拦求职）
-    if (state.age === 22 && (state.edu === '本科' || state.edu === '专科') && (state.certificates || []).indexOf('cet4') === -1) {
-      addLog('danger', '【毕业】你未能拿到学位证（未过英语四级），只能以结业生身份求职。');
+    // v3.44：大学年级推进（本科/专科），grade>4 自动毕业
+    if (state.edu === '本科' || state.edu === '专科') {
+      if ((Number(state.grade) || 0) === 0) state.grade = 1;
+      else if ((Number(state.grade) || 0) < 5) state.grade += 1;
+      if ((Number(state.grade) || 0) > 4) {
+        state.grade = 5;
+        addLog('event', '【毕业】你大学毕业了，四年时光在这一天画上句号。');
+        if ((state.certificates || []).indexOf('cet4') === -1) {
+          addLog('danger', '【毕业】你未能拿到学位证（未过英语四级），只能以结业生身份求职。');
+        }
+      }
     }
 
     if (state.salary > 0) {
@@ -1670,7 +1693,7 @@
     return {
       id: 'DISEASE_' + d.id,
       title: '生病了：' + d.name,
-      description: '你最近总觉得不舒服，去医院检查后确诊「' + d.name + '」。'
+      description: (d.cause ? d.cause + '。' : '你最近总觉得不舒服，去医院检查后确诊「' + d.name + '」。')
         + (state.hasInsurance ? '（有医保，治疗费打 2 折）' : ''),
       options: [
         {
@@ -1755,6 +1778,8 @@
   // 结算写盘：只写 edu / school / examLog，不碰其它系统
   function applyExamResult(stage, score, line) {
     if (line.edu) state.edu = line.edu;
+    // v3.44：录取即大一（grade=1），否则 18 岁当年 isStudentNow=false 会去打工
+    if ((line.edu === '本科' || line.edu === '专科') && (Number(state.grade) || 0) === 0) state.grade = 1;
     if (stage === 'gaokao' && line.edu && line.edu !== '高中') state.housing = 'dorm';   // v3.5.4：高考/升学成功→住宿舍（教育结果副作用，不改判定）
     state.schoolTier = line.tier;
     state.school = (stage === 'gaokao' && line.school)
@@ -2270,6 +2295,7 @@
       schoolTier: '普通',
       major: (typeof s.major === 'string' && s.major) ? s.major : '',   // v3.42：大学专业，旧档缺失 → ''
       certificates: (Array.isArray(s.certificates)) ? s.certificates.filter(function (x) { return typeof x === 'string'; }) : [],   // v3.43：证书，旧档缺失 → []
+      grade: asInt(s.grade, ((s.edu === '本科' || s.edu === '专科') && (Number(s.age) || 0) < 22) ? 1 : 0, 0, 5),   // v3.44：年级，旧档 isStudent → 1
       schoolBonus: 0,
       examLog: [],
       milestones: [],

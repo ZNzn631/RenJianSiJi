@@ -152,13 +152,13 @@
 
     // v3.43：在校期间考证（先过四级；做题家再冲六级）
     var certs = s.certificates || [];
-    var isStd = (s.edu === '本科' || s.edu === '专科') && s.age < 22;
+    var isStd = (s.edu === '本科' || s.edu === '专科') && s.age < 22;   // v3.44：恢复 edu+age 判定（与 isStudentNow 等价，但避开 grade 0 边界）
     if (isStd && certs.indexOf('cet4') === -1 && s.int >= 80) return '@cert:cet4';
     if (isStd && certs.indexOf('cet4') > -1 && certs.indexOf('cet6') === -1 && s.int >= 150 && PERSONA === 'striver') return '@cert:cet6';
 
     if (PERSONA === 'striver') {
       if (!s.salary) {
-        if (s.age < 18 || (s.isStudent && s.age < 22)) return 'study';
+        if (s.age < 18 || ((s.edu === '本科' || s.edu === '专科') && s.age < 22)) return 'study';
         if (s.sta < 50) return 'rest';
         if (s.age >= 22) {
           var j = firstJobOk(['大厂程序员', '医生', '金融分析师', '律师', '普通程序员', '设计师']);

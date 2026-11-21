@@ -30,6 +30,7 @@
     if ($('endMask')) $('endMask').hidden = true;
     if ($('jobMarketMask')) $('jobMarketMask').hidden = true;
     if ($('certMask')) $('certMask').hidden = true;
+    if ($('companionMask')) $('companionMask').hidden = true;
   }
   function bounds(tag) {
     var s = S(), b = [];
@@ -393,10 +394,10 @@
   ok('G4 19 岁/本科后校园池关闭', el19.length === 0, el19.join(','));
 
   restore(PRISTINE);
-  var t1 = S().y * 372 + S().m * 31 + S().d;
+  var t1 = absDay(S());
   var okCnt = 0;
   for (var i = 0; i < 10; i++) { if (RJS.doAction('rest') === true) okCnt++; if (!$('eventMask').hidden) clickFreeOption(); }
-  var t2 = S().y * 372 + S().m * 31 + S().d;
+  var t2 = absDay(S());
   ok('G5 连点休息 10 次推进 10 天且日期连续', t2 - t1 === 10 && okCnt === 10, t1 + '→' + t2 + ' 成功' + okCnt);
 
   var bad = 0;
@@ -525,10 +526,12 @@
     restore(PRISTINE); S().age = 30; S().married = true; S().spouse = '林晓'; S().love = 50; S().money = 5000;
     S().d = 10;                                     // 固定非月末，避免跨月结算干扰
     var b4 = { love: S().love, money: S().money, mood: S().mood };
-    var retC = RJS.doAction('companion');
-    ok('L6 陪伴：感情 +8 / 金钱 −100 / 心情 +3 / 推进 1 天',
-      retC === true && S().love === b4.love + 8 && S().money === b4.money - 100 && S().mood >= b4.mood + 3,
-      'love+' + (S().love - b4.love) + ' money' + (S().money - b4.money) + ' mood+' + (S().mood - b4.mood));
+    var retC = RJS.doAction('companion');                     // v3.44：打开陪伴弹窗
+    var compOpen = retC === true && !$('companionMask').hidden;
+    RJS.applyCompanion('spouse_date');                       // 浪漫约会
+    ok('L6 陪伴弹窗 → 浪漫约会（感情 +10 / 金钱 −300 / 心情 +15）',
+      compOpen && S().love === b4.love + 10 && S().money === b4.money - 300 && S().mood >= b4.mood + 15,
+      'open=' + compOpen + ' love+' + (S().love - b4.love) + ' money' + (S().money - b4.money) + ' mood+' + (S().mood - b4.mood));
 
     // 家庭月结：家用 = max(800, 月薪×15%)，感情 −1
     restore(PRISTINE);
@@ -1270,7 +1273,7 @@
       s.pendingExam = null; s.ended = false;
       var hit = {}; for (i = 0; i < EV.length; i++) hit[EV[i].id] = 0;
 
-      var AGES = [6, 8, 10, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 26, 30, 35, 40, 45, 50, 60, 70];   // v3.28：补童年/青春期
+      var AGES = [6, 8, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26, 30, 35, 40, 45, 50, 60, 70];   // v3.28：补童年/青春期；v3.44：补 20（大三 grade 3）
       var EDUS = ['初中', '高中', '专科', '本科', '硕士', '博士'];
       var LOVE = ['single', 'dating', 'married'];
       var HOUS = ['home', 'dorm', 'rent'];
@@ -1310,7 +1313,12 @@
         s.coldMonths = cfg.coldMonths || 0;   // v3.36：冷战采样
         s.dink = cfg.dink; s.lostChild = 0;
         s.hadTeenLove = cfg.teenLove === true; s.triggeredEvents = []; s.usage = {};
-        s.pendingExam = null; s.isStudent = cfg.edu === '本科' && cfg.age < 22;
+        s.pendingExam = null;
+        // v3.44：按 edu + age 推导 grade（1-4 在校，5 毕业）
+        if (cfg.edu === '本科' || cfg.edu === '专科') {
+          s.grade = cfg.age >= 22 ? 5 : (cfg.age >= 18 ? Math.min(4, cfg.age - 17) : 1);
+        } else { s.grade = 0; }
+        s.isStudent = s.grade >= 1 && s.grade <= 4;
         // 暑假过渡态：已开学（否则 notSummerBreak 永远不通过，校园事件会被误判成死事件）
         s.summerBreakEnd = (s.y * 12 + s.m) - 6;
         s.enteredCollegeMonth = (s.y * 12 + s.m) - 12;
@@ -1470,7 +1478,7 @@
       ok('D5b 时间推进总和 = 100 天（不跳跃、不多扣）', totalDays === 100, totalDays);
       ok('D5c 单次点击只推进 1 天（无单次跳天）', maxJump <= 1, 'maxJump=' + maxJump);
       ok('D5d 跨月次数与发薪次数一致（不漏工资）', payDelta === monthCross,
-        'cross=' + monthCross + ' pay=' + payDelta);
+        'cross=' + monthCross + ' pay=' + payDelta + ' sal=' + S().salary + ' job=' + S().job + ' firstSal=' + S().firstSalary + ' ended=' + S().ended + ' age=' + S().age);
       ok('D5e 日期合法（不出现 2 月 30 日）',
         S().d >= 1 && S().d <= new Date(S().y, S().m, 0).getDate(), S().y + '-' + S().m + '-' + S().d);
       ok('D5f 属性未越界',

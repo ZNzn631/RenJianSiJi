@@ -47,15 +47,15 @@
       options: [
         {
           label: '转一半给家里',
-          effects: { money: -1000, mood: 8 },
+          effects: { mood: 8 },
           result: '妈妈在电话里说「你自己留着花」，声音有点抖。',
-          onChoose: function () { state.firstSalary = true; }   // v3.7：写入状态标记，配合 onceEver 防重复
+          onChoose: function () { var give = Math.max(100, Math.round((state.salary || 0) * 0.5)); state.money -= give; state.firstSalary = true; addLog('event', '你把 ' + give + ' 元转给了家里（月薪 ' + state.salary + ' 的一半）。'); }
         },
         {
           label: '给自己买点东西',
-          effects: { money: -800, mood: 6, stamina: 1 },
+          effects: { mood: 6, stamina: 1 },
           result: '你买了双一直想要的鞋，走路都轻了两斤。',
-          onChoose: function () { state.firstSalary = true; }   // v3.7：写入状态标记，配合 onceEver 防重复
+          onChoose: function () { var spend = Math.max(100, Math.round((state.salary || 0) * 0.3)); state.money -= spend; state.firstSalary = true; addLog('event', '你花了 ' + spend + ' 元犒劳自己（月薪的 3 成）。'); }
         }
       ]
     },

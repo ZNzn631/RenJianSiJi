@@ -8,7 +8,7 @@
       description: '校长把毕业证递到你手里，学士帽往天上一抛。四年的时光，在这一刻盖了章。',
       weight: 8,
       priority: true,
-      requires: { onceEver: true, minEdu: '本科', minAge: 22, maxAge: 24, isStudent: false },   // v3.34：本科毕业（22-24 岁、非在校）才办毕业典礼
+      requires: { onceEver: true, minEdu: '本科', grade: 5 },   // v3.44：毕业当年（grade 5）必发毕业典礼
       options: [
         { label: '拍下这珍贵的一刻', effects: { mood: 12 }, result: '你举着毕业证，笑得像个孩子。' },
         { label: '和老师同学一一告别', effects: { mood: 8, eq: 2 }, result: '你说「常联系」，转身红了眼眶。' },
@@ -103,7 +103,8 @@
       id: 'E_APPLY_MAJOR',
       title: '填报志愿',
       description: '志愿表摊在桌上。这一次，你要为自己选一条路。',
-      weight: 4,
+      weight: 9,
+      priority: true,   // v3.44：18 岁强制必发，不选专业不能继续
       requires: { onceEver: true, alreadyExam: true, minAge: 18, maxAge: 19, education: ['高中'] },   // v3.5.6：先高考再填志愿
       options: [
         { label: '冲计算机（高薪）', effects: { intelligence: 6, mood: -4 }, result: '你选了计算机。未来十年，代码就是你的饭碗。', nextEventId: 'E_FAMILY_QUARREL', onChoose: function () { state.major = '计算机'; } },
@@ -120,11 +121,11 @@
       id: 'E_DORM_NIGHT',
       title: '室友开黑',
       description: '凌晨一点，上铺的键盘声还在响，耳机漏出来的音乐一声比一声大。',
-      weight: 5,
-      requires: { housing: 'dorm', notSummerBreak: true, minAge: 18, maxAge: 25 },   // v3.7：暑假过渡期不出现
+      weight: 9,
+      requires: { isStudent: true,  housing: 'dorm', notSummerBreak: true, minAge: 18, maxAge: 25 },   // v3.7：暑假过渡期不出现
       options: [
         { label: '戴上耳塞忍了', effects: { mood: -5, stamina: -1 }, result: '你睁着眼睛看天花板，直到天亮。' },
-        { label: '让他小点声', effects: { mood: -2, intelligence: 1 }, result: '他嘴上答应了，声音只小了三分钟。' },
+        { label: '让他小点声', effects: { mood: -2, intelligence: 2 }, result: '他嘴上答应了，声音只小了三分钟。' },
         { label: '干脆加入', effects: { mood: 8, stamina: -3, intelligence: -2 }, result: '你们打到四点，第二天早课全翘了。' }
       ]
     },
@@ -132,13 +133,13 @@
       id: 'E_DORM_THEFT',
       title: '宿舍丢东西',
       description: '你的耳机不见了。翻遍床底，最后在室友的抽屉缝里看到了那一截白色线。',
-      weight: 3,
-      requires: { onceEver: true, housing: 'dorm', notSummerBreak: true, minAge: 18, maxAge: 25 },   // v3.7：暑假过渡期不出现
+      weight: 8,
+      requires: { isStudent: true,  onceEver: true, housing: 'dorm', notSummerBreak: true, minAge: 18, maxAge: 25 },   // v3.7：暑假过渡期不出现
       options: [
         { label: '私下问他', effects: { mood: -7 }, result: '他说「可能拿错了」，耳机还回来时线已经断了。' },
         {
           label: '直接找辅导员',
-          effects: { mood: -4, intelligence: 1 },
+          effects: { mood: -4, intelligence: 2 },
           result: '全宿舍被叫去谈话，气氛降到了冰点。',
           nextEventId: 'E_DORM_FIGHT'
         },
@@ -149,7 +150,7 @@
       id: 'E_DORM_FIGHT',
       title: '翻脸',
       description: '那件事之后，宿舍里没人再主动说话。椅子挪动的声音都像是挑衅。',
-      weight: 1,
+      weight: 8,
       chainOnly: true,
       options: [
         { label: '申请换寝室', effects: { money: -300, mood: 4 }, result: '新室友话不多，但你终于能睡好觉了。' },
@@ -160,8 +161,8 @@
       id: 'E_DORM_TALK',
       title: '宿舍夜谈',
       description: '熄灯后，不知道谁先开的口。四个人躺在黑暗里，聊起以后想过的生活。',
-      weight: 4,
-      requires: { housing: 'dorm', notSummerBreak: true, minAge: 18, maxAge: 25 },   // v3.7：暑假过渡期不出现
+      weight: 8,
+      requires: { isStudent: true,  housing: 'dorm', notSummerBreak: true, minAge: 18, maxAge: 25 },   // v3.7：暑假过渡期不出现
       options: [
         { label: '聊到天亮', effects: { mood: 13, stamina: -4 }, result: '第二天全员挂着黑眼圈，但那天晚上你记了很多年。' },
         { label: '听着，早早睡了', effects: { mood: 4, stamina: 1 }, result: '你听着他们的声音睡着，梦里也在笑。' }
@@ -303,11 +304,11 @@
       title: '休学一年',
       description: '你在宿舍躺了两周，突然觉得：也许该停下来一年，先想清楚要什么。',
       weight: 2,
-      requires: { onceEver: true, housing: 'dorm', notSummerBreak: true, minAge: 18, maxAge: 24 },   // v3.7：住宿舍的大学生才会休学；暑假过渡期不出现在校园
+      requires: { isStudent: true,  onceEver: true, housing: 'dorm', notSummerBreak: true, minAge: 18, maxAge: 24 },   // v3.7：住宿舍的大学生才会休学；暑假过渡期不出现在校园
       options: [
         {
           label: '休学，出去走走',
-          effects: { money: -1500, mood: 12, intelligence: 5, stamina: 3 },
+          effects: { money: -1500, mood: 12, intelligence: 6, stamina: 3 },
           result: '你打了三份零工，也第一次看清楚自己怕什么。',
           onChoose: function () { skipMonths(12); }   // v3.7：真实跳过一年（只推进日历与常规结算，不抽事件，休学期间不会有舍友事件）
         },
@@ -467,13 +468,38 @@
         {
           label: '一起报同一所大学',
           effects: { mood: 12, intelligence: 4, will: 3 },
-          result: '你们把志愿填得一模一样，约定在同一个校园继续走下去。'
+          result: '你们把志愿填得一模一样，约定在同一个校园继续走下去。',
+          nextEventId: 'E_U_SAME_SCHOOL'
         },
         {
           label: '异地，但保持联系',
           effects: { mood: 6, eq: 3, will: 4 },
-          result: '车票和聊天记录越攒越多，你们约定每个月见一次。'
+          result: '车票和聊天记录越攒越多，你们约定每个月见一次。',
+          nextEventId: 'E_U_LONG_DISTANCE_TEST'
         }
+      ]
+    },
+    /* v3.44：高考约定后续（同校 / 异地），链式闭环 */
+    {
+      id: 'E_U_SAME_SCHOOL',
+      title: '同校日常',
+      description: '你们真的在同一个校园里了。早八一起占座，晚上一起绕着操场走。',
+      weight: 1,
+      chainOnly: true,
+      options: [
+        { label: '好好在一起', effects: { mood: 10, eq: 2 }, result: '四年里你们一起上过课、一起逃过课。这段感情，是真的。' },
+        { label: '慢慢淡了', effects: { mood: -6, will: 2 }, result: '同校反而让你们看清了彼此。大二那年，你们和平分手。' }
+      ]
+    },
+    {
+      id: 'E_U_LONG_DISTANCE_TEST',
+      title: '异地恋考验',
+      description: '车票攒了一抽屉，视频通话越来越短。你开始怀疑，这段感情还能撑多久。',
+      weight: 1,
+      chainOnly: true,
+      options: [
+        { label: '再坚持一下', effects: { money: -1200, mood: 6, stamina: -3 }, result: '你坐了 12 小时硬座去看她，见面那一刻，所有疲惫都没了。' },
+        { label: '好聚好散', effects: { mood: -10, will: 4, eq: 2 }, result: '你们在电话里沉默了很久，最后说了句「保重」。' }
       ]
     },
     {
@@ -614,7 +640,7 @@
       id: 'U_SKIP_CLASS',
       title: '翘课被抓',
       description: '你躲在被窝里刷手机，突然收到消息：「老师点名了，就你没到。」',
-      weight: 5,
+      weight: 8,
       requires: { isStudent: true, notSummerBreak: true, minAge: 18, maxAge: 25 },
       options: [
         { label: '跑着去教室', effects: { stamina: -3, intelligence: 2, mood: -2 }, result: '你冲进教室时，老师正好念到你的名字。' },
@@ -625,7 +651,7 @@
       id: 'U_EXAM_CRAM',
       title: '期末突击',
       description: '考试周到了，图书馆的通宵区全是你的同学。',
-      weight: 6,
+      weight: 8,
       requires: { isStudent: true, notSummerBreak: true, minAge: 18, maxAge: 25 },   // v3.7：在校生专属；暑假过渡期不出现
       options: [
         { label: '通宵抱佛脚', effects: { stamina: -6, intelligence: 8, mood: -5 }, result: '你背到凌晨四点，考场上手还在抖。' },
@@ -636,7 +662,7 @@
       id: 'U_CLUB',
       title: '社团招新',
       description: '百团大战，学长学姐扯着嗓子拉人。',
-      weight: 4,
+      weight: 8,
       requires: { isStudent: true, notSummerBreak: true, onceEver: true, minAge: 18, maxAge: 22 },   // v3.7：一生一次 + 暑假不出现
       options: [
         { label: '加入辩论队', effects: { eq: 4, cha: 3, mood: 2, money: -100 }, result: '第一次上场，你舌头打结，但台下掌声很响。' },
@@ -669,10 +695,10 @@
       id: 'U_LIBRARY',
       title: '图书馆占座',
       description: '你抱着一摞书去图书馆，发现座位被一本《五年高考》占了。',
-      weight: 3,
+      weight: 8,
       requires: { isStudent: true, notSummerBreak: true, minAge: 18, maxAge: 25 },
       options: [
-        { label: '把书挪开，坐下', effects: { intelligence: 3, mood: -2 }, result: '那本书的主人回来，瞪了你一眼。' },
+        { label: '把书挪开，坐下', effects: { intelligence: 4, mood: -2 }, result: '那本书的主人回来，瞪了你一眼。' },
         { label: '换个地方', effects: { stamina: -1 }, result: '你绕了三层楼，最后在楼梯间蹲着背了会书。' }
       ]
     },
@@ -680,7 +706,7 @@
       id: 'U_CANTEEN_JOB',
       title: '食堂兼职',
       description: '食堂窗口招钟点工，一小时十五块，管一顿饭。',
-      weight: 4,
+      weight: 8,
       requires: { isStudent: true, notSummerBreak: true, minAge: 18, maxAge: 25 },
       options: [
         { label: '去干，赚点零花', effects: { money: 800, stamina: -4, mood: -2 }, result: '你端了四个小时盘子，手酸得夹不住筷子。' },
@@ -691,7 +717,7 @@
       id: 'U_CAMPUS_LOVE2',
       title: '操场告白',
       description: '有人在操场用蜡烛摆了个爱心，围观的人起哄。那个人，你认识。',
-      weight: 3,
+      weight: 8,
       requires: { isStudent: true, notSummerBreak: true, notTeenLove: true, loveState: 'single', minAge: 18, maxAge: 25, cha: { min: 40 } },   // v3.7：暑假不出现、单身且未早恋才告白
       options: [
         { label: '走上去，说愿意', effects: { mood: 15, cha: 3 }, result: '你穿过人群，心跳快得像要炸开。' },
@@ -702,7 +728,7 @@
       id: 'U_DORM_NET',
       title: '宿舍断网',
       description: '宿舍网络突然断了，全楼的哀嚎声此起彼伏。',
-      weight: 3,
+      weight: 8,
       requires: { isStudent: true, housing: 'dorm', notSummerBreak: true, minAge: 18, maxAge: 25 },
       options: [
         { label: '拿手机流量顶', effects: { money: -50, mood: -2 }, result: '你刷了几个视频，话费告急。' },
@@ -713,10 +739,10 @@
       id: 'U_CONTEST',
       title: '竞赛获奖',
       description: '你随手报了个比赛，结果进了决赛。',
-      weight: 2,
+      weight: 8,
       requires: { isStudent: true, notSummerBreak: true, intelligence: { min: 150 }, minAge: 18, maxAge: 25, onceEver: true },
       options: [
-        { label: '认真备战', effects: { stamina: -5, intelligence: 10, mood: -3 }, result: '颁奖那天，你的名字排在第三个。' },
+        { label: '认真备战', effects: { stamina: -5, intelligence: 8, mood: -3 }, result: '颁奖那天，你的名字排在第三个。' },
         { label: '去划水', effects: { mood: 2 }, result: '你见识了什么叫「降维打击」。' }
       ]
     },
@@ -935,7 +961,7 @@
       id: 'E_UNI_DORM_DRAMA',
       title: '宿舍修罗场',
       description: '室友凌晨两点还在打游戏，外放声音。你新买的洗发水，三天见了底。',
-      weight: 5,
+      weight: 8,
       requires: { onceEver: true, isStudent: true, housing: 'dorm', minAge: 18, maxAge: 25 },
       options: [
         {
@@ -959,7 +985,7 @@
       id: 'E_UNI_EXAM_BRIBE',
       title: '期末能不能过',
       description: '高数期中你考了 41 分。期末前，室友神秘地说：「我认识老师，送点东西就能过。」',
-      weight: 5,
+      weight: 8,
       requires: { onceEver: true, isStudent: true, minAge: 18, maxAge: 25 },
       options: [
         {
@@ -984,7 +1010,7 @@
       id: 'E_UNI_CLUB_STREET',
       title: '百团大战',
       description: '社团招新摆了一操场。学生会说能加综测，街舞社说能认识很多人，你宿舍的床也说它能睡你。',
-      weight: 4,
+      weight: 8,
       requires: { onceEver: true, isStudent: true, minAge: 18, maxAge: 22 },
       options: [
         {
@@ -1008,7 +1034,7 @@
       id: 'E_UNI_INTERN_CHOICE',
       title: '大三的岔路',
       description: '大厂实习的名额只有三个，导师说「去了就别回来」。另一边，考研的倒计时已经开始。',
-      weight: 4,
+      weight: 8,
       requires: { onceEver: true, isStudent: true, minAge: 20, maxAge: 24 },
       options: [
         {
@@ -1028,7 +1054,7 @@
       id: 'E_UNI_INTERN_RESULT',
       title: '实习结束',
       description: '实习结束的时候，主管把你的工牌收走，说了一句「有机会常联系」。',
-      weight: 1,
+      weight: 8,
       chainOnly: true,
       requires: { isStudent: true },
       options: [
@@ -1053,7 +1079,7 @@
       id: 'E_UNI_TUTOR_JOB',
       title: '家教',
       description: '中介发来消息：初中生家教，一小时八十。你看了眼下个月的生活费。',
-      weight: 4,
+      weight: 8,
       requires: { onceEver: true, isStudent: true, minAge: 18, maxAge: 25 },
       options: [
         {
@@ -1063,7 +1089,7 @@
         },
         {
           label: '不接，专心学业',
-          effects: { mood: 2, intelligence: 3 },
+          effects: { mood: 2, intelligence: 4 },
           result: '你婉拒了，把钱省给了睡眠和绩点。'
         }
       ]
@@ -1072,7 +1098,7 @@
       id: 'E_UNI_ROLL_CALL',
       title: '帮我点个到',
       description: '室友去约会，你不会被点到，但你得替他答「到」。点名时，老师突然问：「你是本人吗？」',
-      weight: 4,
+      weight: 8,
       requires: { onceEver: true, isStudent: true, minAge: 18, maxAge: 25 },
       options: [
         {
@@ -1091,7 +1117,7 @@
       id: 'E_UNI_LONG_DISTANCE',
       title: '异地恋',
       description: '高中在一起的那个人，考去了另一座城市。车票越攒越多，视频通话越来越短。',
-      weight: 3,
+      weight: 8,
       requires: { onceEver: true, isStudent: true, loveState: 'single', minAge: 18, maxAge: 25 },
       options: [
         {
@@ -1110,12 +1136,12 @@
       id: 'E_UNI_THESIS',
       title: '查重率 48%',
       description: '查重报告出来了，48%。导师只回了两个字：「重写。」',
-      weight: 4,
+      weight: 8,
       requires: { onceEver: true, isStudent: true, minAge: 20, maxAge: 25 },
       options: [
         {
           label: '熬夜自己改',
-          effects: { stamina: -6, intelligence: 5, mood: -6 },
+          effects: { stamina: -6, intelligence: 6, mood: -6 },
           result: '你改了四天，查重降到 9%，头发少了三分之一。'
         },
         {
@@ -1130,7 +1156,7 @@
       id: 'E_UNI_GRAD_PHOTO',
       title: '学士帽',
       description: '毕业典礼那天，你把学士帽扔向天空，风把穗子吹成了一致的角度。',
-      weight: 3,
+      weight: 8,
       requires: { onceEver: true, isStudent: true, minAge: 20, maxAge: 25 },
       options: [
         {
@@ -1140,7 +1166,7 @@
         },
         {
           label: '一个人走一圈',
-          effects: { mood: 4, will: 3, intelligence: 1 },
+          effects: { mood: 4, will: 3, intelligence: 2 },
           result: '你把校园每个角落都走了一遍，然后头也不回地离开。'
         }
       ]
@@ -1390,7 +1416,7 @@
       id: 'E_U_MATH_FAIL',
       title: '高数挂科',
       description: '高数期末成绩出来了：59 分。就差一分，你挂了。',
-      weight: 4,
+      weight: 9,
       requires: { isStudent: true, minAge: 18, maxAge: 22 },
       options: [
         { label: '给老师送礼求情', effects: { money: -2000, mood: -4 }, result: '你拎着水果去了办公室。老师没收，但把平时分往上提了提。' },
@@ -1401,10 +1427,10 @@
       id: 'E_U_CET4_FAIL',
       title: '四六级考试',
       description: '英语四级成绩出来了，你差了 12 分。辅导员说，四级不过，拿不到学位证。',
-      weight: 4,
+      weight: 8,
       requires: { isStudent: true, minAge: 18, maxAge: 22 },
       options: [
-        { label: '花 5000 报辅导班', effects: { money: -5000, intelligence: 3, mood: -2 }, result: '你报了班，天天背单词。下次考试，过了。' },
+        { label: '花 5000 报辅导班', effects: { money: -5000, intelligence: 4, mood: -2 }, result: '你报了班，天天背单词。下次考试，过了。' },
         { label: '裸考碰运气', effects: { mood: -2 }, result: '', onChoose: function () { if (Math.random() < 0.5) { state.int += 2; addLog('event', '【四级】你运气不错，压线过了。'); } else { addLog('sys', '【四级】又没过，你只能再战。'); } } }
       ]
     },
@@ -1412,10 +1438,10 @@
       id: 'E_U_MAJOR_SPLIT',
       title: '专业分流',
       description: '大二了，专业要分流。你站在岔路口，得选个方向。',
-      weight: 4,
+      weight: 8,
       requires: { isStudent: true, minAge: 18, maxAge: 22 },
       options: [
-        { label: '选热门方向', effects: { intelligence: 5, mood: -2 }, result: '你选了竞争最激烈的方向。卷，但是有前途。' },
+        { label: '选热门方向', effects: { intelligence: 6, mood: -2 }, result: '你选了竞争最激烈的方向。卷，但是有前途。' },
         { label: '选感兴趣的', effects: { mood: 4, intelligence: 2 }, result: '你选了自己喜欢的。课业累，但心里踏实。' },
         { label: '随大流', effects: { mood: -1, eq: 1 }, result: '你看室友选什么就选什么。省心，但没主见。' }
       ]
@@ -1424,21 +1450,21 @@
       id: 'E_U_INTERN',
       title: '大厂实习',
       description: '大三，你拿到了大厂的实习 offer。但实习意味着翘课、通勤、熬夜。',
-      weight: 4,
+      weight: 8,
       requires: { isStudent: true, minAge: 18, maxAge: 22 },
       options: [
-        { label: '去实习', effects: { money: 3000, intelligence: 5, mood: -3 }, result: '你挤早高峰地铁去实习，晚上回来补作业。累，但简历好看了。' },
-        { label: '专心考研', effects: { intelligence: 5, mood: 1 }, result: '你拒了 offer，回图书馆占座。考研，才是你的目标。' }
+        { label: '去实习', effects: { money: 3000, intelligence: 6, mood: -3 }, result: '你挤早高峰地铁去实习，晚上回来补作业。累，但简历好看了。' },
+        { label: '专心考研', effects: { intelligence: 6, mood: 1 }, result: '你拒了 offer，回图书馆占座。考研，才是你的目标。' }
       ]
     },
     {
       id: 'E_U_LAB',
       title: '实验室搬砖',
       description: '导师把你叫进实验室：「这个项目，你帮着跑跑数据。没工资，但能学东西。」',
-      weight: 4,
+      weight: 8,
       requires: { isStudent: true, minAge: 18, maxAge: 22 },
       options: [
-        { label: '任劳任怨', effects: { intelligence: 5, stamina: -5, mood: -3 }, result: '你跑了三个月数据，熬了无数个夜。论文二作上有你的名字。' },
+        { label: '任劳任怨', effects: { intelligence: 6, stamina: -5, mood: -3 }, result: '你跑了三个月数据，熬了无数个夜。论文二作上有你的名字。' },
         { label: '摸鱼', effects: { mood: 2, eq: -2 }, result: '你三天打鱼两天晒网。导师在组会上点名批评了你。' }
       ]
     },
@@ -1446,30 +1472,30 @@
       id: 'E_U_THESIS',
       title: '毕业论文',
       description: '论文查重结果出来了：重复率 48%。导师说，降到 10% 以下才能答辩。',
-      weight: 4,
+      weight: 8,
       requires: { isStudent: true, minAge: 18, maxAge: 22 },
       options: [
         { label: '花 3000 找代写', effects: { money: -3000, mood: -4 }, result: '', onChoose: function () { if (Math.random() < 0.3) { state.money -= 3000; state.mood -= 10; addLog('danger', '【代写】被查出学术不端，你被记过了！'); } else { state.int += 2; addLog('sys', '【代写】论文过了，但你心里有愧。'); } } },
-        { label: '熬夜自己改', effects: { stamina: -10, mood: -5, intelligence: 3 }, result: '你逐句改写，熬了整整一周。查重率降到了 8%，顺利答辩。' }
+        { label: '熬夜自己改', effects: { stamina: -10, mood: -5, intelligence: 4 }, result: '你逐句改写，熬了整整一周。查重率降到了 8%，顺利答辩。' }
       ]
     },
     {
       id: 'E_U_DORM_GAME',
       title: '宿舍开黑',
       description: '室友又开黑了，键盘声、喊麦声此起彼伏。你明天还有早八。',
-      weight: 4,
+      weight: 9,
       requires: { isStudent: true, minAge: 18, maxAge: 22 },
       options: [
         { label: '加入他们', effects: { mood: 6, stamina: -3, intelligence: -1 }, result: '你们打到凌晨三点，早八的课全翘了。' },
         { label: '戴耳塞忍了', effects: { mood: -4, stamina: -1 }, result: '你盯着天花板，直到声音停下。' },
-        { label: '让他小点声', effects: { mood: -2, intelligence: 1 }, result: '他嘴上答应了，声音只小了三分钟。' }
+        { label: '让他小点声', effects: { mood: -2, intelligence: 2 }, result: '他嘴上答应了，声音只小了三分钟。' }
       ]
     },
     {
       id: 'E_U_LOVE',
       title: '大学恋爱',
       description: '图书馆靠窗的位置，有个人每天都在。你偷偷看了 TA 一整个学期。',
-      weight: 4,
+      weight: 8,
       requires: { isStudent: true, minAge: 18, maxAge: 22 },
       options: [
         { label: '主动搭话', effects: { mood: 2 }, result: '你鼓起勇气走过去：「这个位置，有人吗？」', nextEventId: 'E_U_LOVE_RESULT' },
@@ -1493,7 +1519,7 @@
       id: 'E_U_GRAD_CHOICE',
       title: '考研抉择',
       description: '大三下学期，你站在三岔路口：考研、考公，还是直接就业？',
-      weight: 4,
+      weight: 8,
       requires: { isStudent: true, minAge: 18, maxAge: 22 },
       options: [
         { label: '考研', effects: { intelligence: 8, mood: -3 }, result: '你买齐了资料，住进了自习室。' },
@@ -1505,21 +1531,21 @@
       id: 'E_U_STUDENT_UNION',
       title: '学生会主席',
       description: '换届竞选，你站上了讲台。台下几百双眼睛看着你。',
-      weight: 4,
+      weight: 8,
       requires: { isStudent: true, minAge: 18, maxAge: 22 },
       options: [
         { label: '全力竞选', effects: { cha: 5, eq: 3, mood: 2, stamina: -3 }, result: '你当选了学生会主席。从此，会议和活动填满了你的课余。' },
-        { label: '专心学习', effects: { mood: 1, intelligence: 3 }, result: '你没参加竞选，把时间留给了图书馆。' }
+        { label: '专心学习', effects: { mood: 1, intelligence: 4 }, result: '你没参加竞选，把时间留给了图书馆。' }
       ]
     },
     {
       id: 'E_U_TUTOR',
       title: '兼职家教',
       description: '周末的家教兼职又来了。学生是个调皮的中学生，教起来很费劲。',
-      weight: 4,
+      weight: 8,
       requires: { isStudent: true, minAge: 18, maxAge: 22 },
       options: [
-        { label: '认真教', effects: { money: 800, mood: -2, intelligence: 1 }, result: '你把知识点掰开揉碎讲，学生终于听懂了。' },
+        { label: '认真教', effects: { money: 800, mood: -2, intelligence: 2 }, result: '你把知识点掰开揉碎讲，学生终于听懂了。' },
         { label: '糊弄过去', effects: { money: 500, mood: -1, eq: -1 }, result: '你随便讲了讲。家长看你的眼神，不太对。' }
       ]
     },
@@ -1527,7 +1553,7 @@
       id: 'E_U_GRADUATION',
       title: '毕业典礼',
       description: '学士帽抛向天空，四年的时光，在这一刻盖了章。',
-      weight: 3,
+      weight: 9,
       requires: { isStudent: true, minAge: 18, maxAge: 22 },
       options: [
         { label: '拍下这一刻', effects: { mood: 12 }, result: '你举着毕业证，笑得像个孩子。' },
@@ -1538,17 +1564,78 @@
     /* v3.43：辅导员开年级大会（必发，提示四六级） */
     {
       id: 'E_U_COUNSELOR',
-      title: '辅导员开年级大会',
-      description: '辅导员站在讲台上敲桌子：「我再强调一遍，没过英语四级的同学抓紧了，拿不到学位证别怪我没提醒！」',
+      title: '班级群通知',
+      description: '班级群弹出一条通知：「英语四六级报名今天截止，没报的抓紧。没过四级拿不到学位证。」',
       weight: 5,
       priority: true,
+      requires: { isStudent: true, grade: 1 },   // v3.44：大一才弹（改为班级群通知）
+      options: [
+        { label: '立刻报名', effects: { mood: -2, intelligence: 2 }, result: '你在群里回了个「1」，然后打开了报名页面。' },
+        { label: '忽略这条通知', effects: { mood: -1 }, result: '你划走了通知，继续刷短视频。' }
+      ]
+    },
+    /* v3.44：大三（grade 3）必发找实习 */
+    {
+      id: 'E_U_INTERN_MUST',
+      title: '找实习',
+      description: '大三了，实习的压力像一块石头压下来。同学们的简历已经改到第九版了。',
+      weight: 9,
+      priority: true,
+      requires: { isStudent: true, grade: 3 },
+      options: [
+        { label: '冲大厂实习', effects: { intelligence: 6, mood: -3 }, result: '你刷了三天面试题，终于拿到了一个大厂的实习 offer。' },
+        { label: '小厂也行', effects: { money: 2000, eq: 1 }, result: '你去了一家小公司，虽然薪水不高，但至少有了履历。' },
+        { label: '不找了，准备考研', effects: { intelligence: 4, mood: 2 }, result: '你把简历丢进了抽屉，买了一套考研资料。' }
+      ]
+    },
+    /* v3.44：毕业后第一个月强制选租房方式 */
+    {
+      id: 'E_RENT_MUST',
+      title: '毕业后的住处',
+      description: '学校宿舍已经清空了。你拖着行李箱站在校门口，得先找个地方住下。',
+      weight: 9,
+      priority: true,
+      requires: { onceEver: true, grade: 5, minAge: 22 },
+      options: [
+        { label: '花钱合租（一室）', effects: { money: -2000, mood: -2 }, result: '你找了个合租的房子，室友是个不说话的程序员。', onChoose: function () { state.housing = 'rent'; state.rentType = 'share'; state.commute = 30; } },
+        { label: '整租一套（贵但安静）', effects: { money: -5000, mood: 3 }, result: '你整租了一套小房子，终于有了自己的空间。', onChoose: function () { state.housing = 'rent'; state.rentType = 'whole'; state.commute = 20; } },
+        { label: '住郊区，通勤认了', effects: { money: -800, mood: -4 }, result: '你住进了郊区，每天通勤两小时。', onChoose: function () { state.housing = 'rent'; state.rentType = 'suburb'; state.commute = 90; } }
+      ]
+    },
+    /* v3.44：3 个高频大学日常 */
+    {
+      id: 'E_U_MORNING_CLASS',
+      title: '早八的折磨',
+      description: '闹钟在 7:00 响起。你睁开眼，天花板在旋转，而早八的课在 30 分钟外。',
+      weight: 9,
       requires: { isStudent: true, minAge: 18, maxAge: 22 },
       options: [
-        { label: '记下来，回去备考', effects: { mood: -2, intelligence: 2 }, result: '你在笔记本上重重写下「四级」。这次，一定要过。' },
-        { label: '左耳进右耳出', effects: { mood: -1 }, result: '你刷着手机，直到散会也没记住辅导员说了啥。' }
+        { label: '挣扎起床', effects: { stamina: -3, intelligence: 2, mood: -1 }, result: '你踩着铃声冲进教室，坐下的那一刻，觉得今天已经赢了。' },
+        { label: '继续睡', effects: { mood: 2, intelligence: -1 }, result: '你关掉闹钟，翻了个身。那节课的点名，你没赶上。' }
+      ]
+    },
+    {
+      id: 'E_U_CANTEEN_DIRT',
+      title: '食堂异物',
+      description: '你从菜里挑出一根黑色的东西。同桌看了一眼，默默放下了筷子。',
+      weight: 9,
+      requires: { isStudent: true, minAge: 18, maxAge: 22 },
+      options: [
+        { label: '找食堂理论', effects: { eq: 1, mood: -3 }, result: '窗口阿姨赔了你一份新的，你胃口全无。' },
+        { label: '忍了，继续吃', effects: { mood: -3, stamina: -1 }, result: '你把那根东西拨到一边，逼自己吃完了。' }
+      ]
+    },
+    {
+      id: 'E_U_FINAL_HINT',
+      title: '期末划重点',
+      description: '最后一节课，老师说：「我就划几个重点。」黑板上开始出现密密麻麻的字。',
+      weight: 9,
+      requires: { isStudent: true, minAge: 18, maxAge: 22 },
+      options: [
+        { label: '认真记下来', effects: { intelligence: 4, mood: -1 }, result: '你抄满了整整三页，期末果然考了里面的题。' },
+        { label: '趴着睡了一觉', effects: { mood: 1, intelligence: -1 }, result: '你醒来时，黑板已经擦干净了。' }
       ]
     }
-,
   ];
   // 合并回全局 eventsData（保持引擎抽取逻辑不变）
   for (var _i = 0; _i < schoolEvents.length; _i++) eventsData.push(schoolEvents[_i]);

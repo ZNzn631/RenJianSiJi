@@ -104,6 +104,7 @@
       requires: {
         stamina: { min: 1 },                    // 体质 > 0 才顶得住班
         minAge: 18,                             // 未满 18 岁不能打工
+        employed: true,                         // v3.44：有正式工作时才显示【打工】（与打零工互斥）
         oncePerDay: false                       // 次数限制关闭（改成 true 即每天一次）
       },
       denyText: { stamina: '体力不足，快去休息。' }
@@ -116,7 +117,7 @@
       effects: { money: 100, stamina: -2, mood: -5, will: 1 },
       displayEffects: { money: 100, stamina: -2, mood: -5 },
       uiHideWhenEmployed: true,                 // v3.7：有正式工作后在 UI 隐藏（只藏按钮、不进 checkRequires，保住平衡模拟的体力消耗）
-      requires: { stamina: { min: 1 } },          // 体力见底就只能先去休息
+      requires: { stamina: { min: 1 }, unemployed: true },   // v3.44：无业时显示【打零工】（与打工互斥）
       denyText: { stamina: '体力不足，快去休息。' },
       // 破产时的保底现金流
       onRun: function () {
@@ -201,29 +202,11 @@
       name: '陪伴',
       description: '花一天时间，陪在重要的人身边。',
       costDays: 1,
-      effects: { money: -100, mood: 3 },
-      displayEffects: { money: -100, mood: 3 },
+      effects: {},
+      displayEffects: {},
       requires: { oncePerDay: false },
       onRun: function () {
-        // v3.9：按对象给不同加成——孩子 > 配偶 > 恋人 > 父母
-        if (livingChildren().length > 0) {
-          addKidRelation(6);
-          addLog('sys', '【陪伴】你陪孩子玩了一天，亲子关系 +6。');
-        } else if (state.married) {
-          addLove(8);
-        } else if (state.loveState === 'dating') {
-          state.datingLove = Math.min(100, (state.datingLove || 0) + 6);
-          addLog('sys', '【陪伴】你陪恋人度过了一天，好感度 +6。');
-        } else {
-          // v3.34：跨城限制——春节（1月）/国庆（10月）才回家，平时电话问候
-          if (state.m === 1 || state.m === 10) {
-            state.mood = Math.min(moodMaxOf(), state.mood + 3);
-            addLog('sys', '【陪伴】你回家陪父母吃了顿饭，心情 +3。');
-          } else {
-            state.mood = Math.min(moodMaxOf(), state.mood + 1);
-            addLog('sys', '【陪伴】离家太远，你给父母打了个电话，心情 +1（春节/国庆再回家）。');
-          }
-        }
+        openCompanionMarket();   // v3.44：改为动态弹窗，列出当前可陪伴的对象
       }
     },
     {
@@ -471,12 +454,8 @@
       requires: { houseMoney: 900000, minAge: 18 },
       denyText: { houseMoney: '首付（按城市房价折算）不够，先攒钱或搬去房价低的城市。' },
       onRun: function () {
-        var down = houseCost(900000);
-        state.money -= down;
-        state.housing = 'own';
-        state.rentType = 'home';
-        state.commute = 30;   // 已购房：通勤中等，不再付房租
-        addLog('event', '【买房】首付 ' + down + ' 元（' + cityName() + '）。你有了自己的家。');
+        var ev = (typeof findEvent === 'function') ? findEvent('E_HOUSE_BUY') : null;
+        if (ev) openEvent(ev);   // v3.44：改为弹窗（全款 / 首付）
       }
     },
     /* v3.31：搬家去别的城市（消耗搬家费 5000，重新选择城市） */
@@ -627,7 +606,7 @@
     { id: 'D_COLD',         name: '感冒',     minAge: 0,  healthLimit: 40, cost: 300,   damage: 5 },
     { id: 'D_GASTRO',       name: '肠胃炎',   minAge: 0,  healthLimit: 40, cost: 800,   damage: 8 },
     { id: 'D_PNEUMONIA',    name: '肺炎',     minAge: 0,  healthLimit: 30, cost: 5000,  damage: 12 },
-    { id: 'D_FRACTURE',     name: '骨折',     minAge: 0,  healthLimit: 30, cost: 3000,  damage: 15 },
+    { id: 'D_FRACTURE',     name: '骨折',     minAge: 0,  healthLimit: 30, cost: 3000,  damage: 15, cause: '下雨路滑，你在台阶上摔了一跤' },
     { id: 'D_NODULE',       name: '结节',     minAge: 30, healthLimit: 35, cost: 5000,  damage: 10 },
     { id: 'D_HYPERTENSION', name: '高血压',   minAge: 40, healthLimit: 40, cost: 8000,  damage: 12 },
     { id: 'D_DIABETES',     name: '糖尿病',   minAge: 40, healthLimit: 35, cost: 10000, damage: 15 },
@@ -959,6 +938,15 @@
     { id: 'lawyer',  name: '法考证书',   costDays: 30, intNeed: 250, prereq: [], major: '法学', desc: '需法学专业，极高难度。' },
     { id: 'cpa',     name: 'CPA 注会',   costDays: 30, intNeed: 250, prereq: [], major: '金融学', desc: '需金融专业，极高难度。' }
   ];
+  // v3.44：陪伴对象数据表（动态弹窗渲染）
+  // cond: parent_home 同城住家 / parent_away 异地 / partner 恋人配偶 / kid 有孩子 / friend 有朋友
+  var COMPANION_OPTIONS = window.COMPANION_OPTIONS = [
+    { id: 'parent_home',  name: '回家陪父母吃饭', desc: '和爸妈坐在一起，吃一顿热乎的。', cost: 100, mood: 10, eq: 2,  cond: 'parent_home', result: '你回家吃了顿饭，妈妈一直往你碗里夹菜。' },
+    { id: 'parent_phone', name: '给父母打个电话', desc: '隔着屏幕聊几句，问问身体。',     cost: 0,   mood: 5,  eq: 1,  cond: 'parent_away', result: '你在电话里说了半小时，挂断时妈妈还在念叨。' },
+    { id: 'spouse_date',  name: '浪漫约会',       desc: '把这一天留给彼此。',               cost: 300, mood: 15, datingLove: 10, cond: 'partner', result: '你们看了场电影，吃了顿好的，像刚在一起时那样。' },
+    { id: 'kid_time',     name: '亲子时光',       desc: '陪孩子玩一天。',                   cost: 200, mood: 10, kidRel: 10,    cond: 'kid',     result: '你陪孩子玩了一整天，累得腰都直不起来，但很值。' },
+    { id: 'friend_party', name: '兄弟聚会',       desc: '约上朋友喝一杯。',                 cost: 200, mood: 12, friendFavor: 8, cond: 'friend',  result: '你们喝到深夜，聊起了很多年前的事。' }
+  ];
   // 兼容旧引用（入职时按职业取名薪）
   var JOBS = {};
   for (var _job in CAREER) JOBS[_job] = { salary: CAREER[_job].salary };
@@ -1200,7 +1188,7 @@
 
 
   // 快照 / 应用 effects / 生成增减文案
-  var LAYOFF_CHANCE = 0.3;
+  var LAYOFF_CHANCE = 0.18;   // v3.44：0.3 → 0.18（打工人频繁裁员导致平凡率飙升，微调降低裁员压力）
   var SPOUSE_SURNAME = ['林', '沈', '周', '许', '苏', '程', '叶', '陈', '温', '江'];
   var SPOUSE_GIVEN = ['晓', '知', '南', '宁', '安', '清', '然', '棠', '屿', '禾'];
 

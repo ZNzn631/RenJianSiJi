@@ -2679,6 +2679,7 @@
         },
         {
           label: '把中的送给同事',
+          requires: { job: 'not_null' },   // v3.44：必须已就业（无业游民没有同事）
           effects: { eq: 3, mood: 6 },
           result: '一下午办公室都在开瓶盖，气氛比发工资那天还好。'
         },
@@ -2860,7 +2861,7 @@
       title: '黑中介',
       description: '合同签完、押金交完、钥匙拿到手，第二天房东找上门：「我没委托过任何人出租。」',
       weight: 3,
-      requires: { minAge: 18, housing: 'rent' },
+      requires: { minAge: 18, housing: 'rent', isStudent: false },   // v3.44：大学期间不触发租房事件
       options: [
         {
           label: '报警，走法律程序',
@@ -3112,7 +3113,7 @@
       title: '租不起市区的房',
       description: '房东又涨租了。中介说，同地段已经涨到一万二，你看着工资条，沉默了。',
       weight: 5,
-      requires: { city: 'beijing', housing: 'rent', minAge: 22 },
+      requires: { city: 'beijing', housing: 'rent', minAge: 22, isStudent: false },   // v3.44：大学期间不触发
       options: [
         { label: '搬到郊区，通勤认了', effects: { mood: -5 }, result: '你搬去了燕郊，每天通勤两小时。', onChoose: function () { state.rentType = 'suburb'; state.commute = 90; } },
         { label: '咬牙续租，吃土也要住市区', effects: { money: -1500, mood: -8 }, result: '你续了租，卡里又少了一截。' }
@@ -3498,6 +3499,42 @@
       options: [
         { label: '提前看考场', effects: { intelligence: 2, mood: 1 }, result: '你提前摸清了路线，第二天稳稳当当进了考场。' },
         { label: '睡过头', effects: { mood: -3 }, result: '闹钟没响，你差点迟到，一路狂奔才赶进考场。' }
+      ]
+    },
+    {
+      id: 'E_HOUSE_BUY',
+      title: '看房',
+      description: '中介发来一套房：「这是你自己的」。你可以全款，也可以按揭。',
+      weight: 1,
+      hideWhenLocked: true,
+      requires: { houseMoney: 900000, minAge: 18 },   // v3.44：去掉 chainOnly，改为行动触发的高门槛池事件
+      options: [
+        {
+          label: '全款拿下',
+          effects: {},
+          result: '',
+          onChoose: function () {
+            var full = houseCost(3000000);
+            if (state.money < full) { addLog('warn', '全款不够（需 ' + full.toLocaleString('en-US') + ' 元）。'); return; }
+            state.money -= full;
+            state.housing = 'own'; state.rentType = 'home'; state.commute = 30;
+            addLog('event', '【买房】全款 ' + full.toLocaleString('en-US') + ' 元（' + cityName() + '）。你有了自己的家。');
+            if (typeof updateGoal === 'function') updateGoal();
+          }
+        },
+        {
+          label: '首付按揭',
+          effects: {},
+          result: '',
+          onChoose: function () {
+            var down = houseCost(900000);
+            if (state.money < down) { addLog('warn', '首付不够（需 ' + down.toLocaleString('en-US') + ' 元）。'); return; }
+            state.money -= down;
+            state.housing = 'own'; state.rentType = 'home'; state.commute = 30;
+            addLog('event', '【买房】首付 ' + down.toLocaleString('en-US') + ' 元，剩余按揭（' + cityName() + '）。你有了自己的家。');
+            if (typeof updateGoal === 'function') updateGoal();
+          }
+        }
       ]
     }
   ];

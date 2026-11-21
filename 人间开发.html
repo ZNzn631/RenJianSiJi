@@ -1987,6 +1987,19 @@
   </div>
 </div>
 
+<!-- 陪伴中心（v3.44）：动态列出可陪伴对象 -->
+<div class="modal-mask" id="companionMask" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="companionTitle">
+    <div class="panel-h">
+      <span>陪伴</span>
+      <span class="hint">花一天时间，陪在重要的人身边</span>
+    </div>
+    <div class="event-title" id="companionTitle">—</div>
+    <p class="event-desc">选择要陪伴的对象。</p>
+    <div class="job-list" id="companionList"></div>
+  </div>
+</div>
+
 <!-- 童年前史（v3.28）：只播 6–15 岁的回忆，不推进时间 -->
 <div class="modal-mask" id="prologueMask" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="prologueTitle">
@@ -2236,10 +2249,15 @@
     $('moodBar').style.width = (state.mood / moodCap * 100).toFixed(1) + '%';
 
     $('sAge').textContent = getAge() + ' 岁  [' + cityName() + ']';   // v3.24：城市标签
-    $('sEdu').textContent = state.edu || '无';
-    if (state.loveState === 'dating') {   // v3.34：交往中显式显示恋爱好感度
-      $('sEdu').textContent += ' · 恋爱好感度 ' + (state.datingLove || 0);
+    var eduText = state.edu || '无';
+    if ((state.edu === '本科' || state.edu === '专科') && (Number(state.grade) || 0) >= 1) {
+      var gl = { 1: '大一', 2: '大二', 3: '大三', 4: '大四', 5: '毕业' };
+      eduText += ' · ' + (gl[state.grade] || ('大' + state.grade));
     }
+    if (state.loveState === 'dating') {   // v3.34：交往中显式显示恋爱好感度
+      eduText += ' · 恋爱好感度 ' + (state.datingLove || 0);
+    }
+    $('sEdu').textContent = eduText;
     $('sJob').textContent = state.job || '无业';
     $('sSalary').textContent = state.salary > 0 ? '月薪 ¥' + state.salary.toLocaleString('en-US') : '';
     if (state.salary > 0) {
@@ -2785,6 +2803,72 @@
     render();
   }
 
+  /* ================= [UI层] 陪伴中心（v3.44） ================= */
+  function companionCondOk(cond) {
+    if (cond === 'parent_home') return state.housing === 'home';
+    if (cond === 'parent_away') return state.housing !== 'home';
+    if (cond === 'partner') return state.married || state.loveState === 'dating';
+    if (cond === 'kid') return livingChildren().length > 0;
+    if (cond === 'friend') return (state.friends || []).length > 0;
+    return false;
+  }
+
+  function companionMiss(opt) {
+    var miss = [];
+    if (!companionCondOk(opt.cond)) miss.push('当前无法陪伴');
+    if ((Number(state.money) || 0) < opt.cost) miss.push('金钱差 ' + (opt.cost - (Number(state.money) || 0)));
+    return miss;
+  }
+
+  function renderCompanionMarket() {
+    var list = $('companionList');
+    if (!list) return;
+    $('companionTitle').textContent = '陪伴 · 当前 ' + getAge() + ' 岁';
+    var opts = (COMPANION_OPTIONS || []).filter(function (o) { return companionCondOk(o.cond); });
+    if (!opts.length) {
+      list.innerHTML = '<div class="job-item"><div class="job-desc">现在没有可以陪伴的人。先去认识几个人吧。</div></div>';
+      return;
+    }
+    list.innerHTML = opts.map(function (opt) {
+      var miss = companionMiss(opt);
+      var ok = miss.length === 0;
+      var costText = opt.cost > 0 ? '¥' + opt.cost : '免费';
+      return '<div class="job-item">'
+        + '<div class="job-top"><span class="job-name">' + esc(opt.name) + '</span><span class="job-salary">' + costText + ' · 心情 +' + opt.mood + '</span></div>'
+        + '<div class="job-desc">' + esc(opt.desc || '') + '</div>'
+        + (ok ? '' : '<div class="job-req">' + esc(miss.join('；')) + '</div>')
+        + '<button class="job-btn' + (ok ? '' : ' is-locked') + '" type="button" data-comp="' + esc(opt.id) + '"' + (ok ? '' : ' disabled') + '>' + (ok ? '选它' : '不达标') + '</button>'
+        + '</div>';
+    }).join('');
+  }
+
+  function openCompanionMarket() {
+    renderCompanionMarket();
+    $('companionMask').hidden = false;
+  }
+
+  function closeCompanionMarket() {
+    $('companionMask').hidden = true;
+  }
+
+  function applyCompanion(optId) {
+    var opt = (COMPANION_OPTIONS || []).filter(function (o) { return o.id === optId; })[0];
+    if (!opt || companionMiss(opt).length) return;
+    closeCompanionMarket();
+    state.money -= opt.cost;
+    state.mood = Math.min(moodMaxOf(), state.mood + opt.mood);
+    if (opt.eq) state.eq += opt.eq;
+    if (opt.datingLove) {
+      if (state.married) addLove(opt.datingLove);
+      else state.datingLove = Math.min(100, (state.datingLove || 0) + opt.datingLove);
+    }
+    if (opt.kidRel) addKidRelation(opt.kidRel);
+    if (opt.friendFavor) touchAllFriends();
+    if (opt.cost > 0) addLog('sys', '【陪伴】' + opt.result + '（-' + opt.cost + ' 元）');
+    else addLog('sys', '【陪伴】' + opt.result);
+    render();
+  }
+
   window.jobOpeningOk = window.jobOpeningOk;
 
   /* ================= [UI层] 按钮渲染（遍历 actionsData） ================= */
@@ -2856,7 +2940,7 @@
       if (daysEl) daysEl.textContent = showLocked ? '条件不足' : actionDays(act) + ' 天';
 
       if (!showLocked) unlocked += 1;
-      if (hide) hiddenList.push({ name: act.name, tip: locked ? miss.map(missLabel).join('；') : '已有正式工作' });
+      if (hide) hiddenList.push({ name: (typeof act.name === 'function' ? act.name() : act.name), tip: locked ? miss.map(missLabel).join('；') : '已有正式工作' });
     }
 
     $('actionHint').textContent = '可做 ' + unlocked + ' 项 · 共 ' + actionsData.length + ' 项';
@@ -3573,6 +3657,21 @@
       certMask.addEventListener('click', function (e) { if (e.target === certMask) closeCertMarket(); });
     }
 
+    var compMask = $('companionMask');
+    if (compMask) {
+      $('companionList').addEventListener('click', function (e) {
+        var node = e.target;
+        while (node && node !== this) {
+          if (node.getAttribute && node.getAttribute('data-comp') !== null) {
+            applyCompanion(node.getAttribute('data-comp'));
+            return;
+          }
+          node = node.parentNode;
+        }
+      });
+      compMask.addEventListener('click', function (e) { if (e.target === compMask) closeCompanionMarket(); });
+    }
+
     bindDevTools();
     $('btnSave').addEventListener('click', saveGame);
     $('btnLoad').addEventListener('click', loadGame);
@@ -3713,6 +3812,10 @@
     closeCertMarket: closeCertMarket,
     applyCert: applyCert,
     certMiss: certMiss,
+    openCompanionMarket: openCompanionMarket,
+    closeCompanionMarket: closeCompanionMarket,
+    applyCompanion: applyCompanion,
+    companionMiss: companionMiss,
 
     // ---- 平衡性模拟专用：只转发既有函数，不改任何逻辑 ----
     simPendingEvent: function () { return pendingEvent; },
