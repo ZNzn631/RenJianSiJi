@@ -6,25 +6,25 @@
 
 《人间四季》——像素风文字人生模拟游戏，纯单文件双击运行（`file://`）。
 
-三个文件分工（不可越界）：
+文件分工（不可越界）：
 
 | 文件 | 只放什么 |
 |---|---|
-| `data.js` | 纯数据：`eventsData` / `actionsData` / `talentsData` / `diseasesData` / `CAREER` / 数值常量 |
+| `data_core.js` / `data_events_school.js` / `data_events_career.js` / `data_events_life.js` | 纯数据：`eventsData` / `actionsData` / `talentsData` / `diseasesData` / `CAREER` / 数值常量 |
 | `engine.js` | 引擎逻辑：时间推进 / 事件抽取 / 条件校验 / 存档 / 结算 |
-| `人间开发.html` | 结构 + 样式 + UI 渲染 |
+| `人间开发.html` | 结构 + 样式 + UI 渲染（测试入口；`index.html` 为另一套 UI，测试未覆盖） |
 
 ## 1. 红线（任何改动前先读）
 
 1. **禁用 ES6 `import` / `export`**，必须保证 `file://` 双击可跑。
 2. **不碰引擎底层**（时间推进、事件抽取、条件校验、存档逻辑），除非用户明确要求。
-3. **新内容只追加到 `data.js`**，不得破坏 `eventsData` 既有数组结构（新事件 append 到数组尾部）。
+3. **新内容只追加到 `data_*.js`**（常量/行动 → `data_core.js`；事件 → 对应 `data_events_*.js`），不得破坏 `eventsData` 既有数组结构（新事件 append 到数组尾部）。
 4. 每次改完给完整文件，不给片段。
 5. 保持像素风：`#111` / `#fff` / 1px 实线 / 硬投影 / 无渐变无圆角。
 
 ## 2. 每次改动后必须执行的测试
 
-**每次修改或新增 `data.js` / `engine.js` 后，必须执行：**
+**每次修改或新增 `data_*.js` / `engine.js` 后，必须执行：**
 
 ```bash
 node tests/run.js
@@ -61,13 +61,23 @@ node tests/check_balance.js 1000 100
 
 ## 5. 目录约定
 
-- `tests/` 固定 5 个文件：`run.js`、`稳定性测试.js`、`event_isolation.js`、`check_balance.js`、`sim_500.js`。
+- `tests/` 固定 8 个文件：`run.js`、`稳定性测试.js`、`event_isolation.js`、`check_balance.js`、`sim_500.js` + `_scan_dynamic.js`、`_scan_events.js`、`_scan_invariants.js`（`_scan_*` 为扫描探针，不并入 run.js 主流程）。
 - 测试产物写系统临时目录，不落仓库。
 - 平衡判定的推荐局数是 **1000 局**（500 局单次抽样误差约 2.2pp，会偶发摸到边界）。
 
 ## 10. CHANGELOG 维护宪法
 - **严禁重写全量**：每次交付代码，绝对不允许重写或全文输出 `CHANGELOG.md`。
-- **增量追加**：每次修改完毕，只需在回复末尾提供 1-3 行标准格式的增量文本，由用户手动粘贴至文件顶部。
+- **统一编写**：CHANGELOG 由制作人（总监）统一维护，版本号与数值口径统一把关；各 AI 不得各自提供增量文本让用户粘贴。
 - **格式铁律**：必须使用 `## [vX.XX] - YYYY-MM-DD`，并以 🚀(Feat) / 🐛(Fix) / ⚖️(Balance) 作为前缀。
 - **长度限制**：永远保持该文件在 20KB 以内，超过则自动删除最旧的详细记录并折叠入早期归档。
 - **数值可追溯**：日志里每个数值必须带 `(n=…, 筛选条件)`；分母不同 ≠ 抽样差，裸数字不入库。
+
+## 11. 交付后必须入库（sync + commit + push）
+
+每次交付代码后，由制作人（总监）执行：
+
+1. `node sync.js` 把工作区核心文件 + `tests/` 同步进 `RenJianSiJi/`（Git 仓库）
+2. `cd RenJianSiJi && git add -A && git commit -m "…"`
+3. `git push`（经用户授权后执行）
+
+**未入库的改动视为「裸奔」，随时可能丢失；AI 不得擅自 push。**
