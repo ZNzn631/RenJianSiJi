@@ -146,11 +146,11 @@ console.log('  英年早逝 ' + early + '%  (区间 ' + EARLY_MIN + '-' + EARLY_
 console.log('  平凡一生 ' + ordinary + '%  (区间 ' + ORDINARY_MIN + '-' + ORDINARY_MAX + '%)  ' + (ordinaryOK ? 'PASS' : 'FAIL'));
 console.log('  贫病交加 ' + bankrupt + '%  (信息项，不作硬闸门)');
 
-// 测量仪器：无结局 / 截断样本（只打印，不进闸门、不改退出码）
+// 测量仪器：无结局 / 截断样本（硬闸门：不为 0 即 exit 1）
 const noEnding = all.filter((x) => !x.endingId).length;
 const truncated = all.filter((x) => x.truncated === true).length;
-console.log('  无结局样本 ' + noEnding + ' 局（endingId 为空，结算缺口）');
-console.log('  截断样本 ' + truncated + ' 局（撞到步数上限，未跑完）');
+console.log('  无结局样本 ' + noEnding + ' 局（endingId 为空，结算缺口）  ' + (noEnding === 0 ? 'PASS' : 'FAIL'));
+console.log('  截断样本 ' + truncated + ' 局（撞到步数上限，未跑完）  ' + (truncated === 0 ? 'PASS' : 'FAIL'));
 
 // v3.24：按城市分组报告早逝率（鹤岗低生活成本是重点盯防对象）
 const cityStats = {};
@@ -188,9 +188,13 @@ console.log('  按阶层结局：' + Object.keys(personaStats).sort().map((p) =>
 
 console.log('  数据写入 ' + OUT);
 
-if (earlyOK && ordinaryOK) {
+if (earlyOK && ordinaryOK && noEnding === 0 && truncated === 0) {
   console.log('✅ 数值保险通过');
   process.exit(0);
+}
+if (noEnding > 0 || truncated > 0) {
+  console.error('❌ 测量仪器不合格：无结局 ' + noEnding + ' 局 / 截断 ' + truncated + ' 局（硬闸门必须为 0）');
+  process.exit(1);
 }
 if (QUICK) {
   console.log('⚠ 快速预检不拦截（样本小，仅供先扫一眼）；请用 node tests/check_balance.js 做全量把关');

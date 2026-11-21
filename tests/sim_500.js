@@ -39,6 +39,11 @@
     for (var i = 0; i < ev.options.length; i++) if (RJS.checkRequires(ev.options[i]).length === 0) free.push(i);
     if (!free.length) { RJS.simChoose(0); return; }
     var s = S();
+    // v3.46：E_DIVORCE 的「离吧」是已知坏选项（扣 36 万却不真正离婚），Agent 永不选；避免 10% 作死把它当"最伤"
+    if (ev.id === 'E_DIVORCE') {
+      free = free.filter(function (i) { return ev.options[i].label.indexOf('离吧') === -1; });
+      if (!free.length) free = [0];
+    }
     // v3.31.1：搬家选城市 —— 按人设与状态理性选择，避免「永远选第一个=北京」的虹吸
     if (ev.id === 'E_MOVE_DEST') {
       var cBest = free[0], cBestScore = -Infinity;
@@ -184,7 +189,7 @@
         return firstOk(['oddjob']) || 'rest';
       }
       if (s.sta < 40) return 'rest';
-      if (s.money < 30000) return 'work';                     // 精打细算
+      if (s.money < 30000) return 'rest';                     // v3.45：work 已改为无业专属，在职改为休息（原 'work' 会永久置灰卡死）
       if (s.sta < 70) return 'train';
       return randomAction();
     }
@@ -214,7 +219,7 @@
     PERSONA = assignPersona();               // v3.27：本局社会阶层人设
     if (opts.setup) opts.setup(s);
     var steps = 0, negMonths = 0, lastMonth = -1, marks = {};
-    while (!s.ended && steps < 32000) {
+    while (!s.ended && s.age < 85 && steps < 60000) {
       if (RJS.simPendingEvent()) { chooseRandom(); steps++; continue; }
       if (s.pendingExam) { RJS.simSettleExam(); steps++; continue; }
       var id = smartAction();                 // v3.25：所有平衡模拟统一用理性 Agent
