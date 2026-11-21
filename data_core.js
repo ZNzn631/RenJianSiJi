@@ -95,19 +95,26 @@
     },
     {
       id: 'work',
-      name: '打工',
-      description: '把一天卖给柜台。',
+      name: '加班',
+      description: '留在公司，把今天的班加满（1.5 倍日薪）。',
       costDays: 1,
-      effects: { money: 100, stamina: -2, mood: -5, will: 1 },
-      displayEffects: { money: 100, stamina: -2, mood: -5 },
-      hideWhenLocked: true,                     // v3.45：不适用时整块隐藏（在职隐藏 / 无业显示）
+      effects: { stamina: -5, mood: -8 },
+      displayEffects: { stamina: -5, mood: -8 },
+      hideWhenLocked: true,                     // v3.46：在职加班（无业时隐藏，与打零工互斥）
       requires: {
-        stamina: { min: 1 },                    // 体质 > 0 才顶得住班
-        minAge: 18,                             // 未满 18 岁不能打工
-        unemployed: true,                       // v3.45：零工只在无业时可用（v3.44 的 employed:true 写反，导致按钮永久不可用）
+        stamina: { min: 1 },                    // 体质 > 0 才扛得住加班
+        minAge: 18,                             // 未满 18 岁不能加班
+        employed: true,                         // v3.46：加班=在职专属（oddjob 才是无业打零工）
         oncePerDay: false                       // 次数限制关闭（改成 true 即每天一次）
       },
-      denyText: { stamina: '体力不足，快去休息。' }
+      denyText: { stamina: '体力不足，快去休息。' },
+      onRun: function () {
+        var dim = daysInMonth(state.y, state.m);
+        var daily = dim > 0 ? (state.salary / dim) : 0;
+        var gain = Math.round(daily * 1.5);
+        state.money += gain;
+        addLog('event', '【加班】你多干了一天，赚了 ' + gain + ' 元（日薪约 ' + Math.round(daily) + ' × 1.5）。');
+      }
     },
     {
       id: 'oddjob',
@@ -1213,13 +1220,13 @@
       desc: '茶杯在桌角凉了又续，玻璃窗下，是你亲眼看着长起来的整条街。',
       hint: '',                                          // v3.47：隐藏结局——hint 不进图鉴展示（文档 §21：隐藏结局不向玩家展示达成条件）
       hidden: true,                                      // v3.47：隐藏结局标记（图鉴未解锁时不展示 hint）
-      test: function () { return state.money > 3000000 && state.edu !== '本科'; }
+      test: function () { return state.money > 3000000 && (EDU_RANK[state.edu] || 0) < EDU_RANK['本科']; }
     },
     {
       id: 'E_SELF_MADE', name: '人生赢家', priority: 4,
       desc: '店门口那盏灯你换了又换，招牌还是手写的那块。深夜关店，账本上的字越写越稳。',
       hint: '没读过多少书，就把路一步一步踩出来了。',
-      test: function () { return state.money > 1000000 && state.edu !== '本科'; }   // v3.47：E_SELF_MADE 不写 money<300 万，靠 priority 3 的 E_MOGUL 先截走
+      test: function () { return state.money > 1000000 && (EDU_RANK[state.edu] || 0) < EDU_RANK['本科']; }   // v3.47：E_SELF_MADE 不写 money<300 万，靠 priority 3 的 E_MOGUL 先截走
     },
     {
       id: 'E_RICH', name: '功成名就', priority: 5,

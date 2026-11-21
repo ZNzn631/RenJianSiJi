@@ -539,6 +539,7 @@
     m.age = 30; m.married = true; m.spouse = '林晓'; m.love = 70; m.mood = 60; m.moodMax = 110;
     m.salary = 10000; m.job = '部门主管'; m.money = 100000;
     m.int = 200; m.currentPositionYears = 1; m.talents = [];   // 去掉天赋倍率与裁员随机，金额可精确断言
+    m.m = 4;                                       // L7 方案 1：非季度月，避开 v3.46 季度绩效随机结算，恢复金额确定性
     m.d = new Date(m.y, m.m, 0).getDate();
     RJS.doAction('rest');
     // 生活成本 1500 + 家用 1500（10000×15%）= −3000；发薪 +10000；感情 −1

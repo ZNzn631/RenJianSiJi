@@ -752,6 +752,8 @@
       totalWorkYears: 0,                               // 总工龄：在职就涨（年终奖用），只被跳槽/辞职清零
       currentPositionYears: 0,                         // 当前岗位工龄：晋升门槛用，晋升/跳槽/辞职清零
       lastJobChangeMonth: 0,                           // 上次入职/跳槽/辞职的绝对月数（年×12+月-1），0 = 从未
+      performance: 50,                                 // v3.46：季度绩效 0-100（初始 50 → 绩效系数 1.0）
+      perfLowQuarters: 0,                              // v3.46：连续低绩效(<40)季度计数，连续两季触发降薪
       triggeredEvents: [],                             // 已触发过的事件 id（一次性事件用）
       studyCarry: 0,                                   // 智力递减收益的小数余量
       deathStrikes: 0,                                 // 濒死计数：钱不够时抢救两次即结束
@@ -1021,6 +1023,54 @@
     return '普通城市';
   }
 
+  // v3.46：季度绩效结算（3/6/9/12 月由 monthlySettle 调用；独立钩子，不碰时间推进循环）
+  function settlePerformance() {
+    if (!(state.salary > 0)) return;                     // 无业：不结算绩效
+
+    var mood = Math.max(0, Math.min(100, state.mood || 0));
+    var sta = Math.max(0, Math.min(100, state.sta || 0));
+    var efficiency = Math.max(0, Math.min(1, mood / 100 * 0.5 + sta / 100 * 0.5));
+    var need = requiredIntelligence();
+    var skillMatch = need > 0 ? Math.max(0, Math.min(1, state.int / need)) : 0.5;
+    var relation = Math.max(0, Math.min(1, (state.eq || 0) / 500));
+    var roll = eventRoll();
+    var perf = Math.round(efficiency * 40 + skillMatch * 30 + relation * 20 + (roll * 21 - 10));
+    perf = Math.max(0, Math.min(100, perf));
+    state.performance = perf;
+
+    var c = CAREER[state.job];
+    // 晋升：绩效 >80 且岗位工龄满 1 年且智力达标 且 有上升空间 → 自动升职
+    if (perf > 80 && c && c.next && state.currentPositionYears >= 1) {
+      var req = c.req || {};
+      if (state.int >= (req.intelligence || 0)) {
+        state.job = c.next;
+        state.salary = CAREER[c.next].salary;
+        state.currentPositionYears = 0;                  // 新岗位重新熬资历
+        addLog('event', '【晋升】季度绩效 ' + perf + ' 分，你被提拔为「' + state.job + '」，月薪涨至 ' + state.salary + '。');
+      }
+    }
+
+    // 降薪：绩效 <40 连续两个季度
+    if (perf < 40) {
+      state.perfLowQuarters = (state.perfLowQuarters || 0) + 1;
+      if (state.perfLowQuarters >= 2 && state.salary > 0) {
+        var cut = Math.round(state.salary * 0.1);
+        state.salary = Math.max(0, state.salary - cut);
+        addLog('danger', '【降薪】连续两个季度绩效低迷（<40），月薪被扣 ' + cut + ' 元，降至 ' + state.salary + '。');
+        state.perfLowQuarters = 0;
+      }
+    } else {
+      state.perfLowQuarters = 0;
+    }
+
+    // 辞退：身体垮 + 业绩差（体质 <20 且绩效 <40）才辞退
+    if ((state.sta || 0) < 20 && perf < 40 && state.salary > 0) {
+      doLayoff('健康崩溃');
+    }
+
+    clampStats();
+  }
+
   // v3.23：股票每月结算。只读/写 state.stockValue，不碰 money / 生活费 / 工资。
   // 牛市 +50%（基础 35% ± 运气加成），熊市 −60%（固定 30%），其余平稳。
   // 长期期望为负：0.35×(+50%) + 0.30×(−60%) = +17.5% − 18% = −0.5%（不含手续费）。
@@ -1057,6 +1107,7 @@
     }
 
     // 有工作：月底发薪，顺带消耗体质与心情
+    if (state.m % 3 === 0) settlePerformance();   // v3.46：季度绩效先结算，发薪立刻用新系数
     if (state.salary > 0) {
       if ((state.streamerBanMonths || 0) > 0) {
         // v3.37：主播封禁期不发薪
@@ -1066,7 +1117,8 @@
           addLog('event', '【解封】你终于熬过了封禁期，恢复了直播，下个月开始正常发薪！');
         }
       } else {
-        var pay = Math.round(state.salary * talentMul('work_money') * cityFactors().salary * 0.92);   // v3.34：天赋工资倍率 × 城市系数 ×（1−8% 社保）
+        var perfCoef = 0.5 + (Number(state.performance) || 0) / 100;   // v3.46：绩效系数 0.5~1.5，直接乘进月薪结算
+        var pay = Math.round(state.salary * talentMul('work_money') * cityFactors().salary * 0.92 * perfCoef);   // v3.34：天赋工资倍率 × 城市系数 ×（1−8% 社保）
         state.money += pay;
         window.__salaryGained = (window.__salaryGained || 0) + pay;   // v3.37：发薪计量（不变式审计专用）
         if (state.sta >= 5) state.sta += PAY_STAMINA;
@@ -2287,6 +2339,8 @@
       salary: asInt(s.salary, 0, 0, 9999999),
       totalWorkYears: asInt(s.totalWorkYears, asInt(s.workYears, 0, 0, 80), 0, 80),
       currentPositionYears: asInt(s.currentPositionYears, asInt(s.workYears, 0, 0, 80), 0, 80),
+      performance: asInt(s.performance, 50, 0, 100),   // v3.46：季度绩效 0-100，旧档缺失 → 50
+      perfLowQuarters: asInt(s.perfLowQuarters, 0, 0, 99),   // v3.46：连续低绩效季度计数，旧档缺失 → 0
       deathStrikes: asInt(s.deathStrikes, 0, 0, 9),
       hospitalCount: asInt(s.hospitalCount, 0, 0, 9),   // v3.9
       studyCarry: isFinite(Number(s.studyCarry)) ? Number(s.studyCarry) : 0,
