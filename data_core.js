@@ -1233,7 +1233,7 @@
       desc: '你读过书，也算挣到了钱。至少这一生，账面上是赢的。',
       hint: '积累了惊人的财富，且拥有高学历。',
       test: function () {
-        return state.money > 1000000 &&
+        return state.money > 3000000 &&
           (EDU_RANK[state.edu] || 0) >= EDU_RANK['本科'];
       }
     },
@@ -1334,7 +1334,7 @@
     { id: 'A_FIRSTLOVE', name: '情窦初开', desc: '经历过一段刻骨铭心的感情', test: function (s) { return s.hadTeenLove === true || (s.triggeredEvents || []).indexOf('E_FIRST_LOVE') > -1; } },
     { id: 'A_HOP3',    name: '跳槽达人', desc: '累计跳槽 3 次',             test: function (s) { return (s.hopCount || 0) >= 3; } },
     { id: 'A_ARCHITECT', name: '架构师',  desc: '晋升为架构师',              test: function (s) { return s.job === '架构师'; } },
-    { id: 'A_RICH',    name: '功成名就', desc: '存款 100 万且本科以上',      test: function (s) { return s.money > 1000000 && (EDU_RANK[s.edu] || 0) >= EDU_RANK['本科']; } },
+    { id: 'A_RICH',    name: '功成名就', desc: '存款 300 万且本科以上',      test: function (s) { return s.money > 3000000 && (EDU_RANK[s.edu] || 0) >= EDU_RANK['本科']; } },
     { id: 'A_DINK',    name: '丁克自由', desc: '选择丁克生活方式',            test: function (s) { return s.dink === true; } }
   ];
 

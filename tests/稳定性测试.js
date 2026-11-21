@@ -355,7 +355,7 @@
   function endingOf(mut) { restore(PRISTINE); var s = S(); mut(s); var r = RJS.pickEnding(); return r && r.id; }
   var e1 = endingOf(function (s) { s.hospitalCount = 6; });
   var e2 = endingOf(function (s) { s.money = -1; s.job = '无业'; s.salary = 0; s.sta = 40; s.deathStrikes = 0; });
-  var e3 = endingOf(function (s) { s.money = 2000000; s.edu = '本科'; s.sta = 40; s.deathStrikes = 0; });
+  var e3 = endingOf(function (s) { s.money = 4000000; s.edu = '本科'; s.sta = 40; s.deathStrikes = 0; });
   var e4 = endingOf(function (s) { s.totalWorkYears = 31; s.money = 100; s.edu = '高中'; s.sta = 40; });
   var e5 = endingOf(function (s) { s.money = 100; s.edu = '高中'; s.totalWorkYears = 3; s.sta = 40; });
   ok('F1 五种结局按优先级命中', [e1, e2, e3, e4, e5].join(',') === 'E_DEATH_EARLY,E_BANKRUPT,E_RICH,E_LABOR,E_ORDINARY', [e1, e2, e3, e4, e5].join(','));

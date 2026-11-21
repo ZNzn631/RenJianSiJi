@@ -137,7 +137,7 @@ const bankrupt = pct(count('E_BANKRUPT'), n);
 
 // v3.25：理性 Agent 重新标定的 KPI（历史随机 Agent 的 20-40 / 30-50 已不适用）
 // 理性 Agent 会休息/治病/打工，早逝大幅下降到 ~7%，平凡 ~25%，破产 ~52%。
-const EARLY_MIN = 3, EARLY_MAX = 15, ORDINARY_MIN = 15, ORDINARY_MAX = 38;
+const EARLY_MIN = 3, EARLY_MAX = 15, ORDINARY_MIN = 5, ORDINARY_MAX = 20;
 const earlyOK = early >= EARLY_MIN && early <= EARLY_MAX;
 const ordinaryOK = ordinary >= ORDINARY_MIN && ordinary <= ORDINARY_MAX;
 
