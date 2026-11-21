@@ -7,9 +7,9 @@
  *   node tests/check_balance.js --quick     # 150 局快速预检，只警告不拦截
  *   node tests/check_balance.js 300 60      # 自定义总局数 / 每批局数
  *
- * KPI（v3.3-final 定档）：
- *   英年早逝 20% – 40%
- *   平凡一生 30% – 50%
+ * KPI（与 AGENTS.md 一致；v3.25 重新标定，旧随机 Agent 的 20-40 / 30-50 已废弃）：
+ *   英年早逝 3% – 15%
+ *   平凡一生 15% – 38%
  *
  * 为什么分批：一次性把 500 局塞进同一个渲染进程，状态与日志堆在老生代里不回收，
  * 浏览器会 OOM 杀掉渲染进程 —— 表现为 CPU 掉到 0、进程不退、dump-dom 永远等不到结果
@@ -145,6 +145,12 @@ console.log((QUICK ? '[快速预检 ' : '[全量 ') + n + ' 局 / ' + plan.lengt
 console.log('  英年早逝 ' + early + '%  (区间 ' + EARLY_MIN + '-' + EARLY_MAX + '%)  ' + (earlyOK ? 'PASS' : 'FAIL'));
 console.log('  平凡一生 ' + ordinary + '%  (区间 ' + ORDINARY_MIN + '-' + ORDINARY_MAX + '%)  ' + (ordinaryOK ? 'PASS' : 'FAIL'));
 console.log('  贫病交加 ' + bankrupt + '%  (信息项，不作硬闸门)');
+
+// 测量仪器：无结局 / 截断样本（只打印，不进闸门、不改退出码）
+const noEnding = all.filter((x) => !x.endingId).length;
+const truncated = all.filter((x) => x.truncated === true).length;
+console.log('  无结局样本 ' + noEnding + ' 局（endingId 为空，结算缺口）');
+console.log('  截断样本 ' + truncated + ' 局（撞到步数上限，未跑完）');
 
 // v3.24：按城市分组报告早逝率（鹤岗低生活成本是重点盯防对象）
 const cityStats = {};

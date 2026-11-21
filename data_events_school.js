@@ -105,9 +105,15 @@
       description: '志愿表摊在桌上。这一次，你要为自己选一条路。',
       weight: 9,
       priority: true,   // v3.44：18 岁强制必发，不选专业不能继续
-      requires: { onceEver: true, alreadyExam: true, minAge: 18, maxAge: 19, education: ['高中'] },   // v3.5.6：先高考再填志愿
+      // v3.46：删除 maxAge —— 它就是唯一的锁死点。实测 1000 局：专科生 99.5%（207/208）拿不到专业，
+      // 因为他们 22 岁才被录取（读档/复读路径），而旧 maxAge:20 从 21 岁起永久拒发本事件，
+      // 连带 14 个带 major 门槛的岗位 + 2 个带 major 门槛的证书全线锁死。
+      // isStudent 已按 grade 1~4 判定（不看年龄），天然排除「已毕业」与「未入学」，年龄上限交给它即可。
+      // 「未填过才触发」由 onceEver 承担：major 不是引擎的 requires 键（checkRequires 对未知键静默忽略），
+      // 写 major:'' 是假条件，一律不写。
+      requires: { onceEver: true, alreadyExam: true, isStudent: true, minAge: 18 },
       options: [
-        { label: '冲计算机（高薪）', effects: { intelligence: 6, mood: -4 }, result: '你选了计算机。未来十年，代码就是你的饭碗。', nextEventId: 'E_FAMILY_QUARREL', onChoose: function () { state.major = '计算机'; } },
+        { label: '冲计算机（高薪）', effects: { intelligence: 6, mood: -4 }, result: '你选了计算机。未来十年，代码就是你的饭碗。', onChoose: function () { state.major = '计算机'; } },   // v3.46：删掉 nextEventId:'E_FAMILY_QUARREL'（那是「学费」，与选专业无关，属误接链式）
         { label: '学临床医学（当医生）', effects: { intelligence: 6, will: 2, mood: -4 }, result: '你选了临床医学。这条路很长，但穿上白大褂的那一刻，值。', onChoose: function () { state.major = '临床医学'; } },
         { label: '学法，考律师', effects: { intelligence: 5, mood: -3 }, result: '你选了法学。从此，逻辑和证据就是你的武器。', onChoose: function () { state.major = '法学'; } },
         { label: '学金融，进投行', effects: { intelligence: 6, mood: -4 }, result: '你选了金融学。钱生钱的世界，等着你。', onChoose: function () { state.major = '金融学'; } },
@@ -1192,6 +1198,8 @@
       ]
     },
     {
+      // v3.46 · 童年蒙太奇专用：人间开发.html prologuePool() 按 (minAge>=6 && maxAge<=15 && !chainOnly) 自动收录，
+      //        只在开局 3~4 段闪回里播，16 岁后的常规事件池永远抽不到它（所以别再当它是死数据）。
       id: 'E_TEEN_REBEL',
       title: '青春期',
       description: '为了一件很小的事——你妈翻了你的书包——你们吵了半个小时。她说「我都是为你好」。',
@@ -1216,6 +1224,8 @@
       ]
     },
     {
+      // v3.46 · 童年蒙太奇专用：人间开发.html prologuePool() 按 (minAge>=6 && maxAge<=15 && !chainOnly) 自动收录，
+      //        只在开局 3~4 段闪回里播，16 岁后的常规事件池永远抽不到它（所以别再当它是死数据）。
       id: 'E_TEEN_CRUSH',
       title: '同桌',
       description: '你的同桌借你橡皮的时候，头发会扫到你的胳膊。你开始盼着上数学课。',
@@ -1240,6 +1250,8 @@
       ]
     },
     {
+      // v3.46 · 童年蒙太奇专用：人间开发.html prologuePool() 按 (minAge>=6 && maxAge<=15 && !chainOnly) 自动收录，
+      //        只在开局 3~4 段闪回里播，16 岁后的常规事件池永远抽不到它（所以别再当它是死数据）。
       id: 'E_TEEN_NETCAFE',
       title: '网吧',
       description: '翻墙出去上网。第二局刚开始，教导主任的手电筒就照到了你脸上。',
@@ -1270,7 +1282,9 @@
       title: '叫家长',
       description: '教导主任的电话打到了家里。你爸骑着摩托车到了学校门口，一路上一句话没说。',
       weight: 1,
-      chainOnly: true,
+      // v3.46：原 chainOnly:true 让它在童年蒙太奇里被 prologuePool 直接过滤（池规则排除 chainOnly），
+      // 而 prologue 的 choosePrologue 不处理 nextEventId —— 两头都断，成了真死数据。
+      // 去掉 chainOnly 后它作为独立闪回进入蒙太奇池（13~15 岁），常规池仍被 maxAge:15 挡在 16 岁之后。
       requires: { minAge: 13, maxAge: 15 },
       options: [
         {
@@ -1291,6 +1305,8 @@
       ]
     },
     {
+      // v3.46 · 童年蒙太奇专用：人间开发.html prologuePool() 按 (minAge>=6 && maxAge<=15 && !chainOnly) 自动收录，
+      //        只在开局 3~4 段闪回里播，16 岁后的常规事件池永远抽不到它（所以别再当它是死数据）。
       id: 'E_TEEN_ISOLATED',
       title: '被孤立',
       description: '不知道从哪一天起，课间没人跟你说话。你走进教室，几个聚在一起的人会突然安静。',
@@ -1510,7 +1526,13 @@
       chainOnly: true,
       options: [
         { label: '看看结果', effects: {}, result: '', onChoose: function () {
-          if (Math.random() < 0.5) { state.loveState = 'dating'; state.datingLove = 50; state.partnerName = 'TA'; state.mood += 8; addLog('event', '【恋爱】你们在一起了。校园里的日子，突然有了颜色。'); }
+          if (Math.random() < 0.5) {
+            state.datingLove = 50;
+            state.partnerName = spouseName();   // v3.45：真名，不再写死 'TA'
+            startDating();                      // v3.45：唯一交往入口（写 loveState/inLove/datingStart）
+            state.mood += 8;
+            addLog('event', '【恋爱】你们在一起了。校园里的日子，突然有了颜色。');
+          }
           else { state.mood -= 4; addLog('sys', '【错过】TA 说已经有喜欢的人了。你笑了笑，说「那祝福你们」。'); }
         } }
       ]
@@ -1547,18 +1569,6 @@
       options: [
         { label: '认真教', effects: { money: 800, mood: -2, intelligence: 2 }, result: '你把知识点掰开揉碎讲，学生终于听懂了。' },
         { label: '糊弄过去', effects: { money: 500, mood: -1, eq: -1 }, result: '你随便讲了讲。家长看你的眼神，不太对。' }
-      ]
-    },
-    {
-      id: 'E_U_GRADUATION',
-      title: '毕业典礼',
-      description: '学士帽抛向天空，四年的时光，在这一刻盖了章。',
-      weight: 9,
-      requires: { isStudent: true, minAge: 18, maxAge: 22 },
-      options: [
-        { label: '拍下这一刻', effects: { mood: 12 }, result: '你举着毕业证，笑得像个孩子。' },
-        { label: '和老师同学道别', effects: { mood: 8, eq: 2 }, result: '你说「常联系」，转身红了眼眶。' },
-        { label: '站在校门口，看人来人往', effects: { mood: 6, will: 3 }, result: '你站了很久，然后转身，走向下一段人生。' }
       ]
     },
     /* v3.43：辅导员开年级大会（必发，提示四六级） */
@@ -1599,7 +1609,8 @@
       options: [
         { label: '花钱合租（一室）', effects: { money: -2000, mood: -2 }, result: '你找了个合租的房子，室友是个不说话的程序员。', onChoose: function () { state.housing = 'rent'; state.rentType = 'share'; state.commute = 30; } },
         { label: '整租一套（贵但安静）', effects: { money: -5000, mood: 3 }, result: '你整租了一套小房子，终于有了自己的空间。', onChoose: function () { state.housing = 'rent'; state.rentType = 'whole'; state.commute = 20; } },
-        { label: '住郊区，通勤认了', effects: { money: -800, mood: -4 }, result: '你住进了郊区，每天通勤两小时。', onChoose: function () { state.housing = 'rent'; state.rentType = 'suburb'; state.commute = 90; } }
+        { label: '住郊区，通勤认了', effects: { money: -800, mood: -4 }, result: '你住进了郊区，每天通勤两小时。', onChoose: function () { state.housing = 'rent'; state.rentType = 'suburb'; state.commute = 90; } },
+        { label: '先换个城市生活', requires: { money: { min: 5000 } }, effects: { money: -5000 }, result: '你把行李箱调了个方向。', nextEventId: 'E_MOVE_DEST' }   // v3.45：承接被删的 E_RENT_CHOICE，保住 E_MOVE_DEST 的链入口
       ]
     },
     /* v3.44：3 个高频大学日常 */

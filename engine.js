@@ -295,9 +295,9 @@
         suffix: true
       };
     },
-    // 在校生（v3.7）：本科/专科且 <22 岁，动态判定（不读 state.isStudent，避免不同步）
+    // 在校生：唯一实现在 isStudentNow()（年级判定），本规则只做 true/false 包装
     isStudent: function (v) {
-      var s = (state.edu === '本科' || state.edu === '专科') && getAge() < 22;
+      var s = isStudentNow();
       if (v === true) {
         if (s) return null;
         return { key: 'isStudent', title: '已不是在校生', detail: '你已经毕业或离开校园了', suffix: true };
@@ -503,16 +503,33 @@
         suffix: true
       };
     },
-    // v3.44：大学年级（grade: 3 = 大三；grade: 5 = 已毕业）
+    // v3.45：大学年级。只接受 number（精确）或 {min,max}（区间）；其它形状一律判不通过，禁止静默放行
     grade: function (v) {
-      var need = Number(v);
-      if (!isFinite(need)) return null;
       var cur = Number(state.grade) || 0;
-      if (cur === need) return null;
       var label = { 1: '大一', 2: '大二', 3: '大三', 4: '大四', 5: '毕业' };
+      var curText = label[cur] || '未入学';
+      if (typeof v === 'number' && isFinite(v)) {
+        if (cur === v) return null;
+        return {
+          key: 'grade', title: '年级不符',
+          detail: '需 ' + (label[v] || (v + ' 年级')) + '（当前 ' + curText + '）',
+          suffix: false
+        };
+      }
+      if (v && typeof v === 'object' && !Array.isArray(v)
+          && (typeof v.min === 'number' || typeof v.max === 'number')) {
+        var lo = (typeof v.min === 'number') ? v.min : -Infinity;
+        var hi = (typeof v.max === 'number') ? v.max : Infinity;
+        if (cur >= lo && cur <= hi) return null;
+        return {
+          key: 'grade', title: '年级不符',
+          detail: '需 ' + (lo === -Infinity ? '' : lo) + '~' + (hi === Infinity ? '' : hi) + ' 年级（当前 ' + curText + '）',
+          suffix: false
+        };
+      }
       return {
-        key: 'grade', title: '年级不符',
-        detail: '需 ' + (label[need] || (need + ' 年级')) + '（当前 ' + (label[cur] || '未入学') + '）',
+        key: 'grade', title: '年级条件非法',
+        detail: 'grade 只接受数字或 {min,max}，当前为 ' + JSON.stringify(v),
         suffix: false
       };
     }
@@ -520,7 +537,7 @@
 
   /* ================= [数据层] v3.7 状态机辅助函数（只读写 state 新字段，不碰引擎） ================= */
 
-  // 在校生统一判定（与 REQUIRE_RULES.isStudent 同源，避免两处漂移）
+  // 在校生唯一实现（REQUIRE_RULES.isStudent 直接调用本函数；旧注释写“同源”是假的，v3.45 已真正统一）
   function isStudentNow() {
     var g = Number(state.grade) || 0;
     return (state.edu === '本科' || state.edu === '专科') && g >= 1 && g <= 4;   // v3.44：改用年级判定
@@ -1217,14 +1234,6 @@
     return true;
   }
 
-
-  function addKid() {
-    state.kids = Math.min(3, (state.kids || 0) + 1);
-    if (state.married) state.moodMax = Math.min(MOOD_MAX_CAP, MOOD_MAX_MARRIED + state.kids * MOOD_BONUS_PER_KID);
-    state.mood = Math.min(moodMaxOf(), state.mood + 6);
-    addLog('event', '【孩子】你有了第 ' + state.kids + ' 个孩子。心情上限提升到 ' + moodMaxOf() + '。');
-    clampStats();
-  }
 
   // 家庭月结：由 monthlySettle 末尾调用（唯一接入点）
   function settleFamily() {
@@ -2147,6 +2156,7 @@
   // 统一落盘核心：silent=true 时静默（不弹 toast，自动存档用）
   function persistGame(silent) {
     try {
+      delete state.stamina;                // v3.45：历史事件误写的垃圾键，入库前清掉（真正防线是 A-02 的存档断言）
       var payload = { app: 'renjian-siji', v: 1, at: Date.now(), state: state };
       localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
       dirty = false;

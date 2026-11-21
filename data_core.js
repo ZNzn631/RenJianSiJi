@@ -100,11 +100,11 @@
       costDays: 1,
       effects: { money: 100, stamina: -2, mood: -5, will: 1 },
       displayEffects: { money: 100, stamina: -2, mood: -5 },
-      uiHideWhenEmployed: true,                 // v3.7：有正式工作后在 UI 隐藏（只藏按钮、不进 checkRequires，保住平衡模拟的体力消耗）
+      hideWhenLocked: true,                     // v3.45：不适用时整块隐藏（在职隐藏 / 无业显示）
       requires: {
         stamina: { min: 1 },                    // 体质 > 0 才顶得住班
         minAge: 18,                             // 未满 18 岁不能打工
-        employed: true,                         // v3.44：有正式工作时才显示【打工】（与打零工互斥）
+        unemployed: true,                       // v3.45：零工只在无业时可用（v3.44 的 employed:true 写反，导致按钮永久不可用）
         oncePerDay: false                       // 次数限制关闭（改成 true 即每天一次）
       },
       denyText: { stamina: '体力不足，快去休息。' }
@@ -116,8 +116,8 @@
       costDays: 1,
       effects: { money: 100, stamina: -2, mood: -5, will: 1 },
       displayEffects: { money: 100, stamina: -2, mood: -5 },
-      uiHideWhenEmployed: true,                 // v3.7：有正式工作后在 UI 隐藏（只藏按钮、不进 checkRequires，保住平衡模拟的体力消耗）
-      requires: { stamina: { min: 1 }, unemployed: true },   // v3.44：无业时显示【打零工】（与打工互斥）
+      hideWhenLocked: true,                     // v3.45：在职时隐藏（零工无业专属）
+      requires: { stamina: { min: 1 }, unemployed: true },   // v3.44：无业时显示【打零工】
       denyText: { stamina: '体力不足，快去休息。' },
       // 破产时的保底现金流
       onRun: function () {
@@ -508,7 +508,7 @@
         if (window.IS_SIMULATION) return;   // v3.34：平衡模拟环境跳过跳月（skipMonth 是 UI 便利，不该影响 Agent 平衡）
         var left = daysInMonth(state.y, state.m) - state.d + 1;   // 本月剩余天数
         advanceDays(left);   // 逐天推进到月底（触发完整日/月结算与事件抽取，不用 skipMonths 以免漏事件）
-        markJobChange();     // 跳月不等于跳槽，重置跳槽冷却
+        // v3.45：跳月是 UI 便利，不是跳槽，不动 lastJobChangeMonth（原注释与行为相反，已删 markJobChange）
       }
     }
   ];
@@ -1209,7 +1209,20 @@
       test: function () { return state.money < 0 && (state.job === '无业' || !state.salary); }
     },
     {
-      id: 'E_RICH', name: '功成名就', priority: 3,
+      id: 'E_MOGUL', name: '亿万富翁', priority: 3,
+      desc: '茶杯在桌角凉了又续，玻璃窗下，是你亲眼看着长起来的整条街。',
+      hint: '',                                          // v3.47：隐藏结局——hint 不进图鉴展示（文档 §21：隐藏结局不向玩家展示达成条件）
+      hidden: true,                                      // v3.47：隐藏结局标记（图鉴未解锁时不展示 hint）
+      test: function () { return state.money > 3000000 && state.edu !== '本科'; }
+    },
+    {
+      id: 'E_SELF_MADE', name: '人生赢家', priority: 4,
+      desc: '店门口那盏灯你换了又换，招牌还是手写的那块。深夜关店，账本上的字越写越稳。',
+      hint: '没读过多少书，就把路一步一步踩出来了。',
+      test: function () { return state.money > 1000000 && state.edu !== '本科'; }   // v3.47：E_SELF_MADE 不写 money<300 万，靠 priority 3 的 E_MOGUL 先截走
+    },
+    {
+      id: 'E_RICH', name: '功成名就', priority: 5,
       desc: '你读过书，也算挣到了钱。至少这一生，账面上是赢的。',
       hint: '积累了惊人的财富，且拥有高学历。',
       test: function () {
@@ -1218,13 +1231,13 @@
       }
     },
     {
-      id: 'E_LABOR', name: '劳碌一生', priority: 4,
+      id: 'E_LABOR', name: '劳碌一生', priority: 6,
       desc: '三十多年，你把时间一格一格交给了工位。',
       hint: '在某份工作上奉献了超过 30 年的青春。',
       test: function () { return state.totalWorkYears > 30; }
     },
     {
-      id: 'E_LOST_CHILD', name: '失孤', priority: 5,
+      id: 'E_LOST_CHILD', name: '失孤', priority: 7,
       desc: '家里的相框擦得很干净，饭桌上永远多摆一副碗筷。',
       hint: '失去过孩子，且再没有别的孩子陪在身边。',
       test: function () {
@@ -1232,7 +1245,7 @@
       }
     },
     {
-      id: 'E_FOUR_GEN', name: '四世同堂', priority: 6,
+      id: 'E_FOUR_GEN', name: '四世同堂', priority: 8,
       desc: '过年时桌子不够坐，得把茶几也搬过来。你坐在最里面，看着一屋子人。',
       hint: '有两个以上的孩子，且已经有孙辈。',
       test: function () {
@@ -1243,12 +1256,31 @@
       }
     },
     {
-      id: 'E_DINK', name: '丁克家族', priority: 7,
+      id: 'E_DINK', name: '丁克家族', priority: 9,
       desc: '两个人把一辈子过成了两个人的。存款够花，房子够住，狗活了十四年。',
       hint: '结婚且主动选择不要孩子，活到晚年。',
       test: function () {
         return state.married === true && state.dink === true && livingChildren().length === 0 && getAge() >= 70;
       }
+    },
+    {
+      id: 'E_HAPPY', name: '幸福一生', priority: 10,
+      desc: '孩子的旧书包挂在门后，饭桌上聊的尽是柴米油盐。最好的，你都留在了家里。',
+      hint: '钱都花在了家里，可家里装着你的全部。',
+      test: function () { return state.married === true && state.kids > 0; }
+    },
+    {
+      id: 'E_SOLO', name: '孤独终老', priority: 11,
+      desc: '屋子不大，收拾得干净。周末给自己做饭，窗台上的花刚换了水。',
+      hint: '一个人，也把自己照顾得很好。',
+      test: function () { return !state.married && state.kids === 0 && getAge() >= 70; }
+    },
+    {
+      id: 'E_SCHOLAR', name: '学术泰斗', priority: 12,
+      desc: '书房的书架顶到天花板，翻旧的那几本还摆在伸手就能够着的地方。窗外下课铃响，你手里的红笔顿了顿。',
+      hint: '',                                          // v3.47：隐藏结局——hint 不进图鉴展示（文档 §21）
+      hidden: true,                                      // v3.47：隐藏结局标记
+      test: function () { return state.edu === '硕士' || state.edu === '博士'; }
     },
     {
       id: 'E_ORDINARY', name: '平凡的一生', priority: 99,

@@ -235,8 +235,11 @@
       id: 'E_FAMILY_QUARREL',
       title: '学费',
       description: '开学前一周，客厅里传来争吵声：这笔学费，家里要借。',
-      weight: 1,
-      chainOnly: true,
+      weight: 3,
+      // v3.46：原先 chainOnly:true，唯一入口是「填报志愿·冲计算机」——选个专业直接跳「家里为学费吵架」，
+      // 纯属误接，跳转已删。删完它就成了孤儿（ISO4b 报红），故改为独立常规事件：
+      // 在校生 + 家里手头紧（≤5000）+ 一生一次，语义本来就该是「穷学生开学前的坎」。
+      requires: { onceEver: true, isStudent: true, minAge: 18, maxAge: 22, money: { max: 5000 } },
       options: [
         { label: '申请助学贷款', effects: { money: 3000, mood: -6, intelligence: 2 }, result: '你在银行排了一下午队，签字的手很稳。' },
         { label: '暑假自己挣', effects: { money: 1500, stamina: -5, mood: -3 }, result: '你在工地搬了四十天砖，晒脱了一层皮。' }
@@ -437,7 +440,7 @@
       requires: { onceEver: true, married: true, minAge: 36, maxAge: 56 },   // v3.5.5：已婚才有婚姻危机
       options: [
         { label: '努力挽回', effects: { money: -30000, mood: -6, intelligence: 2 }, result: '你们去做了咨询，勉强把日子继续过下去。' },
-        { label: '离吧', requires: { money: { min: 360000 } }, effects: { money: -360000, mood: -20, stamina: -3 }, result: '分完财产那天，你一个人在新房子里坐到天亮。' },
+        { label: '离吧', requires: { money: { min: 360000 } }, effects: { mood: -20 }, meta: '分割约一半存款 · 心情 −20', result: '分完财产那天，你一个人在新房子里坐到天亮。', onChoose: function () { divorceNow('divorce'); } },
         { label: '就这样耗着，谁也没力气再吵', effects: { mood: -10 }, result: '行李箱一直放在门口，谁也没动。' }
       ]
     },
@@ -2384,7 +2387,7 @@
               state.mood = Math.min(moodMaxOf(), state.mood + 10);
               addLog('event', '【体检】结果出来：虚惊一场，只是年纪到了（心情 +10）。');
             } else {
-              state.stamina = Math.max(0, state.stamina - 6);
+              state.sta = Math.max(0, state.sta - 6);
               state.mood = Math.max(0, state.mood - 14);
               addLog('danger', '【体检】查出点东西，需要长期吃药复查（体质 −6，心情 −14）。');
             }
@@ -2400,7 +2403,7 @@
               state.mood = Math.min(moodMaxOf(), state.mood + 4);
               addLog('event', '【体检】两项都还好，你把报告折起来放进抽屉。');
             } else {
-              state.stamina = Math.max(0, state.stamina - 3);
+              state.sta = Math.max(0, state.sta - 3);
               state.mood = Math.max(0, state.mood - 8);
               addLog('danger', '【体检】其中一项不太好，医生让你三个月后再来。');
             }
@@ -2556,6 +2559,8 @@
     }
 ,
     {
+      // v3.46 · 童年蒙太奇专用：人间开发.html prologuePool() 按 (minAge>=6 && maxAge<=15 && !chainOnly) 自动收录，
+      //        只在开局 3~4 段闪回里播，16 岁后的常规事件池永远抽不到它（所以别再当它是死数据）。
       id: 'E_KID_NICKNAME',
       title: '外号',
       description: '你有点胖，或者有点黑，或者说话有点结巴。总之从某一天起，全班开始用另一个名字叫你。',
@@ -2580,6 +2585,8 @@
       ]
     },
     {
+      // v3.46 · 童年蒙太奇专用：人间开发.html prologuePool() 按 (minAge>=6 && maxAge<=15 && !chainOnly) 自动收录，
+      //        只在开局 3~4 段闪回里播，16 岁后的常规事件池永远抽不到它（所以别再当它是死数据）。
       id: 'E_KID_CARTOON',
       title: '动画片',
       description: '每天六点，那个频道的动画片开播。作业本摊在旁边，一页没动，铅笔滚到了桌角。',
@@ -2604,6 +2611,8 @@
       ]
     },
     {
+      // v3.46 · 童年蒙太奇专用：人间开发.html prologuePool() 按 (minAge>=6 && maxAge<=15 && !chainOnly) 自动收录，
+      //        只在开局 3~4 段闪回里播，16 岁后的常规事件池永远抽不到它（所以别再当它是死数据）。
       id: 'E_KID_LUCKY_MONEY',
       title: '压岁钱',
       description: '过年收了一沓红包，攥在手里还没捂热，妈妈说「先帮你存着」。',
@@ -2628,6 +2637,8 @@
       ]
     },
     {
+      // v3.46 · 童年蒙太奇专用：人间开发.html prologuePool() 按 (minAge>=6 && maxAge<=15 && !chainOnly) 自动收录，
+      //        只在开局 3~4 段闪回里播，16 岁后的常规事件池永远抽不到它（所以别再当它是死数据）。
       id: 'E_KID_SPORTS',
       title: '运动会',
       description: '四百米决赛，你在第二个弯道被绊倒，膝盖磕在塑胶跑道上。全校都在看台上。',
@@ -3016,47 +3027,6 @@
           label: '想办法联系 TA',
           effects: { money: -100, mood: 5, eq: 3, luck: 2 },
           result: '电话打通了，那头愣了两秒，说「是你啊」。'
-        }
-      ]
-    },
-    {
-      id: 'E_RENT_CHOICE',
-      title: '租房抉择',
-      description: '毕业了，你提着箱子站在城市的街头。住哪儿，是每个月都要重新回答的问题。',
-      weight: 4,
-      priority: true,
-      requires: { onceEver: true, isStudent: false, minAge: 22, maxAge: 28 },
-      options: [
-        {
-          label: '住在家里，省房租',
-          effects: { mood: 2 },
-          result: '你回了家。房租省了，但饭桌上开始出现「什么时候找对象」。',
-          onChoose: function () { state.housing = 'home'; state.rentType = 'home'; state.commute = 40; }
-        },
-        {
-          label: '市区合租，离公司近',
-          effects: { mood: -3, eq: 1 },
-          result: '你和两个陌生人合租。隔壁半夜煮泡面，你闻着香味饿着肚子。',
-          onChoose: function () { state.housing = 'rent'; state.rentType = 'share'; state.commute = 20; }
-        },
-        {
-          label: '市区整租，一个人住',
-          effects: { mood: 4 },
-          result: '一居室，租金贵，但关上门就是自己的世界。',
-          onChoose: function () { state.housing = 'rent'; state.rentType = 'whole'; state.commute = 25; }
-        },
-        {
-          label: '郊区整租，图个便宜安静',
-          effects: { mood: 1, stamina: -1 },
-          result: '房子大了三倍，通勤长了四倍。每天在公交上补觉。',
-          onChoose: function () { state.housing = 'rent'; state.rentType = 'suburb'; state.commute = 90; }
-        },
-        {
-          label: '先换个城市生活',
-          requires: { money: { min: 5000 } },
-          effects: { money: -5000 },
-          result: '你把行李箱调了个方向。',
-          nextEventId: 'E_MOVE_DEST'
         }
       ]
     },

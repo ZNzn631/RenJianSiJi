@@ -36,6 +36,7 @@
   var MOOD = [10, 50, 90];
   var ATTR = [10, 60, 200, 260];   // v3.36：补 260 覆盖技能突破门槛（智力≥250）
   var MONTHS = [1, 2, 3, 5, 7, 9, 12];
+  var GRADES = [0, 1, 2, 3, 4, 5];   // v3.44：大学年级（0=未入学，1-4=大一~大四，5=毕业）
   var JOBS = ['无业', '普通文员', '普通程序员', '大厂程序员', '人民教师', '外卖骑手', '网红主播'];
 
   function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
@@ -72,6 +73,7 @@
     s.housing = cfg.housing;
     s.city = cfg.city || 'normal';
     s.schoolTier = cfg.tier;
+    s.grade = cfg.grade || 0;   // v3.44：注入年级，让 grade 条件事件可被探针构造出满足态
     s.hasInsurance = cfg.insurance;
     s.stockValue = 10000;   // v3.22：覆盖股票事件的可满足性
     s.dink = false; s.lostChild = 0;
@@ -102,6 +104,7 @@
       age: pick(AGES), edu: pick(EDUS), job: pick(JOBS), money: pick(MONEY),
       sta: pick(STA), mood: pick(MOOD), attr: pick(ATTR), love: pick(LOVE),
       housing: pick(HOUS), city: pick(CITIES), month: pick(MONTHS), tier: pick(['重点', '普通']),
+      grade: pick(GRADES),
       insurance: Math.random() < 0.5, teenLove: Math.random() < 0.3,
       exam: Math.random() < 0.7, posYears: Math.floor(Math.random() * 8),
       jobCooldown: Math.floor(Math.random() * 36), childrenMode: Math.floor(Math.random() * 4),
@@ -150,7 +153,10 @@
       for (var h = 0; h < HOUS.length; h++) if (HOUS[h] !== val) { s.housing = HOUS[h]; return true; }
       return false;
     }
-    if (key === 'isStudent') { s.edu = val === true ? '初中' : '本科'; s.age = val === true ? 30 : 20; return true; }
+    // v3.46：isStudent 自 v3.45 起按 grade 1~4 判定（isStudentNow），不再看年龄。
+    // 旧违例只改 edu/age，遇到 isStudent:false 的事件（E_JOB_FAIR 等）时 grade 仍随机落在 1~4，
+    // 破坏后依旧「在校」，被误判成穿透（假阳性）。这里同步补 grade，构造出真正的违规态。
+    if (key === 'isStudent') { s.edu = val === true ? '初中' : '本科'; s.age = val === true ? 30 : 20; s.grade = val === true ? 0 : 1; return true; }
     if (key === 'schoolTier') { s.schoolTier = val === '重点' ? '普通' : '重点'; return true; }
     if (key === 'hasChild') { s.kids = 0; s.children = []; return true; }
     if (key === 'adultChild') { s.kids = 1; s.children = kid(1, nowM).children; return true; }
@@ -216,6 +222,19 @@
       s.coldMonths = Math.max(0, Number(val) - 1);
       return true;
     }
+    // v3.44：年级条件反证
+    if (key === 'grade') {
+      if (typeof val === 'number') {
+        var others = GRADES.filter(function (g) { return g !== val; });
+        s.grade = others[Math.floor(Math.random() * others.length)];
+        return true;
+      }
+      if (val && typeof val === 'object') {
+        if (typeof val.min === 'number') { s.grade = Math.max(0, val.min - 1); return true; }
+        if (typeof val.max === 'number') { s.grade = val.max + 1; return true; }
+      }
+      return false;
+    }
     // 属性区间
     var MAP = { money: 'money', stamina: 'sta', mood: 'mood', intelligence: 'int', cha: 'cha', will: 'will', eq: 'eq', luck: 'luck' };
     if (MAP[key] && val && typeof val === 'object') {
@@ -271,6 +290,15 @@
       leaked.length === 0, leaked.length ? leaked.slice(0, 12).join(', ') + (leaked.length > 12 ? ' …共' + leaked.length + '处' : '') : 'clean');
     ok('ISO3 未发现「条件看起来写了、实际不生效」的字段',
       leaked.length === 0, leaked.length ? 'leaked=' + leaked.length : 'none');
+
+    // v3.44：年级事件必须被真正扫到，不允许因基态缺 grade 而落进 skipped
+    var gradeSkipped = skipped.filter(function (id) {
+      var ev2 = ids[id];
+      return ev2 && ev2.requires && ev2.requires.grade !== undefined;
+    });
+    ok('ISO1b 年级条件事件必须能构造出满足态（不允许因 grade 缺失被跳过）',
+      gradeSkipped.length === 0,
+      gradeSkipped.length ? gradeSkipped.join(', ') : 'clean');
 
     RES.stats.iso = {
       events: EV.length, withRequires: pool.length, satisfiable: found,
