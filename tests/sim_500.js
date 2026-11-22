@@ -32,6 +32,56 @@
     for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i];
     return { id: id, salaryFactor: 1, livingFactor: 1, houseFactor: 1, moodBonus: 0 };
   }
+  // T-04：婚姻策略 —— 走真实「恋爱→求婚→结婚」事件链，绝不直接写 state.married。
+  //   WANTS_MARRY=true 时选推进选项；false 时选拒绝选项。
+  function marriagePick(ev, free) {
+    // 要不要孩子：躺平者丁克（养不起娃，防婚后债务→离婚），其余备孕（冲幸福一生）
+    if (ev.id === 'E_FAMILY_KID') {
+      if (PERSONA === 'layabout') {
+        if (free.indexOf(2) > -1) { RJS.simChoose(2); return true; }   // 丁克
+      } else if (free.indexOf(0) > -1) { RJS.simChoose(0); return true; }   // 备孕
+      return false;
+    }
+    // 婚姻危机：优先「再试一次」止损（love+25，coldMonths 清零），避免离婚
+    if (ev.id === 'E_MARRIED_DIVORCE') {
+      if (free.indexOf(1) > -1) { RJS.simChoose(1); return true; }
+      return false;
+    }
+    if ((S().divorceCount || 0) > 0) return false;   // 离过婚不再主动追求，断掉 marry→divorce→remarry 死循环
+    var m = {
+      E_MARRY_URGE:    { y: [0],       n: [1] },   // 催婚：去见一面 / 推掉
+      E_MARRY_SEEK:    { y: [0, 1],    n: [2] },   // 相亲：认真打扮(需2000)/穿平时的衣服 → 第二次见面
+      E_MARRY_SECOND:  { y: [0, 1],    n: [2] },   // 第二次见面：继续联系(cha/eq≥35)/坦白 → startDating
+      E_MARRY_WED:     { y: [1, 0],    n: [2] },   // 领证：两家人吃顿饭(3万)/风风光光(12万) → marryTo；再等等=不结
+      LV_PROPOSE:      { y: [0, 1],    n: [2] },   // 求婚：单膝跪下/戒指(需8000) → E_LOVE_MARRY；没说出口=不结
+      E_LOVE_MARRY:    { y: [2, 1, 0] },           // 修成正果：先领证(免费)/旅行(1.5万)/体面(4万) → marryTo
+      E_LOVE_GROWN:    { y: [0],       n: [1] },   // 旧情复燃 → startDating
+      E_LOVE_DATE_2:   { y: [0],       n: [1] },   // 深夜散步：牵 TA 的手 → startDating
+      E_FIRST_LOVE:    { y: [0],       n: [1] },   // 初恋：表白 → E_LOVE_YES
+      E_LOVE_YES:      { y: [0] },                 // 在一起了：认真对待
+      E_U_LOVE:        { y: [0],       n: [1] },   // 大学恋爱：主动搭话 → E_U_LOVE_RESULT
+      E_U_LOVE_RESULT: { y: [0] },                 // 后来：看看结果（可能 startDating）
+      E_LOVE_MEET_WORK:   { y: [0], n: [1] },
+      E_LOVE_MEET_PARTY:  { y: [0], n: [1] },
+      E_LOVE_MEET_COFFEE: { y: [0], n: [1] },
+      E_LOVE_MEET_APP:    { y: [0], n: [2] },
+      E_LOVE_MEET_EX:     { y: [0], n: [1] },
+      E_LOVE_DATE_1:      { y: [0], n: [1] },
+      E_LOVE_ONLINE:      { y: [0], n: [2] },
+      E_LOVE_OK:          { y: [0] },
+      E_CAMPUS_LOVE:      { y: [0], n: [2] },
+      E_LOVE_BETROTHAL:   { y: [0], n: [2] },   // 彩礼：自己掏钱补齐 → E_LOVE_MARRY
+      E_LOVE_HOUSE:       { y: [0, 1], n: [2] }, // 买房：付首付/父母垫 → E_LOVE_BETROTHAL
+      E_FAMILY_AFFAIR:    { y: [2, 1], n: [2, 1] } // 裂痕：冷静问清楚(eq≥60)/装作没看见，避免「摊牌」直接离婚
+    }[ev.id];
+    if (!m) return false;
+    var order = WANTS_MARRY ? m.y : m.n;
+    if (!order) return false;
+    for (var i = 0; i < order.length; i++) {
+      if (free.indexOf(order[i]) > -1) { RJS.simChoose(order[i]); return true; }
+    }
+    return false;
+  }
   function chooseRandom() {
     var ev = RJS.simPendingEvent();
     if (!ev) return;
@@ -44,6 +94,7 @@
       free = free.filter(function (i) { return ev.options[i].label.indexOf('离吧') === -1; });
       if (!free.length) free = [0];
     }
+    if (marriagePick(ev, free)) return;   // T-04：婚姻策略优先，不受 10% 作死干扰
     // v3.31.1：搬家选城市 —— 按人设与状态理性选择，避免「永远选第一个=北京」的虹吸
     if (ev.id === 'E_MOVE_DEST') {
       var cBest = free[0], cBestScore = -Infinity;
@@ -103,7 +154,7 @@
     RJS.simChoose(best);
   }
   function randomAction(sabotage) {
-    var EXCLUDE = sabotage ? { moveCity: 1, skipMonth: 1 } : { resign: 1, buyStock: 1, moveCity: 1, skipMonth: 1, propose: 1 };
+    var EXCLUDE = sabotage ? { moveCity: 1, skipMonth: 1 } : { resign: 1, buyStock: 1, moveCity: 1, skipMonth: 1 };
     for (var k = 0; k < 40; k++) {
       var id = ACTS[Math.floor(Math.random() * ACTS.length)];
       if (EXCLUDE[id]) continue;
@@ -132,6 +183,7 @@
   //   30% 随性躺平者：长期零工 → 心情高但抗风险差
   // 之上叠加 10% 的随机「作死」（硬扛疾病 / 冲动投资 / 裸辞）。
   var PERSONA = 'worker';
+  var WANTS_MARRY = true;   // T-04：本局是否有结婚意向（生活目标，非硬造已婚）
   function assignPersona() {
     var r = Math.random();
     if (r < 0.35) return 'striver';
@@ -154,6 +206,22 @@
     if (shouldMove(s)) return 'moveCity';                   // v3.31.1：状态驱动的搬家决策（逃离北上广）
 
     if (s.mood < 12) return 'rest';
+
+    // T-04：婚姻策略（真实路径：social 请客加好感 → propose 求婚；不直接写 s.married）
+    if (WANTS_MARRY) {
+      if (s.married) {
+        // 维持感情：低频 + 有钱才请客（避免躺平者被 social 成本拖到破产→离婚）
+        // 维持感情：做题家/打工人请客频繁（有工资），躺平者低频（防破产）
+        if ((s.love || 0) < 40 && Math.random() < (PERSONA === 'layabout' ? 0.05 : 0.5) && firstOk(['social'])) return 'social';
+      } else if ((s.divorceCount || 0) === 0) {
+        if (s.loveState === 'dating') {
+          if ((s.datingLove || 0) > 85 && s.money >= 10000 && firstOk(['propose'])) return 'propose';   // 好感够了就求婚
+          if (Math.random() < 0.5 && firstOk(['social'])) return 'social';   // 请客，datingLove +5
+        } else if (s.loveState === 'single' && s.age >= 22 && s.age <= 40) {
+          if (Math.random() < 0.15 && firstOk(['social'])) return 'social';  // 偶尔社交，等相识/催婚事件
+        }
+      }
+    }
 
     // v3.43：在校期间考证（先过四级；做题家再冲六级）
     var certs = s.certificates || [];
@@ -217,6 +285,7 @@
     var s = S();
     s.city = pickCity();                     // v3.24：本局出生城市（在结算前指定，系数随之生效）
     PERSONA = assignPersona();               // v3.27：本局社会阶层人设
+    WANTS_MARRY = Math.random() < (PERSONA === 'striver' ? 0.58 : PERSONA === 'worker' ? 0.78 : 0.38);   // T-04：结婚意向（striver 50-60 / worker 70-80 / layabout 30-40）
     if (opts.setup) opts.setup(s);
     var steps = 0, negMonths = 0, lastMonth = -1, marks = {};
     while (!s.ended && s.age < 85 && steps < 60000) {
