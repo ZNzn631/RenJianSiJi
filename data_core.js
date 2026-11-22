@@ -1238,12 +1238,6 @@
       }
     },
     {
-      id: 'E_LABOR', name: '劳碌一生', priority: 6,
-      desc: '三十多年，你把时间一格一格交给了工位。',
-      hint: '在某份工作上奉献了超过 30 年的青春。',
-      test: function () { return state.totalWorkYears > 30; }
-    },
-    {
       id: 'E_LOST_CHILD', name: '失孤', priority: 7,
       desc: '家里的相框擦得很干净，饭桌上永远多摆一副碗筷。',
       hint: '失去过孩子，且再没有别的孩子陪在身边。',
@@ -1278,9 +1272,15 @@
     },
     {
       id: 'E_SOLO', name: '孤独终老', priority: 11,
-      desc: '屋子不大，收拾得干净。周末给自己做饭，窗台上的花刚换了水。',
-      hint: '一个人，也把自己照顾得很好。',
+      desc: '一个人吃饭，一个人看报，一个人把日子过成了习惯。窗台上的花开了一季又一季，你一个人看了一季又一季。',
+      hint: '没等来那个人，也就学会了自己陪自己。',
       test: function () { return !state.married && state.kids === 0 && getAge() >= 70 && state.divorceCount === 0; }
+    },
+    {
+      id: 'E_LABOR', name: '劳碌一生', priority: 12,
+      desc: '三十多年，你把时间一格一格交给了工位。',
+      hint: '在某份工作上奉献了超过 30 年的青春。',
+      test: function () { return state.totalWorkYears > 30; }
     },
     {
       id: 'E_SCHOLAR', name: '学术泰斗', priority: 12,
