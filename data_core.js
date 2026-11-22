@@ -1280,7 +1280,7 @@
       id: 'E_SOLO', name: '孤独终老', priority: 11,
       desc: '屋子不大，收拾得干净。周末给自己做饭，窗台上的花刚换了水。',
       hint: '一个人，也把自己照顾得很好。',
-      test: function () { return !state.married && state.kids === 0 && getAge() >= 70; }
+      test: function () { return !state.married && state.kids === 0 && getAge() >= 70 && state.divorceCount === 0; }
     },
     {
       id: 'E_SCHOLAR', name: '学术泰斗', priority: 12,

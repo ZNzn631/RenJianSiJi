@@ -317,7 +317,7 @@
       ending: s.endingId || 'ALIVE80+', age: s.age, money: Math.round(s.money),
       endingId: s.endingId || '',        // 真实结局（空 = 结算缺口）
       truncated: !s.ended,               // true = 撞步数上限，没跑完
-      negMonths: negMonths, married: s.married, kids: s.kids, edu: s.edu, tier: s.schoolTier, school: s.school,
+      negMonths: negMonths, married: s.married, kids: s.kids, divorceCount: (s.divorceCount || 0), edu: s.edu, tier: s.schoolTier, school: s.school,
       city: s.city || 'normal',          // v3.24：记录本局城市，供按城市分组
       persona: PERSONA,                   // v3.27：记录本局阶层，供按阶层分组
       marks: marks, steps: steps
