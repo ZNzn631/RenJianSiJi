@@ -235,6 +235,19 @@
   .opt-meta{font-size:10px;color:var(--soft);letter-spacing:.02em}
   .event-opt:hover .opt-meta{color:#d0d0d0}
 
+  /* 人才市场（v3.39） */
+  .job-list{display:flex;flex-direction:column;gap:8px;padding:0 18px 18px;max-height:52vh;overflow-y:auto}
+  .job-item{border:1px solid var(--ink);padding:10px 12px;display:flex;flex-direction:column;gap:5px}
+  .job-item .job-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .job-item .job-name{font-size:14px;letter-spacing:.12em}
+  .job-item .job-salary{font-size:11px;font-family:'Press Start 2P','Zpix',monospace;color:#8a8a8a}
+  .job-item .job-desc{font-size:11px;color:#666;line-height:1.6}
+  .job-item .job-req{font-size:10px;color:#c62828;line-height:1.6}
+  .job-item .job-btn{align-self:flex-end;appearance:none;cursor:pointer;font-family:inherit;background:var(--paper);color:var(--ink);border:1px solid var(--ink);padding:5px 14px;font-size:12px;letter-spacing:.1em}
+  .job-item .job-btn:hover{background:var(--ink);color:var(--paper)}
+  .job-item .job-btn.is-locked{opacity:.42;border-style:dashed;cursor:not-allowed}
+  .job-item .job-btn.is-locked:hover{background:var(--paper);color:var(--ink)}
+
   /* 人生结算面板 */
   .end-modal{box-shadow:8px 8px 0 rgba(17,17,17,.14)}
   .end-hero{padding:18px 18px 12px;border-bottom:1px solid var(--hair)}
@@ -1948,6 +1961,45 @@
   </div>
 </div>
 
+<!-- 人才市场（v3.39）：统一求职中心，投递简历后弹出 -->
+<div class="modal-mask" id="jobMarketMask" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="jobMarketTitle">
+    <div class="panel-h">
+      <span>人才市场</span>
+      <span class="hint" id="jobMarketDate">18 岁起可投递</span>
+    </div>
+    <div class="event-title" id="jobMarketTitle">—</div>
+    <p class="event-desc">达标显示绿色【投递】，不达标置灰并提示缺什么。</p>
+    <div class="job-list" id="jobMarketList"></div>
+  </div>
+</div>
+
+<!-- 考证中心（v3.43）：闭关考证弹窗 -->
+<div class="modal-mask" id="certMask" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="certTitle">
+    <div class="panel-h">
+      <span>考证中心</span>
+      <span class="hint" id="certDate">闭关备考，一次拿一张证</span>
+    </div>
+    <div class="event-title" id="certTitle">—</div>
+    <p class="event-desc">达标绿色【报考】，不达标置灰并提示缺什么。</p>
+    <div class="job-list" id="certList"></div>
+  </div>
+</div>
+
+<!-- 陪伴中心（v3.44）：动态列出可陪伴对象 -->
+<div class="modal-mask" id="companionMask" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="companionTitle">
+    <div class="panel-h">
+      <span>陪伴</span>
+      <span class="hint">花一天时间，陪在重要的人身边</span>
+    </div>
+    <div class="event-title" id="companionTitle">—</div>
+    <p class="event-desc">选择要陪伴的对象。</p>
+    <div class="job-list" id="companionList"></div>
+  </div>
+</div>
+
 <!-- 童年前史（v3.28）：只播 6–15 岁的回忆，不推进时间 -->
 <div class="modal-mask" id="prologueMask" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="prologueTitle">
@@ -2197,7 +2249,15 @@
     $('moodBar').style.width = (state.mood / moodCap * 100).toFixed(1) + '%';
 
     $('sAge').textContent = getAge() + ' 岁  [' + cityName() + ']';   // v3.24：城市标签
-    $('sEdu').textContent = state.edu || '无';
+    var eduText = state.edu || '无';
+    if ((state.edu === '本科' || state.edu === '专科') && (Number(state.grade) || 0) >= 1) {
+      var gl = { 1: '大一', 2: '大二', 3: '大三', 4: '大四', 5: '毕业' };
+      eduText += ' · ' + (gl[state.grade] || ('大' + state.grade));
+    }
+    if (state.loveState === 'dating') {   // v3.34：交往中显式显示恋爱好感度
+      eduText += ' · 恋爱好感度 ' + (state.datingLove || 0);
+    }
+    $('sEdu').textContent = eduText;
     $('sJob').textContent = state.job || '无业';
     $('sSalary').textContent = state.salary > 0 ? '月薪 ¥' + state.salary.toLocaleString('en-US') : '';
     if (state.salary > 0) {
@@ -2260,6 +2320,8 @@
       text = money < 3000
         ? '先打零工撑住现金流（存款 ¥' + money.toLocaleString('en-US') + '）'
         : '找份工作，先有稳定收入';
+    } else if (state.housing === 'own') {
+      text = '你已经有房了，安心经营生活';   // v3.34：已买房则不再提示攒首付
     } else if (money < HOUSE) {
       text = '攒首付 ¥' + money.toLocaleString('en-US') + ' / ¥' + HOUSE.toLocaleString('en-US');
     } else {
@@ -2581,6 +2643,234 @@
     openSetup();                                // v3.4-S4：真实玩家 → 回设置页重新起名/抽天赋
   }
 
+  /* ================= [UI层] 人才市场（v3.39 求职中心） ================= */
+  function openingMiss(op) {
+    var miss = [];
+    var age = getAge();
+    var certs = state.certificates || [];
+    if (age < (op.minAge || 0)) miss.push('年龄差 ' + ((op.minAge || 0) - age) + ' 岁');
+    if (op.minEdu && (EDU_RANK[state.edu] || 0) < (EDU_RANK[op.minEdu] || 0)) miss.push('学历需 ' + op.minEdu);
+
+    // v3.43 结业卡口：已毕业且没过四级 → 学历岗位（专科+）拒收（不改 state.edu，只拦求职）
+    if (!isStudentNow() && certs.indexOf('cet4') === -1 && op.minEdu && (EDU_RANK[op.minEdu] || 0) >= (EDU_RANK['专科'] || 0)) {
+      miss.push('无学位证（未过四级），学历岗位不接收结业生');
+    }
+
+    if (op.schoolTier && state.schoolTier !== op.schoolTier) miss.push('需 ' + op.schoolTier + '院校');
+    if (op.major && state.major !== op.major) miss.push('专业不对口（需 ' + op.major + '）');
+
+    // v3.43 证书门槛
+    if (op.cert) {
+      if (op.cert === 'cet6') {
+        if (certs.indexOf('cet6') === -1 && certs.indexOf('cet4') === -1) miss.push('需英语四级/六级证书');
+        // 有四级无六级：不置灰，入职月薪打 8 折（applyJobByName 处理）
+      } else {
+        var certName = { lawyer: '法考证书', cpa: 'CPA 注会', teacher: '教师资格证' }[op.cert] || op.cert;
+        if (certs.indexOf(op.cert) === -1) miss.push('需 ' + certName);
+      }
+    }
+
+    if (op.req) {
+      for (var k in op.req) {
+        if (!Object.prototype.hasOwnProperty.call(op.req, k)) continue;
+        var at = ATTRS[k];
+        if (!at) continue;
+        var need = op.req[k];
+        var cur = Number(state[at.key]) || 0;
+        if (cur < need) miss.push((at.label || k) + '差 ' + (need - cur));
+      }
+    }
+    return miss;
+  }
+
+  function renderJobMarket() {
+    var list = $('jobMarketList');
+    if (!list) return;
+    $('jobMarketTitle').textContent = '求职中心 · ' + cityName();
+    list.innerHTML = (JOB_OPENINGS || []).map(function (op) {
+      var miss = openingMiss(op);
+      var ok = miss.length === 0;
+      return '<div class="job-item">'
+        + '<div class="job-top"><span class="job-name">' + esc(op.job) + '</span><span class="job-salary">¥' + op.salary.toLocaleString('en-US') + '/月</span></div>'
+        + '<div class="job-desc">' + esc(op.desc || '') + '</div>'
+        + (ok ? '' : '<div class="job-req">' + esc(miss.join('；')) + '</div>')
+        + '<button class="job-btn' + (ok ? '' : ' is-locked') + '" type="button" data-job="' + esc(op.job) + '"' + (ok ? '' : ' disabled') + '>' + (ok ? '投递' : '不达标') + '</button>'
+        + '</div>';
+    }).join('');
+  }
+
+  function openJobMarket() {
+    renderJobMarket();
+    $('jobMarketMask').hidden = false;
+  }
+
+  function closeJobMarket() {
+    $('jobMarketMask').hidden = true;
+  }
+
+  window.jobOpeningOk = function (jobName) {
+    var op = (JOB_OPENINGS || []).filter(function (o) { return o.job === jobName; })[0];
+    return !!op && openingMiss(op).length === 0;
+  };
+
+  window.applyJobByName = function (jobName) {
+    var op = (JOB_OPENINGS || []).filter(function (o) { return o.job === jobName; })[0];
+    if (!op || openingMiss(op).length) return false;
+    var salary = op.salary;
+    var certs = state.certificates || [];
+    if (op.cert === 'cet6' && certs.indexOf('cet6') === -1 && certs.indexOf('cet4') > -1) {
+      salary = Math.round(salary * 0.8);   // v3.43：有四级无六级，月薪打 8 折
+    }
+    state.job = op.job;
+    state.salary = salary;
+    state.housing = 'rent';
+    state.totalWorkYears = 0;
+    state.currentPositionYears = 0;
+    markJobChange();
+    return true;
+  };
+
+  function applyJob(jobName) {
+    var op = (JOB_OPENINGS || []).filter(function (o) { return o.job === jobName; })[0];
+    if (!op) return;
+    var miss = openingMiss(op);
+    if (miss.length) { toast(miss.join('；')); return; }
+    applyJobByName(jobName);
+    var finalSalary = state.salary;
+    addLog('event', '你入职了「' + op.job + '」，月薪 ' + finalSalary + '。');
+    closeJobMarket();
+    render();
+  }
+
+  /* ================= [UI层] 考证中心（v3.43） ================= */
+  function certMiss(cert) {
+    var miss = [];
+    var certs = state.certificates || [];
+    if (certs.indexOf(cert.id) > -1) miss.push('已持有');
+    if (cert.prereq && cert.prereq.length) {
+      for (var i = 0; i < cert.prereq.length; i++) {
+        if (certs.indexOf(cert.prereq[i]) === -1) {
+          var preName = { cet4: '英语四级', cet6: '英语六级' }[cert.prereq[i]] || cert.prereq[i];
+          miss.push('需先拿 ' + preName);
+        }
+      }
+    }
+    if (cert.studentOnly && !isStudentNow()) miss.push('仅在校大学生可报考');
+    if (cert.major && state.major !== cert.major) miss.push('需 ' + cert.major + '专业');
+    if (cert.minEdu && (EDU_RANK[state.edu] || 0) < (EDU_RANK[cert.minEdu] || 0)) miss.push('学历需 ' + cert.minEdu);
+    if ((Number(state.int) || 0) < cert.intNeed) miss.push('智力差 ' + (cert.intNeed - (Number(state.int) || 0)));
+    return miss;
+  }
+
+  function renderCertMarket() {
+    var list = $('certList');
+    if (!list) return;
+    $('certTitle').textContent = '闭关考证 · 智力 ' + state.int;
+    list.innerHTML = (CERTIFICATES || []).map(function (cert) {
+      var miss = certMiss(cert);
+      var ok = miss.length === 0;
+      return '<div class="job-item">'
+        + '<div class="job-top"><span class="job-name">' + esc(cert.name) + '</span><span class="job-salary">' + cert.costDays + ' 天</span></div>'
+        + '<div class="job-desc">' + esc(cert.desc || '') + '</div>'
+        + (ok ? '' : '<div class="job-req">' + esc(miss.join('；')) + '</div>')
+        + '<button class="job-btn' + (ok ? '' : ' is-locked') + '" type="button" data-cert="' + esc(cert.id) + '"' + (ok ? '' : ' disabled') + '>' + (ok ? '报考' : '不达标') + '</button>'
+        + '</div>';
+    }).join('');
+  }
+
+  function openCertMarket() {
+    renderCertMarket();
+    $('certMask').hidden = false;
+  }
+
+  function closeCertMarket() {
+    $('certMask').hidden = true;
+  }
+
+  function applyCert(certId) {
+    var cert = (CERTIFICATES || []).filter(function (c) { return c.id === certId; })[0];
+    if (!cert) return;
+    if (certMiss(cert).length) { toast('条件不满足'); return; }
+    closeCertMarket();
+    advanceDaysAutoSave(cert.costDays);   // 扣天数（考证耗时，可能触发跨月）
+    if ((Number(state.int) || 0) >= cert.intNeed) {
+      if (state.certificates.indexOf(cert.id) === -1) state.certificates.push(cert.id);
+      addLog('event', '【考证】你通过了「' + cert.name + '」，证书到手！');
+    } else {
+      state.mood = Math.max(0, state.mood - 10);
+      addLog('danger', '【考证】「' + cert.name + '」差一点没过，心情 -10，继续努力。');
+    }
+    render();
+  }
+
+  /* ================= [UI层] 陪伴中心（v3.44） ================= */
+  function companionCondOk(cond) {
+    if (cond === 'parent_home') return state.housing === 'home';
+    if (cond === 'parent_away') return state.housing !== 'home';
+    if (cond === 'partner') return state.married || state.loveState === 'dating';
+    if (cond === 'kid') return livingChildren().length > 0;
+    if (cond === 'friend') return (state.friends || []).length > 0;
+    return false;
+  }
+
+  function companionMiss(opt) {
+    var miss = [];
+    if (!companionCondOk(opt.cond)) miss.push('当前无法陪伴');
+    if ((Number(state.money) || 0) < opt.cost) miss.push('金钱差 ' + (opt.cost - (Number(state.money) || 0)));
+    return miss;
+  }
+
+  function renderCompanionMarket() {
+    var list = $('companionList');
+    if (!list) return;
+    $('companionTitle').textContent = '陪伴 · 当前 ' + getAge() + ' 岁';
+    var opts = (COMPANION_OPTIONS || []).filter(function (o) { return companionCondOk(o.cond); });
+    if (!opts.length) {
+      list.innerHTML = '<div class="job-item"><div class="job-desc">现在没有可以陪伴的人。先去认识几个人吧。</div></div>';
+      return;
+    }
+    list.innerHTML = opts.map(function (opt) {
+      var miss = companionMiss(opt);
+      var ok = miss.length === 0;
+      var costText = opt.cost > 0 ? '¥' + opt.cost : '免费';
+      return '<div class="job-item">'
+        + '<div class="job-top"><span class="job-name">' + esc(opt.name) + '</span><span class="job-salary">' + costText + ' · 心情 +' + opt.mood + '</span></div>'
+        + '<div class="job-desc">' + esc(opt.desc || '') + '</div>'
+        + (ok ? '' : '<div class="job-req">' + esc(miss.join('；')) + '</div>')
+        + '<button class="job-btn' + (ok ? '' : ' is-locked') + '" type="button" data-comp="' + esc(opt.id) + '"' + (ok ? '' : ' disabled') + '>' + (ok ? '选它' : '不达标') + '</button>'
+        + '</div>';
+    }).join('');
+  }
+
+  function openCompanionMarket() {
+    renderCompanionMarket();
+    $('companionMask').hidden = false;
+  }
+
+  function closeCompanionMarket() {
+    $('companionMask').hidden = true;
+  }
+
+  function applyCompanion(optId) {
+    var opt = (COMPANION_OPTIONS || []).filter(function (o) { return o.id === optId; })[0];
+    if (!opt || companionMiss(opt).length) return;
+    closeCompanionMarket();
+    state.money -= opt.cost;
+    state.mood = Math.min(moodMaxOf(), state.mood + opt.mood);
+    if (opt.eq) state.eq += opt.eq;
+    if (opt.datingLove) {
+      if (state.married) addLove(opt.datingLove);
+      else state.datingLove = Math.min(100, (state.datingLove || 0) + opt.datingLove);
+    }
+    if (opt.kidRel) addKidRelation(opt.kidRel);
+    if (opt.friendFavor) touchAllFriends();
+    if (opt.cost > 0) addLog('sys', '【陪伴】' + opt.result + '（-' + opt.cost + ' 元）');
+    else addLog('sys', '【陪伴】' + opt.result);
+    render();
+  }
+
+  window.jobOpeningOk = window.jobOpeningOk;
+
   /* ================= [UI层] 按钮渲染（遍历 actionsData） ================= */
   function actionDays(act) { return Math.max(1, Math.round(Number(act.costDays) || 1)); }
 
@@ -2598,7 +2888,7 @@
         + (locked ? ' aria-disabled="true" tabindex="-1" title="' + esc(tip) + '"' : '')
         + '>'
         + '<span class="act-top">'
-        +   '<span class="act-name">' + esc(act.name) + '</span>'
+        +   '<span class="act-name">' + esc(typeof act.name === 'function' ? act.name() : act.name) + '</span>'
         +   '<span class="act-days num">' + (locked ? '条件不足' : actionDays(act) + ' 天') + '</span>'
         + '</span>'
         + '<span class="act-meta">' + esc(effectText(act)) + '</span>'
@@ -2650,7 +2940,7 @@
       if (daysEl) daysEl.textContent = showLocked ? '条件不足' : actionDays(act) + ' 天';
 
       if (!showLocked) unlocked += 1;
-      if (hide) hiddenList.push({ name: act.name, tip: locked ? miss.map(missLabel).join('；') : '已有正式工作' });
+      if (hide) hiddenList.push({ name: (typeof act.name === 'function' ? act.name() : act.name), tip: locked ? miss.map(missLabel).join('；') : '已有正式工作' });
     }
 
     $('actionHint').textContent = '可做 ' + unlocked + ' 项 · 共 ' + actionsData.length + ' 项';
@@ -3337,6 +3627,51 @@
       });
     }
 
+    var jmMask = $('jobMarketMask');
+    if (jmMask) {
+      $('jobMarketList').addEventListener('click', function (e) {
+        var node = e.target;
+        while (node && node !== this) {
+          if (node.getAttribute && node.getAttribute('data-job') !== null) {
+            applyJob(node.getAttribute('data-job'));
+            return;
+          }
+          node = node.parentNode;
+        }
+      });
+      jmMask.addEventListener('click', function (e) { if (e.target === jmMask) closeJobMarket(); });
+    }
+
+    var certMask = $('certMask');
+    if (certMask) {
+      $('certList').addEventListener('click', function (e) {
+        var node = e.target;
+        while (node && node !== this) {
+          if (node.getAttribute && node.getAttribute('data-cert') !== null) {
+            applyCert(node.getAttribute('data-cert'));
+            return;
+          }
+          node = node.parentNode;
+        }
+      });
+      certMask.addEventListener('click', function (e) { if (e.target === certMask) closeCertMarket(); });
+    }
+
+    var compMask = $('companionMask');
+    if (compMask) {
+      $('companionList').addEventListener('click', function (e) {
+        var node = e.target;
+        while (node && node !== this) {
+          if (node.getAttribute && node.getAttribute('data-comp') !== null) {
+            applyCompanion(node.getAttribute('data-comp'));
+            return;
+          }
+          node = node.parentNode;
+        }
+      });
+      compMask.addEventListener('click', function (e) { if (e.target === compMask) closeCompanionMarket(); });
+    }
+
     bindDevTools();
     $('btnSave').addEventListener('click', saveGame);
     $('btnLoad').addEventListener('click', loadGame);
@@ -3467,6 +3802,20 @@
     devSubInt: devSubInt,
     devAddAge: devAddAge,
     devSetEdu: devSetEdu,
+
+    // ---- v3.39：求职中心（供模拟 Agent 与测试复用）----
+    jobOpeningOk: jobOpeningOk,
+    applyJobByName: applyJobByName,
+    openJobMarket: openJobMarket,
+    closeJobMarket: closeJobMarket,
+    openCertMarket: openCertMarket,
+    closeCertMarket: closeCertMarket,
+    applyCert: applyCert,
+    certMiss: certMiss,
+    openCompanionMarket: openCompanionMarket,
+    closeCompanionMarket: closeCompanionMarket,
+    applyCompanion: applyCompanion,
+    companionMiss: companionMiss,
 
     // ---- 平衡性模拟专用：只转发既有函数，不改任何逻辑 ----
     simPendingEvent: function () { return pendingEvent; },
