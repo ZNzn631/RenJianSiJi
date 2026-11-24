@@ -858,7 +858,7 @@
       title: '内部消息',
       description: '一个在券商的朋友半夜给你打电话，说某只票下周要重组，消息来源「很可靠」。他说完就挂了，你没来得及问是真是假。',
       weight: 5,
-      requires: { minAge: 22, stockValue: { min: 1 } },
+      requires: { onceEver: true, minAge: 22, stockValue: { min: 1 } },
       options: [
         {
           label: '全仓梭哈，再加五万',
@@ -867,7 +867,7 @@
           result: '你把能动的钱都转了进去，第二天开盘，手心全是汗。',
           onChoose: function () {
             state.stockValue = (state.stockValue || 0) + 50000;
-            if ((state.luck || 0) < 150) {
+            if ((state.luck || 0) < 300) {
               state.money = Math.round((state.money || 0) * 0.2);        // 现金蒸发 80%
               state.stockValue = Math.round((state.stockValue || 0) * 0.5);
               state.mood = Math.max(0, state.mood - 30);

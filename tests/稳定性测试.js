@@ -1785,14 +1785,14 @@
       ok('S10 股灾后心情 −30', S().mood === 50, 'mood=' + S().mood);
       $('eventMask').hidden = true;
 
-      // S11 梭哈幸运：luck ≥ 150 → 不触发股灾
+      // S11 梭哈幸运：luck ≥ 300 → 不触发股灾
       dReset();
       var s10 = S();
-      s10.age = 30; s10.luck = 200; s10.money = 100000; s10.stockValue = 0; s10.mood = 80;
+      s10.age = 30; s10.luck = 350; s10.money = 100000; s10.stockValue = 0; s10.mood = 80;
       RJS.openEventById('E_STOCK_TIP');
       var opt2 = optionByText('全仓梭哈');
       if (opt2) opt2.click();
-      ok('S11 运气 200（≥150）梭哈 → 现金只扣 5 万，持仓翻倍',
+      ok('S11 运气 350（≥300）梭哈 → 现金只扣 5 万，持仓翻倍',
         S().money === 50000 && S().stockValue === 100000,
         'money=' + S().money + ' stock=' + S().stockValue);
       $('eventMask').hidden = true;

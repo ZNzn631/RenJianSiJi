@@ -1283,7 +1283,7 @@
       test: function () { return state.totalWorkYears > 30; }
     },
     {
-      id: 'E_SCHOLAR', name: '学术泰斗', priority: 12,
+      id: 'E_SCHOLAR', name: '学术泰斗', priority: 13,
       desc: '书房的书架顶到天花板，翻旧的那几本还摆在伸手就能够着的地方。窗外下课铃响，你手里的红笔顿了顿。',
       hint: '',                                          // v3.47：隐藏结局——hint 不进图鉴展示（文档 §21）
       hidden: true,                                      // v3.47：隐藏结局标记
