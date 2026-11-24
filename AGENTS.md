@@ -12,7 +12,14 @@
 |---|---|
 | `data_core.js` / `data_events_school.js` / `data_events_career.js` / `data_events_life.js` | 纯数据：`eventsData` / `actionsData` / `talentsData` / `diseasesData` / `CAREER` / 数值常量 |
 | `engine.js` | 引擎逻辑：时间推进 / 事件抽取 / 条件校验 / 存档 / 结算 |
-| `人间开发.html` | 结构 + 样式 + UI 渲染（测试入口；`index.html` 为另一套 UI，测试未覆盖） |
+| `人间开发.html` | 结构 + 样式 + UI 渲染 —— **开发版**（AI 只改这里，测试也跑这里） |
+| `index.html` | **发布版**（玩家双击打开这个）；由 `sync.js` 每次自动从 人间开发.html 覆盖，**不要手改** |
+
+**两套 HTML 工作流（重要，别搞反）**：
+- 开发版 = `人间开发.html`，发布版 = `index.html`。
+- **AI 只改 `人间开发.html`**；**玩家只打开 `index.html`**。
+- `sync.js` 会自动把 `人间开发.html` 覆盖到 `index.html`（约 line 147），保证两者一致。
+- 手改 `index.html` 无效——下次 `node sync.js` 会被开发版覆盖掉。
 
 ## 1. 红线（任何改动前先读）
 
