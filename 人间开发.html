@@ -1681,6 +1681,12 @@
             <span class="stat-v num" id="sMood">80 / 100</span>
           </div>
           <div class="stat-bar-row"><div class="bar"><i id="moodBar" style="width:80%"></i></div></div>
+          <div class="stat-line">
+            <span class="stat-k">健康</span>
+            <span class="leader" aria-hidden="true"></span>
+            <span class="stat-v num" id="sHealth">100 / 100</span>
+          </div>
+          <div class="stat-bar-row"><div class="bar"><i id="healthBar" style="width:100%"></i></div></div>
         </div>
 
         <div class="stat-ledger stat-ledger--meta">
@@ -2247,6 +2253,12 @@
     var moodCap = moodMaxOf();                     // v3.0：上限可能是 110/115/120
     $('sMood').textContent = state.mood + ' / ' + moodCap;
     $('moodBar').style.width = (state.mood / moodCap * 100).toFixed(1) + '%';
+
+    var healthVal = (typeof state.health === 'number') ? state.health : 100;   // v3.49：独立健康值
+    var healthEl = $('sHealth');
+    if (healthEl) healthEl.textContent = healthVal + ' / 100';
+    var healthBarEl = $('healthBar');
+    if (healthBarEl) healthBarEl.style.width = Math.max(0, Math.min(100, healthVal)) + '%';
 
     $('sAge').textContent = getAge() + ' 岁  [' + cityName() + ']';   // v3.24：城市标签
     var eduText = state.edu || '无';

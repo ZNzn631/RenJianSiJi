@@ -67,6 +67,7 @@
     s.age = cfg.age; s.edu = cfg.edu;
     s.job = cfg.job; s.salary = cfg.job === '无业' ? 0 : 14000;
     s.money = cfg.money; s.sta = cfg.sta; s.mood = cfg.mood;
+    s.health = 100;   // v3.49：独立健康值（探针基态，暂不参与联动）
     s.int = cfg.attr; s.cha = cfg.attr; s.eq = cfg.attr; s.will = cfg.attr; s.luck = cfg.attr;
     s.loveState = cfg.love; s.married = cfg.love === 'married';
     s.love = (cfg.loveVal !== undefined) ? cfg.loveVal : (cfg.love === 'married' ? 60 : 0);

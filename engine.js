@@ -692,6 +692,7 @@
       luck: 10,                                        // 运气
       money: 2800,
       mood: 80,
+      health: 100,                                     // v3.49：独立健康值 0-100（慢衰减，暂不联动效率/辞退/死亡/疾病）
       stockValue: 0,        // v3.22：股票市值（买入即 +1 万成本，settleStocks 每月按运气/随机涨跌）
       stockLockUntil: 0,    // v3.36：股票持仓锁定的绝对月数（买入后 3 个月不能卖），0=未锁定
       streamerBanMonths: 0, // v3.37：主播封禁剩余月数（>0 期间不发薪），0=未封禁
@@ -1164,6 +1165,18 @@
     checkDisease();                              // v3.13：跨月疾病判定（只排队，弹窗交给 triggerMonthlyEvent）
   }
 
+  // v3.49：独立健康值年度衰减（纯数值，暂不联动效率/辞退/死亡/疾病）
+  function settleHealth() {
+    var age = getAge();
+    var drop = 0;
+    if (age <= 25) drop = 0;                         // 16–25 岁：不衰减
+    else if (age <= 45) drop = 0.5;                  // 26–45 岁：每年 −0.5
+    else if (age <= 60) drop = 1;                    // 46–60 岁：每年 −1
+    else drop = 1.5;                                 // 60 岁以上：每年 −1.5
+    var h = (typeof state.health === 'number') ? state.health : 100;
+    state.health = Math.max(0, Math.min(100, h - drop));
+  }
+
   // 年终奖：月薪 × (1 + 总工龄×0.2)，最多 3 个月
   function yearEndBonus() {
     var months = Math.max(1, Math.min(3, 1 + state.totalWorkYears * 0.2));   // v3.34：年终奖基数 ≥1 个月工资，封顶 3 个月
@@ -1174,6 +1187,8 @@
   function yearlySettle() {
     state.age += 1;
     addLog('sys', '【岁月】又是一年，你 ' + state.age + ' 岁了。');
+
+    settleHealth();                              // v3.49：健康值年度衰减（只动 health，不联动其它）
 
     if (state.age >= 80) { endLife('age'); return; }
 
@@ -2285,6 +2300,7 @@
       luck: asInt(s.luck, 10, 0, 500),
       money: isFinite(Number(s.money)) ? Math.round(Number(s.money)) : 2800,
       mood: asInt(s.mood, 80, 0, moodMaxVal),
+      health: asInt(s.health, 100, 0, 100),   // v3.49：独立健康值 0-100，旧档缺省 100
       stockValue: asInt(s.stockValue, 0, 0, 999999999),   // v3.22：旧档缺失 → 0
       stockLockUntil: asInt(s.stockLockUntil, 0, 0, 999999),   // v3.36：持仓锁定月份，旧档缺失 → 0
       streamerBanMonths: asInt(s.streamerBanMonths, 0, 0, 999),   // v3.37：主播封禁剩余月数，旧档缺失 → 0

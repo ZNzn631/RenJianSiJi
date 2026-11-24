@@ -272,7 +272,7 @@
     return firstOk(['oddjob']) || 'rest';
   }
 
-  var MARK_AGES = [16, 18, 22, 25, 30, 35, 40, 50, 60, 70, 80];
+  var MARK_AGES = [16, 18, 22, 25, 30, 35, 40, 45, 50, 60, 70, 80];
 
   // v3.24：城市系统 —— 每局从 citiesData 均匀抽一个出生城市，供平衡模拟按城市分组
   var CITY_IDS = (window.citiesData || []).map(function (c) { return c.id; });
@@ -359,7 +359,7 @@
     PERSONA = assignPersona();               // v3.27：本局社会阶层人设
     WANTS_MARRY = Math.random() < (PERSONA === 'striver' ? 0.58 : PERSONA === 'worker' ? 0.78 : 0.38);   // T-04：结婚意向（striver 50-60 / worker 70-80 / layabout 30-40）
     if (opts.setup) opts.setup(s);
-    var steps = 0, negMonths = 0, lastMonth = -1, marks = {}, salaryMarks = {};
+    var steps = 0, negMonths = 0, lastMonth = -1, marks = {}, salaryMarks = {}, healthMarks = {};
     while (!s.ended && s.age < 85 && steps < 60000) {
       var ev = RJS.simPendingEvent();
       if (ev) { step(function () { chooseRandom(); }, 'ev:' + (ev.id || '?')); steps++; continue; }
@@ -383,6 +383,7 @@
           if (s.age === MARK_AGES[i] && marks[MARK_AGES[i]] === undefined) {
             marks[MARK_AGES[i]] = Math.round(s.money);
             salaryMarks[MARK_AGES[i]] = s.salary || 0;
+            healthMarks[MARK_AGES[i]] = Math.round(s.health);
           }
         }
       }
@@ -396,7 +397,7 @@
       negMonths: negMonths, married: s.married, kids: s.kids, divorceCount: (s.divorceCount || 0), edu: s.edu, tier: s.schoolTier, school: s.school,
       city: s.city || 'normal',          // v3.24：记录本局城市，供按城市分组
       persona: PERSONA,                   // v3.27：记录本局阶层，供按阶层分组
-      marks: marks, salaryMarks: salaryMarks, ledger: LEDGER, steps: steps
+      marks: marks, salaryMarks: salaryMarks, healthMarks: healthMarks, ledger: LEDGER, steps: steps
     };
   }
 
