@@ -1230,7 +1230,7 @@
       title: '同桌',
       description: '你的同桌借你橡皮的时候，头发会扫到你的胳膊。你开始盼着上数学课。',
       weight: 6,
-      requires: { minAge: 13, maxAge: 15 },
+      requires: { minAge: 14, maxAge: 15 },
       options: [
         {
           label: '写一张纸条，折成很小的方块递过去',
@@ -1256,7 +1256,7 @@
       title: '网吧',
       description: '翻墙出去上网。第二局刚开始，教导主任的手电筒就照到了你脸上。',
       weight: 6,
-      requires: { minAge: 13, maxAge: 15 },
+      requires: { minAge: 15, maxAge: 15 },
       options: [
         {
           label: '认罚，跟他回办公室写检查',
@@ -1285,7 +1285,7 @@
       // v3.46：原 chainOnly:true 让它在童年蒙太奇里被 prologuePool 直接过滤（池规则排除 chainOnly），
       // 而 prologue 的 choosePrologue 不处理 nextEventId —— 两头都断，成了真死数据。
       // 去掉 chainOnly 后它作为独立闪回进入蒙太奇池（13~15 岁），常规池仍被 maxAge:15 挡在 16 岁之后。
-      requires: { minAge: 13, maxAge: 15 },
+      requires: { minAge: 15, maxAge: 15 },
       options: [
         {
           label: '到家就挨了一顿揍',

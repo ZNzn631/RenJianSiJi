@@ -1772,7 +1772,7 @@
       settleStocks();
       ok('S8 无持仓时 settleStocks 空转（不写日志）', S().logs.length === 0, S().logs.length);
 
-      // S9 梭哈股灾：luck < 150 → 现金蒸发 80%、心情崩溃
+      // S9 梭哈股灾：luck < 300 → 现金蒸发 80%、心情崩溃
       dReset();
       var s9 = S();
       s9.age = 30; s9.luck = 50; s9.money = 100000; s9.stockValue = 0; s9.mood = 80;
@@ -1780,7 +1780,7 @@
       var opt = optionByText('全仓梭哈');
       if (opt) opt.click();
       // effects 先 −50000 → 剩 50000，再 ×0.2 → 10000
-      ok('S9 运气 50（<150）梭哈 → 现金蒸发 80%',
+      ok('S9 运气 50（<300）梭哈 → 现金蒸发 80%',
         S().money === 10000, 'money=' + S().money);
       ok('S10 股灾后心情 −30', S().mood === 50, 'mood=' + S().mood);
       $('eventMask').hidden = true;

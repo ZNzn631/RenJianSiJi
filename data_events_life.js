@@ -2591,7 +2591,7 @@
       title: '动画片',
       description: '每天六点，那个频道的动画片开播。作业本摊在旁边，一页没动，铅笔滚到了桌角。',
       weight: 6,
-      requires: { minAge: 6, maxAge: 12 },
+      requires: { minAge: 7, maxAge: 12 },
       options: [
         {
           label: '先把这一集看完',
@@ -2617,7 +2617,7 @@
       title: '压岁钱',
       description: '过年收了一沓红包，攥在手里还没捂热，妈妈说「先帮你存着」。',
       weight: 5,
-      requires: { minAge: 6, maxAge: 12, onceEver: true },
+      requires: { minAge: 8, maxAge: 12, onceEver: true },
       options: [
         {
           label: '乖乖上交',
@@ -2643,7 +2643,7 @@
       title: '运动会',
       description: '四百米决赛，你在第二个弯道被绊倒，膝盖磕在塑胶跑道上。全校都在看台上。',
       weight: 5,
-      requires: { minAge: 6, maxAge: 12 },
+      requires: { minAge: 10, maxAge: 12 },
       options: [
         {
           label: '爬起来，把剩下的路跑完',
