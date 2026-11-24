@@ -1040,7 +1040,7 @@
 
     var c = CAREER[state.job];
     // 晋升：绩效 >80 且岗位工龄满 1 年且智力达标 且 有上升空间 → 自动升职
-    if (perf > 80 && c && c.next && state.currentPositionYears >= 1) {
+    if (perf > 80 && c && c.next && state.currentPositionYears >= (c.req && c.req.workYears || 1)) {
       var req = c.req || {};
       if (state.int >= (req.intelligence || 0)) {
         state.job = c.next;

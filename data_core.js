@@ -768,14 +768,14 @@
 
   // 按 id 查行动：线性查找而不是静态索引，保证外部往 actionsData 里 push 新条目后立刻可用
   var CAREER = {
-    '普通文员':   { salary: 5000,  next: '部门主管', prev: null,        requiredIntelligence: 30,  req: { workYears: 1, intelligence: 100 } },
-    '部门主管':   { salary: 10000, next: '部门经理', prev: '普通文员',   requiredIntelligence: 100, req: { workYears: 2, intelligence: 150 } },
+    '普通文员':   { salary: 5000,  next: '部门主管', prev: null,        requiredIntelligence: 30,  req: { workYears: 2, intelligence: 100 } },
+    '部门主管':   { salary: 10000, next: '部门经理', prev: '普通文员',   requiredIntelligence: 100, req: { workYears: 4, intelligence: 150 } },
     '部门经理':   { salary: 17000, next: null,       prev: '部门主管',   requiredIntelligence: 150 },
 
     '普通程序员': { salary: 15000, next: '大厂程序员', prev: null,        requiredIntelligence: 130, req: { workYears: 2, intelligence: 180 } },
-    '大厂程序员': { salary: 24000, next: '高级开发', prev: '普通程序员', requiredIntelligence: 180, req: { workYears: 2, intelligence: 250 } },
-    '高级开发':   { salary: 38000, next: '架构师',   prev: '大厂程序员', requiredIntelligence: 250, req: { workYears: 3, intelligence: 350 } },
-    '架构师':     { salary: 60000, next: null,       prev: '高级开发',   requiredIntelligence: 350 },
+    '大厂程序员': { salary: 18000, next: '高级开发', prev: '普通程序员', requiredIntelligence: 180, req: { workYears: 4, intelligence: 250 } },
+    '高级开发':   { salary: 38000, next: '架构师',   prev: '大厂程序员', requiredIntelligence: 250, req: { workYears: 4, intelligence: 350 } },
+    '架构师':     { salary: 40000, next: null,       prev: '高级开发',   requiredIntelligence: 350 },
 
     /* v3.19：职业专属事件需要的三个平级职业（无晋升链，靠跳槽涨薪） */
     '人民教师':   { salary: 7000,  next: null, prev: null, requiredIntelligence: 80 },
@@ -785,54 +785,54 @@
     /* v3.39：8 个高差异化新职业（最低级 = 职业名，晋升链 3-4 级） */
     // 医生（4 级）
     '医生':       { salary: 15000, next: '主治医师',   prev: null, requiredIntelligence: 200, req: { workYears: 2, intelligence: 260 } },
-    '主治医师':   { salary: 22000, next: '副主任医师', prev: '医生', requiredIntelligence: 260, req: { workYears: 3, intelligence: 320 } },
+    '主治医师':   { salary: 22000, next: '副主任医师', prev: '医生', requiredIntelligence: 260, req: { workYears: 4, intelligence: 320 } },
     '副主任医师': { salary: 32000, next: '主任医师',   prev: '主治医师', requiredIntelligence: 320, req: { workYears: 4, intelligence: 380 } },
-    '主任医师':   { salary: 45000, next: null,         prev: '副主任医师', requiredIntelligence: 380 },
+    '主任医师':   { salary: 40000, next: null,         prev: '副主任医师', requiredIntelligence: 380 },
 
     // 警察（3 级）
     '警察':       { salary: 9000,  next: '刑侦队长', prev: null, requiredIntelligence: 80,  req: { workYears: 2, intelligence: 120 } },
-    '刑侦队长':   { salary: 15000, next: '分局局长', prev: '警察', requiredIntelligence: 120, req: { workYears: 3, intelligence: 180 } },
+    '刑侦队长':   { salary: 15000, next: '分局局长', prev: '警察', requiredIntelligence: 120, req: { workYears: 4, intelligence: 180 } },
     '分局局长':   { salary: 22000, next: null,       prev: '刑侦队长', requiredIntelligence: 180 },
 
     // 金融分析师（3 级）
-    '金融分析师': { salary: 18000, next: '高级分析师', prev: null, requiredIntelligence: 220, req: { workYears: 2, intelligence: 280 } },
-    '高级分析师': { salary: 26000, next: '基金经理', prev: '金融分析师', requiredIntelligence: 280, req: { workYears: 3, intelligence: 340 } },
+    '金融分析师': { salary: 16000, next: '高级分析师', prev: null, requiredIntelligence: 220, req: { workYears: 2, intelligence: 280 } },
+    '高级分析师': { salary: 26000, next: '基金经理', prev: '金融分析师', requiredIntelligence: 280, req: { workYears: 4, intelligence: 340 } },
     '基金经理':   { salary: 40000, next: null,       prev: '高级分析师', requiredIntelligence: 340 },
 
     // 设计师（3 级）
     '设计师':     { salary: 12000, next: '高级设计师', prev: null, requiredIntelligence: 140, req: { workYears: 2, intelligence: 200 } },
-    '高级设计师': { salary: 18000, next: '设计总监', prev: '设计师', requiredIntelligence: 200, req: { workYears: 3, intelligence: 260 } },
+    '高级设计师': { salary: 18000, next: '设计总监', prev: '设计师', requiredIntelligence: 200, req: { workYears: 4, intelligence: 260 } },
     '设计总监':   { salary: 25000, next: null,       prev: '高级设计师', requiredIntelligence: 260 },
 
     // 厨师（3 级）
     '厨师':       { salary: 7000,  next: '主厨',     prev: null, requiredIntelligence: 40,  req: { workYears: 2, intelligence: 100 } },
-    '主厨':       { salary: 12000, next: '行政总厨', prev: '厨师', requiredIntelligence: 100, req: { workYears: 3, intelligence: 160 } },
+    '主厨':       { salary: 12000, next: '行政总厨', prev: '厨师', requiredIntelligence: 100, req: { workYears: 4, intelligence: 160 } },
     '行政总厨':   { salary: 18000, next: null,       prev: '主厨', requiredIntelligence: 160 },
 
     // 律师（3 级）
     '律师':       { salary: 14000, next: '执业律师', prev: null, requiredIntelligence: 200, req: { workYears: 2, intelligence: 260 } },
-    '执业律师':   { salary: 24000, next: '合伙人', prev: '律师', requiredIntelligence: 260, req: { workYears: 3, intelligence: 320 } },
+    '执业律师':   { salary: 24000, next: '合伙人', prev: '律师', requiredIntelligence: 260, req: { workYears: 4, intelligence: 320 } },
     '合伙人':     { salary: 38000, next: null,       prev: '执业律师', requiredIntelligence: 320 },
 
     // 销售（3 级）
     '销售':       { salary: 10000, next: '销售经理', prev: null, requiredIntelligence: 60,  req: { workYears: 2, intelligence: 120 } },
-    '销售经理':   { salary: 16000, next: '销售总监', prev: '销售', requiredIntelligence: 120, req: { workYears: 3, intelligence: 180 } },
+    '销售经理':   { salary: 16000, next: '销售总监', prev: '销售', requiredIntelligence: 120, req: { workYears: 4, intelligence: 180 } },
     '销售总监':   { salary: 24000, next: null,       prev: '销售经理', requiredIntelligence: 180 },
 
     // 公务员（3 级）
-    '公务员':     { salary: 8000,  next: '副科',     prev: null, requiredIntelligence: 100, req: { workYears: 3, intelligence: 160 } },
+    '公务员':     { salary: 8000,  next: '副科',     prev: null, requiredIntelligence: 100, req: { workYears: 2, intelligence: 160 } },
     '副科':       { salary: 12000, next: '正科',     prev: '公务员', requiredIntelligence: 160, req: { workYears: 4, intelligence: 220 } },
     '正科':       { salary: 16000, next: null,       prev: '副科', requiredIntelligence: 220 },
 
     /* v3.40：终极扩充，16 个新职业（最低级 = 职业名，供专属事件 job 判定；体质门槛已换算到 0-100） */
     // 消防员（3 级）
     '消防员': { salary: 8000,  next: '班长',   prev: null, requiredIntelligence: 60,  req: { workYears: 2, intelligence: 90 } },
-    '班长':   { salary: 11000, next: '中队长', prev: '消防员', requiredIntelligence: 90,  req: { workYears: 3, intelligence: 120 } },
+    '班长':   { salary: 11000, next: '中队长', prev: '消防员', requiredIntelligence: 90,  req: { workYears: 4, intelligence: 120 } },
     '中队长': { salary: 15000, next: null,     prev: '班长', requiredIntelligence: 120 },
 
     // 军人（3 级）
     '军人': { salary: 7000,  next: '士官', prev: null, requiredIntelligence: 60, req: { workYears: 2, intelligence: 90 } },
-    '士官': { salary: 10000, next: '军官', prev: '军人', requiredIntelligence: 90, req: { workYears: 3, intelligence: 120 } },
+    '士官': { salary: 10000, next: '军官', prev: '军人', requiredIntelligence: 90, req: { workYears: 4, intelligence: 120 } },
     '军官': { salary: 15000, next: null,   prev: '士官', requiredIntelligence: 120 },
 
     // 司机（2 级）
@@ -845,57 +845,57 @@
 
     // 电商运营（3 级）
     '电商运营': { salary: 8000,  next: '运营主管', prev: null, requiredIntelligence: 150, req: { workYears: 2, intelligence: 200 } },
-    '运营主管': { salary: 12000, next: '运营总监', prev: '电商运营', requiredIntelligence: 200, req: { workYears: 3, intelligence: 250 } },
+    '运营主管': { salary: 12000, next: '运营总监', prev: '电商运营', requiredIntelligence: 200, req: { workYears: 4, intelligence: 250 } },
     '运营总监': { salary: 18000, next: null,     prev: '运营主管', requiredIntelligence: 250 },
 
     // 作家（3 级）
     '作家':   { salary: 5000,  next: '签约作家', prev: null, requiredIntelligence: 180, req: { workYears: 2, intelligence: 230 } },
-    '签约作家': { salary: 8000,  next: '白金大神', prev: '作家', requiredIntelligence: 230, req: { workYears: 3, intelligence: 280 } },
+    '签约作家': { salary: 8000,  next: '白金大神', prev: '作家', requiredIntelligence: 230, req: { workYears: 4, intelligence: 280 } },
     '白金大神': { salary: 15000, next: null,     prev: '签约作家', requiredIntelligence: 280 },
 
     // 画家（3 级）
     '画家':   { salary: 4000, next: '艺术家', prev: null, requiredIntelligence: 150, req: { workYears: 2, intelligence: 200 } },
-    '艺术家': { salary: 7000, next: '名家',   prev: '画家', requiredIntelligence: 200, req: { workYears: 3, intelligence: 250 } },
+    '艺术家': { salary: 7000, next: '名家',   prev: '画家', requiredIntelligence: 200, req: { workYears: 4, intelligence: 250 } },
     '名家':   { salary: 12000, next: null,   prev: '艺术家', requiredIntelligence: 250 },
 
     // 音乐人（3 级）
     '音乐人':     { salary: 5000,  next: '独立音乐人', prev: null, requiredIntelligence: 180, req: { workYears: 2, intelligence: 230 } },
-    '独立音乐人': { salary: 9000,  next: '明星',       prev: '音乐人', requiredIntelligence: 230, req: { workYears: 3, intelligence: 280 } },
+    '独立音乐人': { salary: 9000,  next: '明星',       prev: '音乐人', requiredIntelligence: 230, req: { workYears: 4, intelligence: 280 } },
     '明星':       { salary: 20000, next: null,         prev: '独立音乐人', requiredIntelligence: 280 },
 
     // 演员（3 级）
     '演员': { salary: 4000,  next: '配角',     prev: null, requiredIntelligence: 250, req: { workYears: 2, intelligence: 300 } },
-    '配角': { salary: 8000,  next: '影帝影后', prev: '演员', requiredIntelligence: 300, req: { workYears: 3, intelligence: 350 } },
+    '配角': { salary: 8000,  next: '影帝影后', prev: '演员', requiredIntelligence: 300, req: { workYears: 4, intelligence: 350 } },
     '影帝影后': { salary: 25000, next: null,   prev: '配角', requiredIntelligence: 350 },
 
     // 运动员（3 级）
     '运动员': { salary: 8000,  next: '省队',   prev: null, requiredIntelligence: 70, req: { workYears: 2, intelligence: 100 } },
-    '省队':   { salary: 12000, next: '国家队', prev: '运动员', requiredIntelligence: 100, req: { workYears: 3, intelligence: 130 } },
+    '省队':   { salary: 12000, next: '国家队', prev: '运动员', requiredIntelligence: 100, req: { workYears: 4, intelligence: 130 } },
     '国家队': { salary: 20000, next: null,     prev: '省队', requiredIntelligence: 130 },
 
     // 健身教练（3 级）
     '健身教练': { salary: 7000,  next: '私人教练', prev: null, requiredIntelligence: 200, req: { workYears: 2, intelligence: 230 } },
-    '私人教练': { salary: 11000, next: '店长',     prev: '健身教练', requiredIntelligence: 230, req: { workYears: 3, intelligence: 260 } },
+    '私人教练': { salary: 11000, next: '店长',     prev: '健身教练', requiredIntelligence: 230, req: { workYears: 4, intelligence: 260 } },
     '店长':     { salary: 16000, next: null,       prev: '私人教练', requiredIntelligence: 260 },
 
     // 护士（3 级）
     '护士':   { salary: 7000,  next: '护师',   prev: null, requiredIntelligence: 150, req: { workYears: 2, intelligence: 200 } },
-    '护师':   { salary: 10000, next: '护士长', prev: '护士', requiredIntelligence: 200, req: { workYears: 3, intelligence: 240 } },
+    '护师':   { salary: 10000, next: '护士长', prev: '护士', requiredIntelligence: 200, req: { workYears: 4, intelligence: 240 } },
     '护士长': { salary: 14000, next: null,     prev: '护师', requiredIntelligence: 240 },
 
     // 药剂师（3 级）
     '药剂师':   { salary: 8000,  next: '药师',     prev: null, requiredIntelligence: 200, req: { workYears: 2, intelligence: 240 } },
-    '药师':     { salary: 12000, next: '主管药师', prev: '药剂师', requiredIntelligence: 240, req: { workYears: 3, intelligence: 280 } },
+    '药师':     { salary: 12000, next: '主管药师', prev: '药剂师', requiredIntelligence: 240, req: { workYears: 4, intelligence: 280 } },
     '主管药师': { salary: 16000, next: null,       prev: '药师', requiredIntelligence: 280 },
 
     // 建筑师（3 级）
     '建筑师':   { salary: 12000, next: '高级建筑师', prev: null, requiredIntelligence: 250, req: { workYears: 2, intelligence: 300 } },
-    '高级建筑师': { salary: 18000, next: '总建筑师', prev: '建筑师', requiredIntelligence: 300, req: { workYears: 3, intelligence: 350 } },
+    '高级建筑师': { salary: 18000, next: '总建筑师', prev: '建筑师', requiredIntelligence: 300, req: { workYears: 4, intelligence: 350 } },
     '总建筑师':   { salary: 26000, next: null,     prev: '高级建筑师', requiredIntelligence: 350 },
 
     // 科研人员（3 级）
     '科研人员':   { salary: 10000, next: '副研究员', prev: null, requiredIntelligence: 300, req: { workYears: 2, intelligence: 350 } },
-    '副研究员':   { salary: 15000, next: '首席科学家', prev: '科研人员', requiredIntelligence: 350, req: { workYears: 3, intelligence: 400 } },
+    '副研究员':   { salary: 15000, next: '首席科学家', prev: '科研人员', requiredIntelligence: 350, req: { workYears: 4, intelligence: 400 } },
     '首席科学家': { salary: 22000, next: null,       prev: '副研究员', requiredIntelligence: 400 },
 
     // 自由职业者（无晋升链）
@@ -906,13 +906,13 @@
   var JOB_OPENINGS = window.JOB_OPENINGS = [
     { job: '普通文员',   salary: 5000,  minAge: 22, minEdu: '专科', req: { intelligence: 100 }, desc: '坐办公室，先有份工作。' },
     { job: '普通程序员', salary: 15000, minAge: 22, minEdu: '本科', req: { intelligence: 130 }, desc: '小公司外包，先上车再说。' },
-    { job: '大厂程序员', salary: 24000, minAge: 22, minEdu: '本科', schoolTier: '重点', major: '计算机', req: { intelligence: 180 }, cert: 'cet6', desc: '投了三百份简历。' },
+    { job: '大厂程序员', salary: 18000, minAge: 22, minEdu: '本科', schoolTier: '重点', major: '计算机', req: { intelligence: 180 }, cert: 'cet6', desc: '投了三百份简历。' },
     { job: '人民教师',   salary: 7000,  minAge: 22, minEdu: '本科', major: '师范', req: { eq: 40 }, cert: 'teacher', desc: '考编，然后是几十年的黑板。' },
     { job: '外卖骑手',   salary: 8000,  minAge: 20, req: { stamina: 50 }, desc: '今天就能上线，靠腿吃饭。' },
     { job: '网红主播',   salary: 9000,  minAge: 18, req: { cha: 55, luck: 45, money: 1500 }, desc: '补光灯、声卡、一张能说会道的嘴。' },
     { job: '医生',       salary: 15000, minAge: 26, minEdu: '本科', major: '临床医学', req: { intelligence: 200 }, desc: '规培三年，才配拿起第一把手术刀。' },
     { job: '警察',       salary: 9000,  minAge: 22, minEdu: '专科', req: { stamina: 60, will: 50 }, desc: '穿上这身警服，就没有节假日。' },
-    { job: '金融分析师', salary: 18000, minAge: 24, minEdu: '本科', major: '金融学', req: { intelligence: 220 }, cert: 'cpa', desc: '高薪，但你的每个判断都值几千万。' },
+    { job: '金融分析师', salary: 16000, minAge: 24, minEdu: '本科', major: '金融学', req: { intelligence: 220 }, cert: 'cpa', desc: '高薪，但你的每个判断都值几千万。' },
     { job: '设计师',     salary: 12000, minAge: 22, minEdu: '专科', major: '艺术', req: { intelligence: 140, cha: 60 }, desc: '五彩斑斓的黑，是入门第一课。' },
     { job: '厨师',       salary: 7000,  minAge: 20, req: { stamina: 50 }, desc: '热油和菜刀，比想象中更近。' },
     { job: '律师',       salary: 14000, minAge: 25, minEdu: '本科', major: '法学', req: { intelligence: 200, will: 60 }, cert: 'lawyer', desc: '法考通过只是开始。' },

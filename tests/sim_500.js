@@ -279,27 +279,100 @@
   if (!CITY_IDS.length) CITY_IDS = ['normal'];
   function pickCity() { return CITY_IDS[Math.floor(Math.random() * CITY_IDS.length)]; }
 
+  // T-05：收入来源记账（22–30 岁窗口）。只记录，不改任何游戏逻辑。
+  //   口径：salary 复用引擎自带发薪计量 window.__salaryGained（逐局清零，精确）；
+  //   bonus 在跨年瞬间按「工资 × 工龄月数(1~3) × 城市工资系数」复算（与 yearlySettle 同式）；
+  //   其余按行动/事件 ID 归类，core = 本步金钱变化 − 发薪 − 年终奖，保证各桶之和 = 窗口金钱净变化。
+  var LEDGER = null;
+  function ledgerReset() {
+    LEDGER = {
+      salary: 0, bonus: 0, overtime: 0, side: 0, stock: 0,
+      eventIncome: 0, eventExpense: 0, other: 0,
+      promoCount: 0, raiseSum: 0, entrySalary: 0
+    };
+    window.__salaryGained = 0;
+  }
+  function snapMoney() {
+    var s = S();
+    return {
+      money: s.money, salary: s.salary, stockValue: s.stockValue || 0,
+      y: s.y, m: s.m, age: s.age, totalWorkYears: s.totalWorkYears || 0,
+      city: s.city || 'normal', sal: window.__salaryGained || 0
+    };
+  }
+  function step(fn, id) {
+    var before = snapMoney();
+    fn();
+    var after = snapMoney();
+    var dmoney = after.money - before.money;
+    var dsal = after.sal - before.sal;
+    var win = before.age >= 22 && before.age < 31;   // 22–30 岁窗口（含 30，不含 31）
+
+    // 入职月薪：全龄段取第一份工作（不受窗口限制）
+    if (!LEDGER.entrySalary && after.salary > 0) LEDGER.entrySalary = after.salary;
+
+    if (!win) return;
+
+    // 晋升（窗口内，且月薪实际上升才算成功；promote 失败/跨月被裁不计数）
+    if (id === 'promote' && after.salary > before.salary) {
+      LEDGER.promoCount++;
+      LEDGER.raiseSum += (after.salary - before.salary);
+    }
+
+    var bonus = 0;
+    if (after.y !== before.y && before.salary > 0) {
+      var mons = Math.max(1, Math.min(3, 1 + (after.totalWorkYears || 0) * 0.2));
+      bonus = Math.round(after.salary * mons * cityMeta(after.city).salaryFactor);
+    }
+    var core = dmoney - dsal - bonus;
+    LEDGER.salary += dsal;
+    LEDGER.bonus += bonus;
+
+    var isEv = id.indexOf('ev:') === 0;
+    var p = isEv ? id.slice(3) : id;
+    var fixed = null;
+    if (p === 'buyStock') fixed = -10150;                                   // 本金 -10000 + 手续费 -150
+    else if (p === 'sellStock') { var v = before.stockValue; fixed = v - Math.max(1, Math.round(v * 0.015)); }
+    else if (p === 'freelanceCode') fixed = 500;
+    else if (p === 'oddjob') fixed = 100;
+
+    if (fixed !== null) {
+      if (p === 'buyStock' || p === 'sellStock') LEDGER.stock += fixed; else LEDGER.side += fixed;
+      LEDGER.other += (core - fixed);      // 残余 = 跨月生活费/房租等
+    } else if (p === 'work') {
+      LEDGER.overtime += core;             // 加班费随机（core 即行动自身收益，含偶发跨月污染）
+    } else if (p === 'writeNovel') {
+      LEDGER.side += core;                 // 稿费 200~1200
+    } else if (isEv) {
+      if (core >= 0) LEDGER.eventIncome += core; else LEDGER.eventExpense += core;
+    } else {
+      LEDGER.other += core;                // 生活费/房租/家庭/求职/考证等净变化（多为负）
+    }
+  }
+
   function life(opts) {
     opts = opts || {};
     REAL_RESET.click();
     var s = S();
+    ledgerReset();
     s.city = pickCity();                     // v3.24：本局出生城市（在结算前指定，系数随之生效）
     PERSONA = assignPersona();               // v3.27：本局社会阶层人设
     WANTS_MARRY = Math.random() < (PERSONA === 'striver' ? 0.58 : PERSONA === 'worker' ? 0.78 : 0.38);   // T-04：结婚意向（striver 50-60 / worker 70-80 / layabout 30-40）
     if (opts.setup) opts.setup(s);
-    var steps = 0, negMonths = 0, lastMonth = -1, marks = {};
+    var steps = 0, negMonths = 0, lastMonth = -1, marks = {}, salaryMarks = {};
     while (!s.ended && s.age < 85 && steps < 60000) {
-      if (RJS.simPendingEvent()) { chooseRandom(); steps++; continue; }
-      if (s.pendingExam) { RJS.simSettleExam(); steps++; continue; }
+      var ev = RJS.simPendingEvent();
+      if (ev) { step(function () { chooseRandom(); }, 'ev:' + (ev.id || '?')); steps++; continue; }
+      if (s.pendingExam) { step(function () { RJS.simSettleExam(); }, 'exam'); steps++; continue; }
       var id = smartAction();                 // v3.25：所有平衡模拟统一用理性 Agent
       if (!id) { steps++; continue; }
       s.logs.length = 0;
       if (id.indexOf('@cert:') === 0) {
-        RJS.applyCert(id.slice(6));           // v3.43：@cert:cet4 → 考四级
+        step(function () { RJS.applyCert(id.slice(6)); }, 'cert');            // v3.43：@cert:cet4 → 考四级
       } else if (id.charAt(0) === '@') {
-        RJS.applyJobByName(id.slice(1));      // v3.39：@职位名 → 直接入职
+        step(function () { RJS.applyJobByName(id.slice(1)); }, 'job');        // v3.39：@职位名 → 直接入职
       } else {
-        RJS.doAction(id);
+        step(function () { RJS.doAction(id); }, id);
       }
       steps++;
       var mk = s.y * 12 + s.m;
@@ -307,7 +380,10 @@
         lastMonth = mk;
         if (s.money < 0) negMonths++;
         for (var i = 0; i < MARK_AGES.length; i++) {
-          if (s.age === MARK_AGES[i] && marks[MARK_AGES[i]] === undefined) marks[MARK_AGES[i]] = Math.round(s.money);
+          if (s.age === MARK_AGES[i] && marks[MARK_AGES[i]] === undefined) {
+            marks[MARK_AGES[i]] = Math.round(s.money);
+            salaryMarks[MARK_AGES[i]] = s.salary || 0;
+          }
         }
       }
     }
@@ -320,7 +396,7 @@
       negMonths: negMonths, married: s.married, kids: s.kids, divorceCount: (s.divorceCount || 0), edu: s.edu, tier: s.schoolTier, school: s.school,
       city: s.city || 'normal',          // v3.24：记录本局城市，供按城市分组
       persona: PERSONA,                   // v3.27：记录本局阶层，供按阶层分组
-      marks: marks, steps: steps
+      marks: marks, salaryMarks: salaryMarks, ledger: LEDGER, steps: steps
     };
   }
 
